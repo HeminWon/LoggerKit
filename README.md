@@ -18,10 +18,21 @@
 
 ### Swift Package Manager
 
+在 `Package.swift` 中添加依赖：
+
 ```swift
 dependencies: [
-    .package(path: "../Packages/LoggerKit")
+    .package(url: "https://github.com/HeminWon/LoggerKit.git", from: "0.1.0")
 ]
+```
+
+然后在 target 中添加：
+
+```swift
+.target(
+    name: "YourTarget",
+    dependencies: ["LoggerKit"]
+)
 ```
 
 ## 快速开始

@@ -8,7 +8,7 @@
 import Foundation
 
 /// 线程安全的缓存容器（多读单写）
-final class ConcurrentCache<Key: Hashable, Value>: @unchecked Sendable {
+final class ConcurrentCache<Key: Hashable & Sendable, Value: Sendable>: @unchecked Sendable {
     private var storage = [Key: Value]()
     private let queue = DispatchQueue(label: "concurrent.cache.queue", attributes: .concurrent)
 
