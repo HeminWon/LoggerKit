@@ -1,0 +1,48 @@
+/*
+  Localizable.strings (Simplified Chinese)
+  LoggerKit
+*/
+
+// MARK: - Search Field Names
+"search_field_message" = "消息";
+"search_field_file" = "文件";
+"search_field_function" = "函数";
+"search_field_context" = "模块";
+"search_field_thread" = "线程";
+
+// MARK: - Log Detail Scene
+"loading_logs" = "加载日志中...";
+"error_prefix" = "错误: %@";
+"total_count" = "共 %d 条";
+"filter_count" = "(%d个筛选)";
+"filter_button" = "筛选";
+"share_log" = "分享日志";
+"copy_log" = "复制日志";
+
+// MARK: - Log Filter Sheet
+"filter_title" = "筛选";
+"reset_button" = "重置";
+"done_button" = "完成";
+"message_keywords" = "消息关键词";
+"clear_button" = "清空";
+"select_all_button" = "全选";
+"log_level" = "日志等级";
+
+// MARK: - Search Preview Section
+"keyword_search" = "关键词搜索";
+"match_count" = "匹配 %d 条";
+"search_placeholder" = "搜索消息、函数、文件...";
+"search_scope" = "搜索范围";
+"match_preview" = "匹配结果预览";
+"items_count" = "%d 项";
+"no_match" = "无匹配结果";
+"more_items" = "还有 %d 项...";
+"remove_keyword" = "移除关键词";
+"add_keyword" = "添加关键词";
+"no_match_items" = "无匹配项";
+
+// MARK: - Collapsible Filter Section
+"search_prompt" = "搜索%@...";
+
+// MARK: - Log List Scene
+"clear_all" = "清除全部";

@@ -1,0 +1,48 @@
+/*
+  Localizable.strings (English)
+  LoggerKit
+*/
+
+// MARK: - Search Field Names
+"search_field_message" = "Message";
+"search_field_file" = "File";
+"search_field_function" = "Function";
+"search_field_context" = "Module";
+"search_field_thread" = "Thread";
+
+// MARK: - Log Detail Scene
+"loading_logs" = "Loading logs...";
+"error_prefix" = "Error: %@";
+"total_count" = "%d items";
+"filter_count" = "(%d filters)";
+"filter_button" = "Filter";
+"share_log" = "Share Log";
+"copy_log" = "Copy Log";
+
+// MARK: - Log Filter Sheet
+"filter_title" = "Filter";
+"reset_button" = "Reset";
+"done_button" = "Done";
+"message_keywords" = "Message Keywords";
+"clear_button" = "Clear";
+"select_all_button" = "Select All";
+"log_level" = "Log Level";
+
+// MARK: - Search Preview Section
+"keyword_search" = "Keyword Search";
+"match_count" = "Matched %d";
+"search_placeholder" = "Search messages, functions, files...";
+"search_scope" = "Search Scope";
+"match_preview" = "Match Preview";
+"items_count" = "%d items";
+"no_match" = "No matches";
+"more_items" = "%d more...";
+"remove_keyword" = "Remove Keyword";
+"add_keyword" = "Add Keyword";
+"no_match_items" = "No matches";
+
+// MARK: - Collapsible Filter Section
+"search_prompt" = "Search %@...";
+
+// MARK: - Log List Scene
+"clear_all" = "Clear All";
