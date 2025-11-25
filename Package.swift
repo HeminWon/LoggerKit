@@ -29,6 +29,7 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftyBeaver", package: "SwiftyBeaver")
             ],
+            path: "Sources/LoggerKit",
             resources: [
                 .process("Resources")
             ]

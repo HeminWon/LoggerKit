@@ -75,3 +75,19 @@ public struct LogListScene: View {
 #Preview {
     LogListScene(sceneState: LogListSceneState())
 }
+
+#if canImport(UIKit)
+import UIKit
+
+extension LogListScene {
+    /// 创建一个包含 LogListScene 的 UIViewController,方便在 UIKit 项目中使用
+    /// - Parameter sceneState: 可选的场景状态,不传则使用默认状态
+    /// - Returns: 包含 LogListScene 的 UIViewController,外部可以自行决定如何展示 (present/push)
+    public static func makeViewController(sceneState: LogListSceneState? = nil) -> UIViewController {
+        let scene = LogListScene(sceneState: sceneState)
+        let hostingController = UIHostingController(rootView: scene)
+        hostingController.title = "Log Files"
+        return hostingController
+    }
+}
+#endif

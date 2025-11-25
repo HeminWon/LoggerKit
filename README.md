@@ -35,6 +35,31 @@ dependencies: [
 )
 ```
 
+## 示例应用
+
+想要快速体验 LoggerKit 的所有功能?我们提供了完整的 iOS 示例应用!
+
+### 运行示例
+
+```bash
+# 克隆仓库
+git clone https://github.com/HeminWon/LoggerKit.git
+cd LoggerKit
+
+# 打开示例项目
+open Examples/iOS/LoggerKitExample/LoggerKitExample.xcodeproj
+```
+
+示例应用包含:
+- ✅ 基础使用 - 6 种日志级别演示
+- ✅ 高级配置 - 自定义配置和文件轮转
+- ✅ 日志查看器 - UI 组件集成演示
+- ✅ 依赖注入 - 多种注入模式示例
+- ✅ 性能测试 - 批量日志性能评估
+- ✅ 多线程场景 - 并发安全性测试
+
+📖 [查看示例应用完整文档](Examples/iOS/README.md)
+
 ## 快速开始
 
 ### 基础使用

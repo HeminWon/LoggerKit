@@ -43,23 +43,23 @@ public struct Logger: LoggerProtocol, Sendable {
 
     // MARK: - LoggerProtocol
 
-    public func verbose(_ message: String, file: String, function: String, line: Int) {
+    public func verbose(_ message: String,  file: String = #file, function: String = #function, line: Int = #line) {
         LoggerEngine.shared.verbose(message, file: file, function: function, line: line, context: context)
     }
 
-    public func debug(_ message: String, file: String, function: String, line: Int) {
+    public func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         LoggerEngine.shared.debug(message, file: file, function: function, line: line, context: context)
     }
 
-    public func info(_ message: String, file: String, function: String, line: Int) {
+    public func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         LoggerEngine.shared.info(message, file: file, function: function, line: line, context: context)
     }
 
-    public func warning(_ message: String, file: String, function: String, line: Int) {
+    public func warning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         LoggerEngine.shared.warning(message, file: file, function: function, line: line, context: context)
     }
 
-    public func error(_ message: String, file: String, function: String, line: Int) {
+    public func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
         LoggerEngine.shared.error(message, file: file, function: function, line: line, context: context)
     }
 }
