@@ -82,8 +82,10 @@ public class LogDetailSceneState: ObservableObject {
             invalidateCache()
         }
     }
+    @Published var displayEvents: [LogEvent] = []
     @Published var isLoading: Bool = false
     @Published var error: Error?
+    @Published var loadingProgress: String = ""
 
     // MARK: - 多条件筛选状态
     @Published var searchText: String = ""
@@ -95,6 +97,16 @@ public class LogDetailSceneState: ObservableObject {
 
     // MARK: - 搜索配置
     @Published var searchFields: Set<SearchField> = [.message, .fileName, .function]
+
+    // MARK: - 分页
+    private var currentPage = 0
+    private let pageSize = 500
+
+    // MARK: - 数据库管理器 (nonisolated 以便在后台线程访问)
+    private nonisolated(unsafe) var databaseManager: LogDatabaseManager?
+
+    // MARK: - 统计信息
+    @Published var statistics: LogStatistics?
 
     // MARK: - 缓存属性
     private var _cachedFunctions: [String]?
@@ -431,6 +443,9 @@ public class LogDetailSceneState: ObservableObject {
         self.logFileURL = logFileURL
         self.prefix = prefix
         self.identifier = identifier
+
+        // 获取数据库管理器
+        self.databaseManager = LoggerEngine.shared.getDatabaseManager()
     }
 
     /// 异步加载日志文件
@@ -455,6 +470,119 @@ public class LogDetailSceneState: ObservableObject {
         } catch {
             self.error = error
             print("❌ Failed to load log file: \(error)")
+        }
+    }
+
+    // MARK: - 数据库查询方法
+
+    /// 从数据库加载日志数据
+    func loadLogsFromDatabase(resetPagination: Bool = true) async {
+        if resetPagination {
+            currentPage = 0
+        }
+
+        isLoading = true
+        loadingProgress = "正在查询..."
+        defer {
+            isLoading = false
+            loadingProgress = ""
+        }
+
+        do {
+            // 捕获需要的值,避免在后台线程访问 @MainActor 属性
+            guard let dbManager = databaseManager else {
+                print("⚠️ Database manager not available")
+                return
+            }
+
+            let levels = selectedLevels
+            let functions = selectedFunctions
+            let fileNames = selectedFileNames
+            let contexts = selectedContexts
+            let threads = selectedThreads
+            let search = searchText
+            let limit = pageSize
+            let offset = currentPage * pageSize
+
+            let events: [LogEvent] = try await Task.detached { () -> [LogEvent] in
+                return try dbManager.fetchEvents(
+                    levels: levels,
+                    functions: functions,
+                    fileNames: fileNames,
+                    contexts: contexts,
+                    threads: threads,
+                    searchText: search,
+                    limit: limit,
+                    offset: offset
+                )
+            }.value
+
+            if resetPagination {
+                self.displayEvents = events
+            } else {
+                self.displayEvents.append(contentsOf: events)
+            }
+
+            currentPage += 1
+        } catch {
+            self.error = error
+            print("❌ Failed to load logs from database: \(error)")
+        }
+    }
+
+    /// 加载更多日志
+    func loadMore() async {
+        await loadLogsFromDatabase(resetPagination: false)
+    }
+
+    /// 加载统计信息
+    func loadStatistics() async {
+        do {
+            guard let dbManager = databaseManager else { return }
+
+            let stats = try await Task.detached {
+                try dbManager.fetchStatistics()
+            }.value
+
+            self.statistics = stats
+        } catch {
+            print("❌ Failed to load statistics: \(error)")
+        }
+    }
+
+    /// 重新查询
+    func refresh() {
+        Task {
+            await loadLogsFromDatabase(resetPagination: true)
+        }
+    }
+
+    /// 获取筛选选项
+    func loadFilterOptions() async {
+        do {
+            guard let dbManager = databaseManager else { return }
+
+            _ = try await Task.detached {
+                try dbManager.fetchUniqueValues(for: "function")
+            }.value
+
+            _ = try await Task.detached {
+                try dbManager.fetchUniqueValues(for: "fileName")
+            }.value
+
+            _ = try await Task.detached {
+                try dbManager.fetchUniqueValues(for: "context")
+            }.value
+
+            _ = try await Task.detached {
+                try dbManager.fetchUniqueValues(for: "thread")
+            }.value
+
+            // 更新可用选项
+            // (可以保存到 @Published 属性中供 UI 使用)
+
+        } catch {
+            print("❌ Failed to load filter options: \(error)")
         }
     }
 

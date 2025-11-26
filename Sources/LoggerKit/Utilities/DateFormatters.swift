@@ -26,4 +26,13 @@ public enum DateFormatters {
         df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         return df
     }()
+
+    /// 仅日期格式：yyyy-MM-dd (用于 CoreData 日期索引)
+    public static let dateOnlyFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = TimeZone.current
+        df.dateFormat = "yyyy-MM-dd"
+        return df
+    }()
 }

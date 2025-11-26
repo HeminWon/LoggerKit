@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22758" systemVersion="23G93" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="LogEventEntity" representedClassName="LogEventEntity" syncable="YES">
+        <attribute name="context" optional="NO" attributeType="String"/>
+        <attribute name="date" optional="NO" attributeType="String"/>
+        <attribute name="file" optional="NO" attributeType="String"/>
+        <attribute name="fileName" optional="NO" attributeType="String"/>
+        <attribute name="function" optional="NO" attributeType="String"/>
+        <attribute name="hour" optional="NO" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="level" optional="NO" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="line" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="message" optional="NO" attributeType="String"/>
+        <attribute name="thread" optional="NO" attributeType="String"/>
+        <attribute name="timestamp" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+
+        <!-- 索引配置 -->
+        <fetchIndex name="byTimestamp">
+            <fetchIndexElement property="timestamp" type="Binary" order="descending"/>
+        </fetchIndex>
+        <fetchIndex name="byLevel">
+            <fetchIndexElement property="level" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="byDateHour">
+            <fetchIndexElement property="date" type="Binary" order="ascending"/>
+            <fetchIndexElement property="hour" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="byFileName">
+            <fetchIndexElement property="fileName" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="byFunction">
+            <fetchIndexElement property="function" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="byContext">
+            <fetchIndexElement property="context" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="byThread">
+            <fetchIndexElement property="thread" type="Binary" order="ascending"/>
+        </fetchIndex>
+
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="id"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
+</model>

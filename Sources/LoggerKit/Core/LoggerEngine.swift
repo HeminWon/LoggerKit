@@ -12,29 +12,40 @@ import SwiftyBeaver
 public struct LoggerEngineConfiguration: Sendable {
     public let level: LogLevel
     public let enableConsole: Bool
-    public let enableFile: Bool
-    public let logDirectory: URL?
-    public let fileGenerationPolicy: FileGenerationPolicy
-    public let rotationPolicy: RotationPolicy
-    public let maxLogFiles: Int
+    public let enableDatabase: Bool
+    public let maxDatabaseSize: Int64
+    public let maxRetentionDays: Int
 
     public init(
         level: LogLevel = .debug,
         enableConsole: Bool = true,
-        enableFile: Bool = true,
-        logDirectory: URL? = nil,
-        fileGenerationPolicy: FileGenerationPolicy = .daily,
-        rotationPolicy: RotationPolicy = .size(10 * 1024 * 1024),
-        maxLogFiles: Int = 10
+        enableDatabase: Bool = true,
+        maxDatabaseSize: Int64 = 100 * 1024 * 1024, // 100MB
+        maxRetentionDays: Int = 30
     ) {
         self.level = level
         self.enableConsole = enableConsole
-        self.enableFile = enableFile
-        self.logDirectory = logDirectory
-        self.fileGenerationPolicy = fileGenerationPolicy
-        self.rotationPolicy = rotationPolicy
-        self.maxLogFiles = maxLogFiles
+        self.enableDatabase = enableDatabase
+        self.maxDatabaseSize = maxDatabaseSize
+        self.maxRetentionDays = maxRetentionDays
     }
+
+    // MARK: - 向后兼容 (已废弃)
+
+    @available(*, deprecated, renamed: "enableDatabase", message: "使用 enableDatabase 替代")
+    public var enableFile: Bool { enableDatabase }
+
+    @available(*, deprecated, message: "CoreData 不再使用此参数")
+    public var logDirectory: URL? { nil }
+
+    @available(*, deprecated, message: "CoreData 不再使用此参数")
+    public var fileGenerationPolicy: FileGenerationPolicy { .daily }
+
+    @available(*, deprecated, message: "CoreData 不再使用此参数")
+    public var rotationPolicy: RotationPolicy { .size(10 * 1024 * 1024) }
+
+    @available(*, deprecated, message: "CoreData 不再使用此参数")
+    public var maxLogFiles: Int { 10 }
 }
 
 /// 日志引擎单例，管理底层资源
@@ -44,7 +55,9 @@ public final class LoggerEngine: @unchecked Sendable {
     public static let shared = LoggerEngine()
 
     private let swiftyBeaver: SwiftyBeaver.Type
-    private var logFileManager: LogFileManager?
+    private var coreDataDestination: CoreDataDestination?
+    private var databaseManager: LogDatabaseManager?
+    private var rotationManager: LogDatabaseRotationManager?
     private let moduleCache: ConcurrentCache<String, String>
     private var isConfigured = false
     private let lock = NSLock()
@@ -97,38 +110,28 @@ public final class LoggerEngine: @unchecked Sendable {
             swiftyBeaver.addDestination(console)
         }
 
-        // 配置文件输出
-        guard configuration.enableFile else { return }
+        // 配置 CoreData 数据库输出
+        guard configuration.enableDatabase else { return }
 
-        // 确定日志目录
-        let loggerKitDirectory: URL
-        if let customDirectory = configuration.logDirectory {
-            loggerKitDirectory = customDirectory
-        } else {
-            guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-                return
-            }
-            loggerKitDirectory = documentsURL.appendingPathComponent(Constants.logDirectoryName, isDirectory: true)
-        }
+        let coreDataDest = CoreDataDestination()
+        coreDataDest.minLevel = configuration.level.swiftyBeaverLevel
+        swiftyBeaver.addDestination(coreDataDest)
 
-        // 使用 LogFileManager 管理日志文件
-        let fileManager = LogFileManager(
-            directory: loggerKitDirectory,
-            generationPolicy: configuration.fileGenerationPolicy,
-            rotationPolicy: configuration.rotationPolicy,
-            maxFiles: configuration.maxLogFiles
+        self.coreDataDestination = coreDataDest
+
+        // 创建数据库管理器
+        let dbManager = LogDatabaseManager()
+        self.databaseManager = dbManager
+
+        // 创建轮转管理器
+        self.rotationManager = LogDatabaseRotationManager(
+            databaseManager: dbManager,
+            maxDatabaseSize: configuration.maxDatabaseSize,
+            maxRetentionDays: configuration.maxRetentionDays
         )
-        self.logFileManager = fileManager
 
-        // 获取当前应使用的日志文件
-        let jFileURL = fileManager.currentLogFileURL()
-
-        let jFile = FileDestination()
-        jFile.format = "$J"
-        jFile.minLevel = configuration.level.swiftyBeaverLevel
-        jFile.logFileURL = jFileURL
-
-        swiftyBeaver.addDestination(jFile)
+        // 启动时执行一次清理
+        rotationManager?.performRotationIfNeeded()
     }
 
     // MARK: - 日志方法
@@ -176,19 +179,23 @@ public final class LoggerEngine: @unchecked Sendable {
 
     // MARK: - 公共方法
 
-    /// 手动触发日志轮转检查
-    public func checkRotation() {
-        logFileManager?.performRotationIfNeeded()
-    }
-
-    /// 清理旧日志文件
-    public func cleanupOldLogs() {
-        logFileManager?.cleanupOldFiles()
-    }
-
     /// 刷新日志缓冲
     public func flush() {
-        // SwiftyBeaver 没有直接的 flush 方法
-        // 这里预留接口
+        coreDataDestination?.flush()
+    }
+
+    /// 获取数据库管理器
+    public func getDatabaseManager() -> LogDatabaseManager? {
+        return databaseManager
+    }
+
+    /// 执行数据库轮转
+    public func performDatabaseRotation() {
+        rotationManager?.performRotationIfNeeded()
+    }
+
+    /// 清理过期日志
+    public func cleanupExpiredLogs() {
+        rotationManager?.cleanupExpiredLogs()
     }
 }

@@ -67,18 +67,23 @@ public struct Logger: LoggerProtocol, Sendable {
 // MARK: - 便捷方法
 
 public extension Logger {
-    /// 手动触发日志轮转检查
-    static func checkRotation() {
-        LoggerEngine.shared.checkRotation()
+    /// 执行数据库轮转检查
+    static func performDatabaseRotation() {
+        LoggerEngine.shared.performDatabaseRotation()
     }
 
-    /// 清理旧日志文件
-    static func cleanupOldLogs() {
-        LoggerEngine.shared.cleanupOldLogs()
+    /// 清理过期日志
+    static func cleanupExpiredLogs() {
+        LoggerEngine.shared.cleanupExpiredLogs()
     }
 
     /// 刷新日志缓冲
     static func flush() {
         LoggerEngine.shared.flush()
+    }
+
+    /// 获取数据库管理器
+    static func getDatabaseManager() -> LogDatabaseManager? {
+        return LoggerEngine.shared.getDatabaseManager()
     }
 }
