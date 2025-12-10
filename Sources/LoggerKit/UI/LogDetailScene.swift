@@ -19,8 +19,8 @@ public struct LogDetailScene: View {
     @State var isSharePresented: Bool = false
     @State var isFilterPresented: Bool = false
 
-    public init(sceneState: LogDetailSceneState) {
-        self.sceneState = sceneState
+    public init(sceneState: LogDetailSceneState? = nil) {
+        self.sceneState = sceneState ?? LogDetailSceneState()
     }
 
     public var body: some View {
@@ -96,7 +96,7 @@ public struct LogDetailScene: View {
             }
         }
         #endif
-        .navigationTitle(sceneState.logFileURL.lastPathComponent)
+        .navigationTitle(sceneState.displayTitle)
         #if os(iOS) || os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -191,3 +191,17 @@ struct LogRowView: View {
 #Preview {
 }
 
+#if canImport(UIKit)
+extension LogDetailScene {
+    /// 创建一个包含 LogDetailScene 的 UIViewController,方便在 UIKit 项目中使用
+    /// - Parameter sceneState: 可选的场景状态,不传则使用默认状态（加载所有日志）
+    /// - Returns: 包含 LogDetailScene 的 UIViewController,外部可以自行决定如何展示 (present/push)
+    public static func makeViewController(sceneState: LogDetailSceneState? = nil) -> UIViewController {
+        let state = sceneState ?? LogDetailSceneState()
+        let scene = LogDetailScene(sceneState: state)
+        let hostingController = UIHostingController(rootView: scene)
+        hostingController.title = "Logs"
+        return hostingController
+    }
+}
+#endif

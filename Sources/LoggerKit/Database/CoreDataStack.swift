@@ -17,7 +17,40 @@ public final class CoreDataStack {
     // MARK: - Core Data Stack
 
     lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "LoggerKit")
+        // 从正确的 bundle 加载模型
+        let modelURL: URL
+
+        // 尝试查找编译后的 .momd 文件
+        if let momdURL = Bundle.module.url(forResource: "LoggerKit", withExtension: "momd") {
+            modelURL = momdURL
+        }
+        // 如果找不到 .momd，尝试查找 .mom 文件（单个模型版本）
+        else if let momURL = Bundle.module.url(forResource: "LoggerKit", withExtension: "mom") {
+            modelURL = momURL
+        }
+        // 如果还找不到，尝试在 xcdatamodeld 目录中查找
+        else if let xcdatamodeldURL = Bundle.module.url(forResource: "LoggerKit", withExtension: "xcdatamodeld"),
+                let momURL = Bundle(url: xcdatamodeldURL)?.url(forResource: "LoggerKit", withExtension: "mom") {
+            modelURL = momURL
+        } else {
+            // 打印调试信息
+            print("❌ Bundle.module resourcePath: \(Bundle.module.resourcePath ?? "nil")")
+            if let resourcePath = Bundle.module.resourcePath {
+                do {
+                    let contents = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
+                    print("❌ Bundle contents: \(contents)")
+                } catch {
+                    print("❌ Failed to list bundle contents: \(error)")
+                }
+            }
+            fatalError("Failed to find LoggerKit CoreData model in bundle")
+        }
+
+        guard let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL) else {
+            fatalError("Failed to load model from \(modelURL)")
+        }
+
+        let container = NSPersistentContainer(name: "LoggerKit", managedObjectModel: managedObjectModel)
 
         // 配置存储路径
         let storeURL = FileManager.default

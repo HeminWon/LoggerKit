@@ -25,6 +25,48 @@ public final class LogDatabaseManager {
 
     // MARK: - 查询方法
 
+    /// 按日期查询日志事件
+    public func fetchEvents(
+        forDate date: String,
+        levels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error, .critical, .fault],
+        sortDescriptors: [NSSortDescriptor] = [],
+        limit: Int = 10000,
+        offset: Int = 0
+    ) throws -> [LogEvent] {
+        let context = coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        // 构建谓词
+        var predicates: [NSPredicate] = []
+
+        // 日期筛选
+        predicates.append(NSPredicate(format: "date == %@", date))
+
+        // 日志等级筛选
+        if !levels.isEmpty {
+            let levelValues = levels.map { Int16($0.rawValue) }
+            predicates.append(NSPredicate(format: "level IN %@", levelValues))
+        }
+
+        // 组合谓词
+        fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+
+        // 排序
+        if sortDescriptors.isEmpty {
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+        } else {
+            fetchRequest.sortDescriptors = sortDescriptors
+        }
+
+        // 分页
+        fetchRequest.fetchLimit = limit
+        fetchRequest.fetchOffset = offset
+
+        // 执行查询
+        let entities = try context.fetch(fetchRequest)
+        return entities.map { $0.toLogEvent() }
+    }
+
     /// 查询日志事件
     public func fetchEvents(
         levels: Set<LogEvent.Level>,
@@ -163,6 +205,56 @@ public final class LogDatabaseManager {
         return results.compactMap { $0[keyPath] as? String }.filter { !$0.isEmpty }
     }
 
+    /// 获取所有唯一的日期列表（按日期倒序排列）
+    public func fetchUniqueDates() throws -> [String] {
+        let context = coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        fetchRequest.propertiesToFetch = ["date"]
+        fetchRequest.returnsDistinctResults = true
+        fetchRequest.resultType = .dictionaryResultType
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+
+        let results = try context.fetch(fetchRequest) as! [NSDictionary]
+        return results.compactMap { $0["date"] as? String }.filter { !$0.isEmpty }
+    }
+
+    /// 查询指定日期的日志数量
+    public func fetchEventCount(for date: String) throws -> Int {
+        let context = coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "date == %@", date)
+        return try context.count(for: fetchRequest)
+    }
+
+    /// 删除指定日期的日志
+    public func deleteLogs(forDate date: String) throws {
+        let context = coreDataStack.newBackgroundContext()
+
+        context.performAndWait {
+            let fetchRequest = LogEventEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "date == %@", date)
+
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
+            deleteRequest.resultType = .resultTypeObjectIDs
+
+            do {
+                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+                let objectIDs = result.result as! [NSManagedObjectID]
+
+                // 合并更改到主上下文
+                NSManagedObjectContext.mergeChanges(
+                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                    into: [coreDataStack.viewContext]
+                )
+
+                print("✅ Deleted \(objectIDs.count) logs for date \(date)")
+            } catch {
+                print("❌ Failed to delete logs: \(error)")
+            }
+        }
+    }
+
     /// 删除指定日期之前的日志
     public func deleteLogs(before date: Date) throws {
         let context = coreDataStack.newBackgroundContext()
@@ -190,6 +282,33 @@ public final class LogDatabaseManager {
                 print("✅ Deleted \(objectIDs.count) logs before \(date)")
             } catch {
                 print("❌ Failed to delete logs: \(error)")
+            }
+        }
+    }
+
+    /// 删除所有日志
+    public func deleteAllLogs() throws {
+        let context = coreDataStack.newBackgroundContext()
+
+        context.performAndWait {
+            let fetchRequest = LogEventEntity.fetchRequest()
+
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
+            deleteRequest.resultType = .resultTypeObjectIDs
+
+            do {
+                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+                let objectIDs = result.result as! [NSManagedObjectID]
+
+                // 合并更改到主上下文
+                NSManagedObjectContext.mergeChanges(
+                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                    into: [coreDataStack.viewContext]
+                )
+
+                print("✅ Deleted all \(objectIDs.count) logs")
+            } catch {
+                print("❌ Failed to delete all logs: \(error)")
             }
         }
     }

@@ -75,7 +75,6 @@ struct CategorizedSearchResults {
 @MainActor
 public class LogDetailSceneState: ObservableObject {
 
-    @Published var logContent: String?
     @Published var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error]
     @Published var events: [LogEvent] = [] {
         didSet {
@@ -432,15 +431,77 @@ public class LogDetailSceneState: ObservableObject {
     }
 
     var exportFileName: String {
-        return [prefix, identifier, logFileURL.lastPathComponent].joined(separator: "_")
+        if let logDate = logDate {
+            return [prefix, identifier, logDate].joined(separator: "_")
+        } else {
+            let fileName = logFileURL.lastPathComponent
+            if fileName.isEmpty || fileName == "/" {
+                return [prefix, identifier, "all_logs"].joined(separator: "_")
+            }
+            return [prefix, identifier, fileName].joined(separator: "_")
+        }
+    }
+
+    /// 显示标题
+    var displayTitle: String {
+        if let logDate = logDate {
+            return logDate
+        }
+
+        let path = logFileURL.path
+        if path.isEmpty || path == "/" {
+            return "Logs"
+        }
+
+        return logFileURL.lastPathComponent
     }
 
     let logFileURL: URL
+    let logDate: String?
     private(set) var prefix: String
     private(set) var identifier: String
 
+    /// 初始化（默认方式，从数据库加载所有日志）
+    public init(prefix: String? = nil, identifier: String? = nil) {
+        // 创建一个空的URL作为占位符
+        self.logFileURL = URL(fileURLWithPath: "")
+        self.logDate = nil
+
+        if let prefix = prefix {
+            self.prefix = prefix
+        } else {
+            let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
+            self.prefix = bundleId
+        }
+
+        if let identifier = identifier {
+            self.identifier = identifier
+        } else {
+            let logIdentifier: String = UserDefaults.standard.string(forKey: Constants.UserDefaultsKeys.logIdentifier) ?? String(UUID().uuidString.prefix(8))
+            self.identifier = logIdentifier
+            UserDefaults.standard.set(logIdentifier, forKey: Constants.UserDefaultsKeys.logIdentifier)
+        }
+
+        // 获取数据库管理器
+        self.databaseManager = LoggerEngine.shared.getDatabaseManager()
+    }
+
+    /// 初始化（使用文件URL，兼容旧方式）
     public init(logFileURL: URL, prefix: String, identifier: String) {
         self.logFileURL = logFileURL
+        self.logDate = nil
+        self.prefix = prefix
+        self.identifier = identifier
+
+        // 获取数据库管理器
+        self.databaseManager = LoggerEngine.shared.getDatabaseManager()
+    }
+
+    /// 初始化（使用日期，从数据库查询）
+    public init(logDate: String, prefix: String, identifier: String) {
+        // 创建一个空的URL作为占位符
+        self.logFileURL = URL(fileURLWithPath: "")
+        self.logDate = logDate
         self.prefix = prefix
         self.identifier = identifier
 
@@ -450,26 +511,69 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 异步加载日志文件
     func loadLogFile() async {
+        // 如果有日期，使用数据库查询方式
+        if let date = logDate {
+            await loadLogsForDate(date)
+            return
+        }
+
+        // 加载所有日志（现在统一使用数据库）
+        await loadAllLogsFromDatabase()
+    }
+
+    /// 从数据库加载所有日志
+    private func loadAllLogsFromDatabase() async {
         isLoading = true
-        defer { isLoading = false }
+        loadingProgress = "正在加载所有日志..."
+        defer {
+            isLoading = false
+            loadingProgress = ""
+        }
 
         do {
-            // 在后台线程读取文件
-            let content = try await Task.detached {
-                try String(contentsOf: self.logFileURL, encoding: .utf8)
+            guard let dbManager = databaseManager else {
+                print("⚠️ Database manager not available")
+                return
+            }
+
+            let events: [LogEvent] = try await Task.detached {
+                // 加载所有日志，限制数量以避免性能问题
+                try dbManager.fetchEvents(
+                    levels: [.verbose, .debug, .info, .warning, .error, .critical, .fault],
+                    limit: 10000
+                )
             }.value
 
-            self.logContent = content
-
-            // 在后台线程解析
-            let parsedEvents = await Task.detached {
-                LogParser.parseJsonLinesToEvents(content)
-            }.value
-
-            self.events = parsedEvents
+            self.events = events
         } catch {
             self.error = error
-            print("❌ Failed to load log file: \(error)")
+            print("❌ Failed to load all logs: \(error)")
+        }
+    }
+
+    /// 从数据库加载指定日期的日志
+    private func loadLogsForDate(_ date: String) async {
+        isLoading = true
+        loadingProgress = "正在加载日志..."
+        defer {
+            isLoading = false
+            loadingProgress = ""
+        }
+
+        do {
+            guard let dbManager = databaseManager else {
+                print("⚠️ Database manager not available")
+                return
+            }
+
+            let events: [LogEvent] = try await Task.detached {
+                try dbManager.fetchEvents(forDate: date)
+            }.value
+
+            self.events = events
+        } catch {
+            self.error = error
+            print("❌ Failed to load logs for date \(date): \(error)")
         }
     }
 

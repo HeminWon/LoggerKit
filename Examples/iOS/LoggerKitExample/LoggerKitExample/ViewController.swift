@@ -91,14 +91,13 @@ class ViewController: UIViewController {
     }
 
     private func setupLogger() {
-        // 配置 LoggerKit
+        // 配置 LoggerKit (使用 CoreData 存储)
         LoggerKit.configure(
             level: .verbose,
             enableConsole: true,
-            enableFile: true,
-            fileGenerationPolicy: .daily,
-            rotationPolicy: .size(10 * 1024 * 1024),
-            maxLogFiles: 7
+            enableDatabase: true,
+            maxDatabaseSize: 50 * 1024 * 1024,  // 50MB
+            maxRetentionDays: 7                  // 保留 7 天
         )
     }
 
@@ -165,7 +164,7 @@ class ViewController: UIViewController {
 
     @objc private func showLogList() {
         // 使用 UIKit 静态方法创建 ViewController
-        let logVC = LogListScene.makeViewController()
+        let logVC = LogDetailScene.makeViewController()
         navigationController?.pushViewController(logVC, animated: true)
     }
 

@@ -30,22 +30,6 @@ public struct LoggerEngineConfiguration: Sendable {
         self.maxRetentionDays = maxRetentionDays
     }
 
-    // MARK: - 向后兼容 (已废弃)
-
-    @available(*, deprecated, renamed: "enableDatabase", message: "使用 enableDatabase 替代")
-    public var enableFile: Bool { enableDatabase }
-
-    @available(*, deprecated, message: "CoreData 不再使用此参数")
-    public var logDirectory: URL? { nil }
-
-    @available(*, deprecated, message: "CoreData 不再使用此参数")
-    public var fileGenerationPolicy: FileGenerationPolicy { .daily }
-
-    @available(*, deprecated, message: "CoreData 不再使用此参数")
-    public var rotationPolicy: RotationPolicy { .size(10 * 1024 * 1024) }
-
-    @available(*, deprecated, message: "CoreData 不再使用此参数")
-    public var maxLogFiles: Int { 10 }
 }
 
 /// 日志引擎单例，管理底层资源
@@ -172,9 +156,36 @@ public final class LoggerEngine: @unchecked Sendable {
         if let cached = moduleCache.value(for: file) {
             return cached
         }
-        let module = LogConfiguration.defaultModuleExtractor(file)
+        let module = defaultModuleExtractor(file)
         moduleCache.setValue(module, for: file)
         return module
+    }
+
+    /// 默认模块名提取器
+    private func defaultModuleExtractor(_ file: String) -> String {
+        let components = file.split(separator: "/")
+
+        // CocoaPods
+        if let podsIndex = components.firstIndex(of: "Pods"), podsIndex + 1 < components.count {
+            return String(components[podsIndex + 1])
+        }
+
+        // SPM
+        if let checkoutIndex = components.firstIndex(of: "checkouts"), checkoutIndex + 1 < components.count {
+            return String(components[checkoutIndex + 1])
+        }
+
+        // Xcode project
+        if let appIndex = components.firstIndex(where: { $0.hasSuffix(".xcodeproj") }) {
+            return String(components[appIndex])
+        }
+
+        // 回退：使用父目录名
+        if components.count > 1 {
+            return String(components[components.count - 2])
+        }
+
+        return "Unknown"
     }
 
     // MARK: - 公共方法

@@ -90,33 +90,6 @@ public struct LogEvent: Codable, Identifiable, Sendable {
 
 public struct LogParser {
 
-    /// 逐行解析 JSON，跳过错误行（容错处理）
-    public static func parseJsonLinesToEvents(_ content: String) -> [LogEvent] {
-        let lines = content
-            .components(separatedBy: .newlines)
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-        var events: [LogEvent] = []
-        let decoder = JSONDecoder()
-
-        for (index, line) in lines.enumerated() {
-            guard let data = line.data(using: .utf8) else {
-                print("⚠️ Line \(index + 1): Cannot convert to data")
-                continue
-            }
-
-            do {
-                let event = try decoder.decode(LogEvent.self, from: data)
-                events.append(event)
-            } catch {
-                print("⚠️ Line \(index + 1): JSON decode failed - \(error)")
-                // 继续处理下一行，不中断
-            }
-        }
-
-        return events
-    }
-
     // LogEvent to temp file 格式化后的 log
     public static func logEventToTempFile(fileName: String, events: [LogEvent]) -> URL {
         let tempFile = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)

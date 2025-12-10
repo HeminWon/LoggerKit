@@ -41,23 +41,4 @@ public enum LoggerKit {
         LoggerEngine.configure(configuration)
     }
 
-    // MARK: - 向后兼容 (已废弃)
-
-    @available(*, deprecated, message: "使用新的 configure 方法, 参数已更改为 enableDatabase, maxDatabaseSize, maxRetentionDays")
-    public static func configure(
-        level: LogLevel = .debug,
-        enableConsole: Bool = true,
-        enableFile: Bool = true,
-        logDirectory: URL? = nil,
-        fileGenerationPolicy: FileGenerationPolicy = .daily,
-        rotationPolicy: RotationPolicy = .size(10 * 1024 * 1024),
-        maxLogFiles: Int = 10
-    ) {
-        let configuration = LoggerEngineConfiguration(
-            level: level,
-            enableConsole: enableConsole,
-            enableDatabase: enableFile
-        )
-        LoggerEngine.configure(configuration)
-    }
 }
