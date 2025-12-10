@@ -30,15 +30,9 @@ struct SearchPreviewSection: View {
     // MARK: - 搜索框
     private var searchBox: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(String(localized: "keyword_search", bundle: .module))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Spacer()
-                Text(String(format: String(localized: "match_count", bundle: .module), sceneState.filteredEvents.count))
-                    .font(.caption)
-                    .foregroundColor(.blue)
-            }
+            Text(String(localized: "keyword_search", bundle: .module))
+                .font(.subheadline)
+                .fontWeight(.medium)
 
             HStack {
                 Image(systemName: "magnifyingglass")

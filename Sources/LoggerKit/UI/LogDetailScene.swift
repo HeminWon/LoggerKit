@@ -23,11 +23,36 @@ public struct LogDetailScene: View {
         self.sceneState = sceneState ?? LogDetailSceneState()
     }
 
+    // MARK: - Localized Strings
+    private var loadingText: String {
+        String(localized: "loading_logs", bundle: .module)
+    }
+
+    private var errorPrefix: String {
+        String(localized: "error_prefix", bundle: .module)
+    }
+
+    private var totalCountFormat: String {
+        String(localized: "total_count", bundle: .module)
+    }
+
+    private var filterCountFormat: String {
+        String(localized: "filter_count", bundle: .module)
+    }
+
+    private var filterButtonText: String {
+        String(localized: "filter_button", bundle: .module)
+    }
+
+    private var shareLogText: String {
+        String(localized: "share_log", bundle: .module)
+    }
+
     public var body: some View {
         VStack {
             if sceneState.isLoading {
                 Spacer()
-                ProgressView(String(localized: "loading_logs", bundle: .module))
+                ProgressView(loadingText)
                 Spacer()
             } else if let error = sceneState.error {
                 Spacer()
@@ -35,7 +60,7 @@ public struct LogDetailScene: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
                         .foregroundColor(.red)
-                    Text(String(format: String(localized: "error_prefix", bundle: .module), error.localizedDescription))
+                    Text(String(format: errorPrefix, error.localizedDescription))
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                         .padding()
@@ -44,11 +69,11 @@ public struct LogDetailScene: View {
             } else {
                 // 1️⃣ 筛选结果统计
                 HStack {
-                    Text(String(format: String(localized: "total_count", bundle: .module), sceneState.filteredEvents.count))
+                    Text(String(format: totalCountFormat, sceneState.filteredEvents.count))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if sceneState.activeFilterCount > 0 {
-                        Text(String(format: String(localized: "filter_count", bundle: .module), sceneState.activeFilterCount))
+                        Text(String(format: filterCountFormat, sceneState.activeFilterCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
@@ -61,7 +86,7 @@ public struct LogDetailScene: View {
 
                 // 2️⃣ 日志列表
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
+                    LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(sceneState.filteredEvents, id: \.id) { logEvent in
                             LogRowView(event: logEvent)
                         }
@@ -106,33 +131,34 @@ public struct LogDetailScene: View {
                     isFilterPresented = true
                 } label: {
                     if sceneState.activeFilterCount > 0 {
-                        Label(String(localized: "filter_button", bundle: .module), systemImage: "line.3.horizontal.decrease.circle.fill")
+                        Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle.fill")
                     } else {
-                        Label(String(localized: "filter_button", bundle: .module), systemImage: "line.3.horizontal.decrease.circle")
+                        Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle")
                     }
                 }
 
                 // 分享按钮
-                Button {
-                    isSharePresented = true
-                } label: {
-                    Label(String(localized: "share_log", bundle: .module), systemImage: "square.and.arrow.up")
-                }
+                shareButton
             }
         }
         #else
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
-                Button {
-                    isSharePresented = true
-                } label: {
-                    Label(String(localized: "share_log", bundle: .module), systemImage: "square.and.arrow.up")
-                }
+                shareButton
             }
         }
         #endif
     }
     
+    // MARK: - Subviews
+    private var shareButton: some View {
+        Button {
+            isSharePresented = true
+        } label: {
+            Label(shareLogText, systemImage: "square.and.arrow.up")
+        }
+    }
+
     private var activityItem: URL {
         LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: sceneState.filteredEvents)
     }
@@ -151,14 +177,18 @@ public struct LogDetailScene: View {
 struct LogRowView: View {
     let event: LogEvent
 
+    // 缓存计算的颜色,避免每次重绘都计算
+    private let cachedSessionColor: Color
+
     public init(event: LogEvent) {
         self.event = event
+        self.cachedSessionColor = Self.sessionColor(for: event.sessionId)
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(event.sessionId)
-                .foregroundColor(sessionColor(for: event.sessionId))
+                .foregroundColor(cachedSessionColor)
                 .font(.system(size: 9))
             + Text(" ")
                 .font(.system(size: 9))
@@ -182,7 +212,7 @@ struct LogRowView: View {
     }
 
     // 根据 sessionId 生成一致的柔和随机颜色
-    private func sessionColor(for sessionId: String) -> Color {
+    private static func sessionColor(for sessionId: String) -> Color {
         // 使用稳定的 hash 算法,确保同一 sessionId 总是生成相同的颜色
         let hash = sessionId.utf8.reduce(0) {
             ($0 &* 31 &+ Int($1)) & 0xFFFFFFFF

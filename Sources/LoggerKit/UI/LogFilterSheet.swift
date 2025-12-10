@@ -93,6 +93,15 @@ struct LogFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(String(localized: "filter_title", bundle: .module))
+                            .font(.headline)
+                        Text(String(format: String(localized: "match_count", bundle: .module), sceneState.filteredEvents.count))
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "reset_button", bundle: .module)) {
                         sceneState.resetFilters()
