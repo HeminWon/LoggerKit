@@ -157,23 +157,49 @@ struct LogRowView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(event.prefix)
-                .foregroundColor(.gray)   // 前缀灰色
+            Text(event.sessionId)
+                .foregroundColor(sessionColor(for: event.sessionId))
                 .font(.system(size: 9))
-                .frame(maxWidth: .infinity, alignment: .leading)
- 
+            + Text(" ")
+                .font(.system(size: 9))
+            + Text(event.prefix)
+                .foregroundColor(.gray)
+                .font(.system(size: 9))
+
             Text(event.message)
                 .foregroundColor(event.level.color)
                 .font(.caption2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 1)
         // 长按弹出复制菜单
         .contextMenu {
             Button(action: { copyLog() }) {
                 Label(String(localized: "copy_log", bundle: .module), systemImage: "doc.on.doc")
             }
         }
+    }
+
+    // 根据 sessionId 生成一致的柔和随机颜色
+    private func sessionColor(for sessionId: String) -> Color {
+        // 使用稳定的 hash 算法,确保同一 sessionId 总是生成相同的颜色
+        let hash = sessionId.utf8.reduce(0) {
+            ($0 &* 31 &+ Int($1)) & 0xFFFFFFFF
+        }
+
+        // 从 hash 生成 HSB 颜色参数
+        // Hue(色相): 0-360度,使用 hash 确保每个会话有不同的颜色
+        let hue = Double(abs(hash) % 360) / 360.0
+
+        // Saturation(饱和度): 40%-60%,中等饱和度让前景色更鲜明
+        let saturation = 0.40 + Double((abs(hash) >> 8) % 21) / 100.0
+
+        // Brightness(亮度): 50%-70%,中等亮度确保与背景有足够对比度
+        let brightness = 0.50 + Double((abs(hash) >> 16) % 21) / 100.0
+
+        // 返回柔和的颜色,前景色使用完全不透明
+        return Color(hue: hue, saturation: saturation, brightness: brightness, opacity: 1.0)
     }
     
     private func copyLog() {

@@ -18,7 +18,13 @@ public final class CoreDataDestination: BaseDestination {
     private let queue = DispatchQueue(label: "com.loggerkit.coredata", qos: .utility)
     private var flushTimer: Timer?
 
-    public init(coreDataStack: CoreDataStack = .shared, batchSize: Int = 50) {
+    // 会话信息
+    private let sessionId: String
+    private let sessionStartTime: TimeInterval
+
+    public init(sessionId: String, sessionStartTime: TimeInterval, coreDataStack: CoreDataStack = .shared, batchSize: Int = 50) {
+        self.sessionId = sessionId
+        self.sessionStartTime = sessionStartTime
         self.coreDataStack = coreDataStack
         self.batchSize = batchSize
 
@@ -51,7 +57,7 @@ public final class CoreDataDestination: BaseDestination {
         line: Int,
         context: Any? = nil
     ) -> String? {
-        // 构造日志事件
+        // 构造日志事件,包含会话信息
         let logEvent = LogEvent(
             thread: thread,
             function: function,
@@ -60,7 +66,9 @@ public final class CoreDataDestination: BaseDestination {
             timestamp: Date().timeIntervalSince1970,
             level: mapLevel(level),
             message: msg,
-            context: (context as? String) ?? ""
+            context: (context as? String) ?? "",
+            sessionId: sessionId,
+            sessionStartTime: sessionStartTime
         )
 
         // 添加到待写入队列

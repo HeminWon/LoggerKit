@@ -7,3 +7,6 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 Package.resolved
+
+# OpenSpec archived changes
+Examples/iOS/LoggerKitExample/openspec/changes/archive/

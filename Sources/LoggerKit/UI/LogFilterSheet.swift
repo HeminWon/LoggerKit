@@ -72,6 +72,10 @@ struct LogFilterSheet: View {
                             Divider()
                         }
 
+                        // 会话筛选
+                        SessionFilterSection(sceneState: sceneState)
+                        Divider()
+
                         // 线程筛选（折叠式）
                         if !sceneState.availableThreads.isEmpty {
                             CollapsibleFilterSection(
@@ -184,6 +188,137 @@ struct LogFilterSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - 会话筛选 Section
+struct SessionFilterSection: View {
+    @ObservedObject var sceneState: LogDetailSceneState
+    @State private var sessions: [SessionInfo] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(String(localized: "session_filter_title", bundle: .module))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                if let _ = sceneState.selectedSessionId {
+                    Button(String(localized: "clear_button", bundle: .module)) {
+                        sceneState.selectedSessionId = nil
+                    }
+                    .font(.caption)
+                    .foregroundColor(.red)
+                }
+            }
+
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            } else if let error = errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            } else if sessions.isEmpty {
+                Text(String(localized: "session_empty_message", bundle: .module))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(sessions) { session in
+                            SessionChip(
+                                session: session,
+                                isSelected: sceneState.selectedSessionId == session.id
+                            ) {
+                                if sceneState.selectedSessionId == session.id {
+                                    sceneState.selectedSessionId = nil
+                                } else {
+                                    sceneState.selectedSessionId = session.id
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            await loadSessions()
+        }
+    }
+
+    private func loadSessions() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            guard let dbManager = LoggerEngine.shared.getDatabaseManager() else {
+                errorMessage = "Database manager not available"
+                isLoading = false
+                return
+            }
+
+            let loadedSessions = try await Task.detached {
+                try dbManager.fetchAllSessions()
+            }.value
+
+            sessions = loadedSessions
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+}
+
+// MARK: - 会话芯片
+struct SessionChip: View {
+    let session: SessionInfo
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text(session.id)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                    }
+                }
+
+                Text(formattedDate)
+                    .font(.caption2)
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+
+                Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                    .font(.caption2)
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(isSelected ? Color.accentColor : Color.gray.opacity(0.2))
+            .foregroundColor(isSelected ? .white : .primary)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var formattedDate: String {
+        let date = Date(timeIntervalSince1970: session.startTime)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm:ss"
+        return formatter.string(from: date)
     }
 }
 

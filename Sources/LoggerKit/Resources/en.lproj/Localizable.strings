@@ -44,5 +44,10 @@
 // MARK: - Collapsible Filter Section
 "search_prompt" = "Search %@...";
 
+// MARK: - Session Filter
+"session_filter_title" = "Session Filter";
+"session_empty_message" = "No sessions available";
+"session_log_count" = "%d logs";
+
 // MARK: - Log List Scene
 "clear_all" = "Clear All";

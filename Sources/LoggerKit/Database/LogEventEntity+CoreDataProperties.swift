@@ -26,6 +26,8 @@ extension LogEventEntity {
     @NSManaged public var context: String?
     @NSManaged public var date: String?
     @NSManaged public var hour: Int16
+    @NSManaged public var sessionId: String
+    @NSManaged public var sessionStartTime: Double
 }
 
 extension LogEventEntity: Identifiable {}

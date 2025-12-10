@@ -8,6 +8,19 @@
 import CoreData
 import Combine
 
+/// 会话信息
+public struct SessionInfo: Identifiable, Hashable {
+    public let id: String  // sessionId
+    public let startTime: TimeInterval
+    public let logCount: Int
+
+    public init(id: String, startTime: TimeInterval, logCount: Int) {
+        self.id = id
+        self.startTime = startTime
+        self.logCount = logCount
+    }
+}
+
 /// 日志统计信息
 public struct LogStatistics {
     public let totalCount: Int
@@ -74,6 +87,7 @@ public final class LogDatabaseManager {
         fileNames: Set<String> = [],
         contexts: Set<String> = [],
         threads: Set<String> = [],
+        sessionId: String? = nil,
         searchText: String = "",
         sortDescriptors: [NSSortDescriptor] = [],
         limit: Int = 1000,
@@ -110,6 +124,11 @@ public final class LogDatabaseManager {
         // 线程筛选
         if !threads.isEmpty {
             predicates.append(NSPredicate(format: "thread IN %@", Array(threads)))
+        }
+
+        // 会话筛选
+        if let sessionId = sessionId {
+            predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
         }
 
         // 搜索文本 (在 message, function, fileName 中搜索)
@@ -217,6 +236,45 @@ public final class LogDatabaseManager {
 
         let results = try context.fetch(fetchRequest) as! [NSDictionary]
         return results.compactMap { $0["date"] as? String }.filter { !$0.isEmpty }
+    }
+
+    /// 获取所有会话列表（按启动时间倒序排列）
+    public func fetchAllSessions() throws -> [SessionInfo] {
+        let context = coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        // 配置 GROUP BY 查询
+        fetchRequest.propertiesToGroupBy = ["sessionId"]
+        fetchRequest.returnsDistinctResults = true
+        fetchRequest.resultType = .dictionaryResultType
+
+        // 添加 MAX(sessionStartTime) 表达式获取会话启动时间
+        let startTimeExpression = NSExpression(forFunction: "max:", arguments: [NSExpression(forKeyPath: "sessionStartTime")])
+        let startTimeDescription = NSExpressionDescription()
+        startTimeDescription.name = "sessionStartTime"
+        startTimeDescription.expression = startTimeExpression
+        startTimeDescription.expressionResultType = .doubleAttributeType
+
+        // 添加 COUNT 表达式统计日志数量
+        let countExpression = NSExpression(forFunction: "count:", arguments: [NSExpression(forKeyPath: "sessionId")])
+        let countDescription = NSExpressionDescription()
+        countDescription.name = "logCount"
+        countDescription.expression = countExpression
+        countDescription.expressionResultType = .integer64AttributeType
+
+        fetchRequest.propertiesToFetch = ["sessionId", startTimeDescription, countDescription]
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "sessionStartTime", ascending: false)]
+
+        let results = try context.fetch(fetchRequest) as! [NSDictionary]
+
+        return results.compactMap { dict -> SessionInfo? in
+            guard let sessionId = dict["sessionId"] as? String,
+                  let sessionStartTime = dict["sessionStartTime"] as? Double,
+                  let logCount = dict["logCount"] as? Int else {
+                return nil
+            }
+            return SessionInfo(id: sessionId, startTime: sessionStartTime, logCount: logCount)
+        }
     }
 
     /// 查询指定日期的日志数量

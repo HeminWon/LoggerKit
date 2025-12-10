@@ -46,9 +46,16 @@ public final class LoggerEngine: @unchecked Sendable {
     private var isConfigured = false
     private let lock = NSLock()
 
+    // 会话管理
+    public let sessionId: String
+    public let sessionStartTime: TimeInterval
+
     private init() {
         self.swiftyBeaver = SwiftyBeaver.self
         self.moduleCache = ConcurrentCache()
+        // 生成会话ID（UUID前8位）
+        self.sessionId = String(UUID().uuidString.prefix(8))
+        self.sessionStartTime = Date().timeIntervalSince1970
     }
 
     /// 配置日志引擎（应在 App 启动时调用一次）
@@ -97,7 +104,7 @@ public final class LoggerEngine: @unchecked Sendable {
         // 配置 CoreData 数据库输出
         guard configuration.enableDatabase else { return }
 
-        let coreDataDest = CoreDataDestination()
+        let coreDataDest = CoreDataDestination(sessionId: sessionId, sessionStartTime: sessionStartTime)
         coreDataDest.minLevel = configuration.level.swiftyBeaverLevel
         swiftyBeaver.addDestination(coreDataDest)
 
@@ -208,5 +215,10 @@ public final class LoggerEngine: @unchecked Sendable {
     /// 清理过期日志
     public func cleanupExpiredLogs() {
         rotationManager?.cleanupExpiredLogs()
+    }
+
+    /// 获取会话信息
+    public func getSessionInfo() -> (sessionId: String, sessionStartTime: TimeInterval) {
+        return (sessionId, sessionStartTime)
     }
 }

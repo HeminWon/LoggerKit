@@ -47,7 +47,7 @@ public struct LogEvent: Codable, Identifiable, Sendable {
         }
 
     }
-    
+
     public let thread: String
     public let function: String
     public let line: Int
@@ -56,15 +56,25 @@ public struct LogEvent: Codable, Identifiable, Sendable {
     public let level: Level
     public let message: String
     public let context: String
-    
+    public let sessionId: String
+    public let sessionStartTime: TimeInterval
+
     enum CodingKeys: String, CodingKey {
-        case thread, function, line, file, timestamp, level, message, context
+        case thread, function, line, file, timestamp, level, message, context, sessionId, sessionStartTime
     }
     
     // 格式化日期显示
     var formattedDate: String {
         let date = Date(timeIntervalSince1970: timestamp)
         return DateFormatters.displayFormatter.string(from: date)
+    }
+
+    // 会话显示文本
+    var sessionDisplayText: String {
+        let sessionDate = Date(timeIntervalSince1970: sessionStartTime)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "\(sessionId) (\(formatter.string(from: sessionDate)))"
     }
     
     var fileName: String {

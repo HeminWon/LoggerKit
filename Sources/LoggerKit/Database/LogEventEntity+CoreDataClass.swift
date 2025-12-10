@@ -23,6 +23,8 @@ public class LogEventEntity: NSManagedObject {
         entity.file = event.file
         entity.line = Int32(event.line)
         entity.context = event.context
+        entity.sessionId = event.sessionId
+        entity.sessionStartTime = event.sessionStartTime
 
         // 提取文件名
         entity.fileName = event.fileName
@@ -45,7 +47,9 @@ public class LogEventEntity: NSManagedObject {
             timestamp: timestamp,
             level: LogEvent.Level(rawValue: Int(level)) ?? .debug,
             message: message ?? "",
-            context: context ?? ""
+            context: context ?? "",
+            sessionId: sessionId,
+            sessionStartTime: sessionStartTime
         )
     }
 }

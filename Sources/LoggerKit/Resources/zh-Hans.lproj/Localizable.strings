@@ -44,5 +44,10 @@
 // MARK: - Collapsible Filter Section
 "search_prompt" = "搜索%@...";
 
+// MARK: - Session Filter
+"session_filter_title" = "会话筛选";
+"session_empty_message" = "暂无会话记录";
+"session_log_count" = "%d 条日志";
+
 // MARK: - Log List Scene
 "clear_all" = "清除全部";

@@ -93,6 +93,7 @@ public class LogDetailSceneState: ObservableObject {
     @Published var selectedContexts: Set<String> = []
     @Published var selectedThreads: Set<String> = []
     @Published var selectedMessageKeywords: Set<String> = []
+    @Published var selectedSessionId: String? = nil
 
     // MARK: - 搜索配置
     @Published var searchFields: Set<SearchField> = [.message, .fileName, .function]
@@ -245,6 +246,11 @@ public class LogDetailSceneState: ObservableObject {
                 return false
             }
 
+            // 会话筛选
+            if let sessionId = selectedSessionId, event.sessionId != sessionId {
+                return false
+            }
+
             // 关键词搜索
             if !searchText.isEmpty {
                 let lowercasedMessage = event.message.lowercased()
@@ -282,6 +288,7 @@ public class LogDetailSceneState: ObservableObject {
         if !selectedContexts.isEmpty { count += 1 }
         if !selectedThreads.isEmpty { count += 1 }
         if !selectedMessageKeywords.isEmpty { count += 1 }
+        if selectedSessionId != nil { count += 1 }
         return count
     }
 
@@ -427,6 +434,7 @@ public class LogDetailSceneState: ObservableObject {
         selectedContexts = []
         selectedThreads = []
         selectedMessageKeywords = []
+        selectedSessionId = nil
         searchFields = [.message, .fileName, .function] // 重置搜索范围
     }
 
@@ -604,6 +612,7 @@ public class LogDetailSceneState: ObservableObject {
             let fileNames = selectedFileNames
             let contexts = selectedContexts
             let threads = selectedThreads
+            let sessionId = selectedSessionId
             let search = searchText
             let limit = pageSize
             let offset = currentPage * pageSize
@@ -615,6 +624,7 @@ public class LogDetailSceneState: ObservableObject {
                     fileNames: fileNames,
                     contexts: contexts,
                     threads: threads,
+                    sessionId: sessionId,
                     searchText: search,
                     limit: limit,
                     offset: offset

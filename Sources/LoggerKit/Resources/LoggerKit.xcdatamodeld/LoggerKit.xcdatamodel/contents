@@ -13,6 +13,8 @@
         <attribute name="message" optional="NO" attributeType="String"/>
         <attribute name="thread" optional="NO" attributeType="String"/>
         <attribute name="timestamp" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="sessionId" optional="NO" attributeType="String" defaultValueString="unknown"/>
+        <attribute name="sessionStartTime" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
 
         <!-- 索引配置 -->
         <fetchIndex name="byTimestamp">
@@ -36,6 +38,9 @@
         </fetchIndex>
         <fetchIndex name="byThread">
             <fetchIndexElement property="thread" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="bySessionId">
+            <fetchIndexElement property="sessionId" type="Binary" order="ascending"/>
         </fetchIndex>
 
         <uniquenessConstraints>
