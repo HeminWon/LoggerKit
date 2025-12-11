@@ -112,7 +112,7 @@ public final class LogDatabaseManager {
 
         // 函数名筛选
         if !functions.isEmpty {
-            predicates.append(NSPredicate(format: "function IN %@", Array(functions)))
+            predicates.append(NSPredicate(format: "%K IN %@", "function", Array(functions)))
         }
 
         // 文件名筛选
@@ -138,8 +138,8 @@ public final class LogDatabaseManager {
         // 搜索文本 (在 message, function, fileName 中搜索)
         if !searchText.isEmpty {
             let searchPredicate = NSPredicate(
-                format: "message CONTAINS[cd] %@ OR function CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
-                searchText, searchText, searchText
+                format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
+                searchText, "function", searchText, searchText
             )
             predicates.append(searchPredicate)
         }

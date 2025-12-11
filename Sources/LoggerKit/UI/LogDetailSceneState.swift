@@ -90,6 +90,7 @@ public class LogDetailSceneState: ObservableObject {
     }
     @Published var displayEvents: [LogEvent] = []
     @Published var isLoading: Bool = false
+    @Published var isLoadingMore: Bool = false  // 分页加载状态
     @Published var error: Error?
     @Published var loadingProgress: String = ""
 
@@ -598,9 +599,12 @@ public class LogDetailSceneState: ObservableObject {
             return
         }
 
-        // 立即设置loading状态
-        isLoading = true
-        defer { isLoading = false }
+        // 根据是否重置分页来设置不同的loading状态
+        if resetPagination {
+            isLoading = true
+        } else {
+            isLoadingMore = true
+        }
 
         let shouldReset = resetPagination
         let levels = selectedLevels
@@ -643,9 +647,11 @@ public class LogDetailSceneState: ObservableObject {
                             self?.currentPage = 1
                             // 重置时恢复hasMoreData标志
                             self?.hasMoreData = true
+                            self?.isLoading = false
                         } else {
                             self?.displayEvents.append(contentsOf: events)
                             self?.currentPage += 1
+                            self?.isLoadingMore = false
                         }
 
                         // 判断是否还有更多数据: 如果返回数量小于请求数量,说明没有更多了
@@ -662,6 +668,14 @@ public class LogDetailSceneState: ObservableObject {
                         print("❌ Failed to load logs from database: \(error)")
                         self?.error = error
                         self?.loadingProgress = ""
+
+                        // 重置 loading 状态
+                        if shouldReset {
+                            self?.isLoading = false
+                        } else {
+                            self?.isLoadingMore = false
+                        }
+
                         continuation.resume()
                     }
                 }
@@ -672,7 +686,7 @@ public class LogDetailSceneState: ObservableObject {
     /// 加载更多日志
     func loadMore() async {
         // 如果没有更多数据或正在加载中,直接返回
-        guard hasMoreData && !isLoading else { return }
+        guard hasMoreData && !isLoadingMore else { return }
 
         await loadLogsFromDatabase(resetPagination: false)
     }

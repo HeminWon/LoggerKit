@@ -112,6 +112,28 @@ public struct LogDetailScene: View {
                                 }
                         }
                     }
+
+                    // 分页加载指示器
+                    if sceneState.isLoadingMore {
+                        if #available(iOS 15.0, macOS 13.0, *) {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                        } else {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                            .listRowInsets(EdgeInsets())
+                        }
+                    }
                 }
                 .listStyle(.plain)
             }
