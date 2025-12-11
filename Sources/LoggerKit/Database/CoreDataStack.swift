@@ -16,38 +16,41 @@ public final class CoreDataStack {
 
     // MARK: - Core Data Stack
 
-    lazy var persistentContainer: NSPersistentContainer = {
-        // 从正确的 bundle 加载模型
-        let modelURL: URL
+    /// 静态缓存的模型URL
+    /// 优化:仅在首次访问时查询Bundle,后续访问直接使用缓存
+    private static let modelURL: URL = {
+        // 定义候选路径列表
+        let candidatePaths: [(resource: String, extension: String)] = [
+            ("LoggerKit", "momd"),      // 编译后的模型文件
+            ("LoggerKit", "mom"),       // 单个模型版本
+            ("LoggerKit", "xcdatamodeld") // 开发时的模型文件
+        ]
 
-        // 尝试查找编译后的 .momd 文件
-        if let momdURL = Bundle.module.url(forResource: "LoggerKit", withExtension: "momd") {
-            modelURL = momdURL
-        }
-        // 如果找不到 .momd，尝试查找 .mom 文件（单个模型版本）
-        else if let momURL = Bundle.module.url(forResource: "LoggerKit", withExtension: "mom") {
-            modelURL = momURL
-        }
-        // 如果还找不到，尝试在 xcdatamodeld 目录中查找
-        else if let xcdatamodeldURL = Bundle.module.url(forResource: "LoggerKit", withExtension: "xcdatamodeld"),
-                let momURL = Bundle(url: xcdatamodeldURL)?.url(forResource: "LoggerKit", withExtension: "mom") {
-            modelURL = momURL
-        } else {
-            // 打印调试信息
-            print("❌ Bundle.module resourcePath: \(Bundle.module.resourcePath ?? "nil")")
-            if let resourcePath = Bundle.module.resourcePath {
-                do {
-                    let contents = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
-                    print("❌ Bundle contents: \(contents)")
-                } catch {
-                    print("❌ Failed to list bundle contents: \(error)")
-                }
+        // 遍历候选路径查找模型文件
+        for (resource, ext) in candidatePaths {
+            if let url = Bundle.module.url(forResource: resource, withExtension: ext) {
+                return url
             }
-            fatalError("Failed to find LoggerKit CoreData model in bundle")
         }
 
-        guard let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL) else {
-            fatalError("Failed to load model from \(modelURL)")
+        // 如果都找不到,打印调试信息并抛出错误
+        print("❌ Bundle.module resourcePath: \(Bundle.module.resourcePath ?? "nil")")
+        if let resourcePath = Bundle.module.resourcePath {
+            do {
+                let contents = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
+                print("❌ Bundle contents: \(contents)")
+            } catch {
+                print("❌ Failed to list bundle contents: \(error)")
+            }
+        }
+
+        fatalError("Failed to find LoggerKit CoreData model in bundle. Tried extensions: \(candidatePaths.map { $0.extension }.joined(separator: ", "))")
+    }()
+
+    lazy var persistentContainer: NSPersistentContainer = {
+        // 使用静态缓存的模型URL
+        guard let managedObjectModel = NSManagedObjectModel(contentsOf: Self.modelURL) else {
+            fatalError("Failed to load model from \(Self.modelURL)")
         }
 
         let container = NSPersistentContainer(name: "LoggerKit", managedObjectModel: managedObjectModel)

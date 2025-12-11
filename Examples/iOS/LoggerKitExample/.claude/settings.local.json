@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(cat:*)",
-      "mcp__thinking__sequentialthinking"
+      "mcp__thinking__sequentialthinking",
+      "Bash(swift test:*)",
+      "Bash(tee:*)",
+      "Bash(swift build:*)"
     ],
     "deny": [],
     "ask": []

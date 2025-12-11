@@ -162,39 +162,61 @@ public final class LogDatabaseManager {
     }
 
     /// 统计信息
+    /// 优化版本:使用2次查询代替原来的9次查询(1次总数 + 7次级别统计 + 1次热门函数)
     public func fetchStatistics() throws -> LogStatistics {
         let context = coreDataStack.viewContext
 
-        // 总数
-        let countRequest = LogEventEntity.fetchRequest()
-        let totalCount = try context.count(for: countRequest)
+        // === 优化 1/2: 单次分组查询获取所有级别统计 ===
+        let levelRequest = LogEventEntity.fetchRequest()
+        levelRequest.resultType = .dictionaryResultType
 
-        // 按等级统计
-        var levelCounts: [Int: Int] = [:]
-        for level in 0...6 {
-            let request = LogEventEntity.fetchRequest()
-            request.predicate = NSPredicate(format: "level == %d", level)
-            let count = try context.count(for: request)
-            levelCounts[level] = count
-        }
-
-        // 热门函数 (Top 100)
-        let functionRequest = LogEventEntity.fetchRequest()
-        functionRequest.propertiesToFetch = ["function"]
-        functionRequest.resultType = .dictionaryResultType
-
-        let functionExpression = NSExpression(forKeyPath: "function")
-        let countExpression = NSExpression(forFunction: "count:", arguments: [functionExpression])
+        // 配置分组查询:按level分组,统计每个级别的数量
+        let levelExpression = NSExpression(forKeyPath: "level")
+        let countExpression = NSExpression(forFunction: "count:", arguments: [levelExpression])
 
         let countDescription = NSExpressionDescription()
-        countDescription.name = "count"
+        countDescription.name = "levelCount"
         countDescription.expression = countExpression
         countDescription.expressionResultType = .integer64AttributeType
 
+        levelRequest.propertiesToGroupBy = ["level"]
+        levelRequest.propertiesToFetch = ["level", countDescription]
+
+        // 执行分组查询
+        let levelResults = try context.fetch(levelRequest) as! [NSDictionary]
+
+        // 解析结果:构建levelCounts字典并计算总数
+        var levelCounts: [Int: Int] = [:]
+        var totalCount = 0
+
+        for dict in levelResults {
+            guard let level = dict["level"] as? Int16,
+                  let count = dict["levelCount"] as? Int else { continue }
+
+            let levelInt = Int(level)
+            levelCounts[levelInt] = count
+            totalCount += count
+        }
+
+        // === 优化 2/2: 热门函数查询(保持原有实现) ===
+        let functionRequest = LogEventEntity.fetchRequest()
+        functionRequest.resultType = .dictionaryResultType
+
+        let functionExpression = NSExpression(forKeyPath: "function")
+        let functionCountExpression = NSExpression(forFunction: "count:", arguments: [functionExpression])
+
+        let functionCountDescription = NSExpressionDescription()
+        functionCountDescription.name = "count"
+        functionCountDescription.expression = functionCountExpression
+        functionCountDescription.expressionResultType = .integer64AttributeType
+
         functionRequest.propertiesToGroupBy = ["function"]
-        functionRequest.propertiesToFetch = ["function", countDescription]
+        functionRequest.propertiesToFetch = ["function", functionCountDescription]
         functionRequest.sortDescriptors = [NSSortDescriptor(key: "count", ascending: false)]
         functionRequest.fetchLimit = 100
+
+        // 过滤掉function为空的情况
+        functionRequest.predicate = NSPredicate(format: "function != nil AND function != ''")
 
         let functionResults = try context.fetch(functionRequest) as! [NSDictionary]
         let topFunctions = functionResults.compactMap { dict -> (String, Int)? in
