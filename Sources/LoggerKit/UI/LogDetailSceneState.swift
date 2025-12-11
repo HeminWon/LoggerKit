@@ -102,8 +102,8 @@ public class LogDetailSceneState: ObservableObject {
     private var currentPage = 0
     private let pageSize = 500
 
-    // MARK: - 数据库管理器 (nonisolated 以便在后台线程访问)
-    private nonisolated(unsafe) var databaseManager: LogDatabaseManager?
+    // MARK: - 数据库管理器
+    private var databaseManager: LogDatabaseManager?
 
     // MARK: - 统计信息
     @Published var statistics: LogStatistics?
@@ -531,31 +531,44 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 从数据库加载所有日志
     private func loadAllLogsFromDatabase() async {
-        isLoading = true
-        loadingProgress = "正在加载所有日志..."
-        defer {
-            isLoading = false
-            loadingProgress = ""
+        // 在闭包前捕获必要的值,避免在闭包中访问@Published属性
+        guard let dbManager = databaseManager else {
+            print("⚠️ Database manager not available")
+            return
         }
 
-        do {
-            guard let dbManager = databaseManager else {
-                print("⚠️ Database manager not available")
-                return
+        isLoading = true
+        loadingProgress = "正在加载所有日志..."
+
+        // 使用 performBackgroundTask 确保线程安全
+        await withCheckedContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
+                do {
+                    // 在后台 context 中执行查询
+                    let events = try dbManager.fetchEvents(
+                        in: context,
+                        levels: [.verbose, .debug, .info, .warning, .error, .critical, .fault],
+                        limit: 10000
+                    )
+
+                    // 切换到主线程更新 UI
+                    Task { @MainActor [weak self] in
+                        self?.events = events
+                        self?.isLoading = false
+                        self?.loadingProgress = ""
+                        continuation.resume()
+                    }
+                } catch {
+                    // 错误处理
+                    Task { @MainActor [weak self] in
+                        print("❌ Failed to load all logs: \(error)")
+                        self?.error = error
+                        self?.isLoading = false
+                        self?.loadingProgress = ""
+                        continuation.resume()
+                    }
+                }
             }
-
-            let events: [LogEvent] = try await Task.detached {
-                // 加载所有日志，限制数量以避免性能问题
-                try dbManager.fetchEvents(
-                    levels: [.verbose, .debug, .info, .warning, .error, .critical, .fault],
-                    limit: 10000
-                )
-            }.value
-
-            self.events = events
-        } catch {
-            self.error = error
-            print("❌ Failed to load all logs: \(error)")
         }
     }
 
@@ -589,58 +602,69 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 从数据库加载日志数据
     func loadLogsFromDatabase(resetPagination: Bool = true) async {
-        if resetPagination {
-            currentPage = 0
+        // 在闭包前捕获必要的值,避免在闭包中访问@Published属性
+        guard let dbManager = databaseManager else {
+            print("⚠️ Database manager not available")
+            return
         }
+
+        let shouldReset = resetPagination
+        let levels = selectedLevels
+        let functions = selectedFunctions
+        let fileNames = selectedFileNames
+        let contexts = selectedContexts
+        let threads = selectedThreads
+        let sessionId = selectedSessionId
+        let search = searchText
+        let limit = pageSize
+        let page = shouldReset ? 0 : currentPage
+        let offset = page * pageSize
 
         isLoading = true
         loadingProgress = "正在查询..."
-        defer {
-            isLoading = false
-            loadingProgress = ""
-        }
 
-        do {
-            // 捕获需要的值,避免在后台线程访问 @MainActor 属性
-            guard let dbManager = databaseManager else {
-                print("⚠️ Database manager not available")
-                return
+        // 使用 performBackgroundTask 确保线程安全
+        await withCheckedContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
+                do {
+                    // 在后台 context 中执行查询
+                    let events = try dbManager.fetchEvents(
+                        in: context,
+                        levels: levels,
+                        functions: functions,
+                        fileNames: fileNames,
+                        contexts: contexts,
+                        threads: threads,
+                        sessionId: sessionId,
+                        searchText: search,
+                        limit: limit,
+                        offset: offset
+                    )
+
+                    // 切换到主线程更新 UI
+                    Task { @MainActor [weak self] in
+                        if shouldReset {
+                            self?.displayEvents = events
+                            self?.currentPage = 1
+                        } else {
+                            self?.displayEvents.append(contentsOf: events)
+                            self?.currentPage += 1
+                        }
+                        self?.isLoading = false
+                        self?.loadingProgress = ""
+                        continuation.resume()
+                    }
+                } catch {
+                    // 错误处理
+                    Task { @MainActor [weak self] in
+                        print("❌ Failed to load logs from database: \(error)")
+                        self?.error = error
+                        self?.isLoading = false
+                        self?.loadingProgress = ""
+                        continuation.resume()
+                    }
+                }
             }
-
-            let levels = selectedLevels
-            let functions = selectedFunctions
-            let fileNames = selectedFileNames
-            let contexts = selectedContexts
-            let threads = selectedThreads
-            let sessionId = selectedSessionId
-            let search = searchText
-            let limit = pageSize
-            let offset = currentPage * pageSize
-
-            let events: [LogEvent] = try await Task.detached { () -> [LogEvent] in
-                return try dbManager.fetchEvents(
-                    levels: levels,
-                    functions: functions,
-                    fileNames: fileNames,
-                    contexts: contexts,
-                    threads: threads,
-                    sessionId: sessionId,
-                    searchText: search,
-                    limit: limit,
-                    offset: offset
-                )
-            }.value
-
-            if resetPagination {
-                self.displayEvents = events
-            } else {
-                self.displayEvents.append(contentsOf: events)
-            }
-
-            currentPage += 1
-        } catch {
-            self.error = error
-            print("❌ Failed to load logs from database: \(error)")
         }
     }
 
@@ -651,16 +675,25 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 加载统计信息
     func loadStatistics() async {
-        do {
-            guard let dbManager = databaseManager else { return }
+        guard let dbManager = databaseManager else { return }
 
-            let stats = try await Task.detached {
-                try dbManager.fetchStatistics()
-            }.value
+        await withCheckedContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
+                do {
+                    // fetchStatistics()内部使用自己的viewContext,这里只需要在后台线程调用
+                    let stats = try dbManager.fetchStatistics()
 
-            self.statistics = stats
-        } catch {
-            print("❌ Failed to load statistics: \(error)")
+                    Task { @MainActor [weak self] in
+                        self?.statistics = stats
+                        continuation.resume()
+                    }
+                } catch {
+                    print("❌ Failed to load statistics: \(error)")
+                    Task { @MainActor in
+                        continuation.resume()
+                    }
+                }
+            }
         }
     }
 

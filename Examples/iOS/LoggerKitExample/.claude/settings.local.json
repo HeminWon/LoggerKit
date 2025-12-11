@@ -5,7 +5,8 @@
       "mcp__thinking__sequentialthinking",
       "Bash(swift test:*)",
       "Bash(tee:*)",
-      "Bash(swift build:*)"
+      "Bash(swift build:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n⚡️ perf: 阶段1A性能优化 - 数据库查询和资源初始化\n\n**优化内容:**\n\n1. **合并数据库统计查询 (LogDatabaseManager.swift)**\n   - 将9次查询优化为2次(1次总数+7次级别统计+1次热门函数 → 1次分组查询+1次热门函数)\n   - 使用NSExpressionDescription进行聚合统计\n   - 预期性能提升:统计查询时间减少80%(500ms → 50-100ms)\n\n2. **优化CoreDataStack资源初始化 (CoreDataStack.swift)**\n   - 提取模型URL查询为静态缓存属性\n   - 使用循环遍历候选路径,简化重复代码\n   - 改进错误信息,包含查找路径和文件类型\n\n3. **添加性能测试框架**\n   - 新增PerformanceTests.swift:性能基准测试\n   - 新增DatabaseOptimizationTests.swift:优化正确性验证\n   - 支持测量查询时间和数据库大小\n\n**影响范围:**\n- 内部实现优化,不影响公开API\n- 完全向后兼容\n- 风险:低\n\n**测试:**\n- 构建成功\n- 单元测试框架已就绪\n\n**相关:**\n- 实现 openspec/changes/optimize-phase1-performance 阶段1A\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

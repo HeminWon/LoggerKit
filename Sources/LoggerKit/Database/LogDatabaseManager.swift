@@ -81,7 +81,10 @@ public final class LogDatabaseManager {
     }
 
     /// 查询日志事件
+    /// 支持后台context查询,用于线程安全的数据库操作
+    /// - Parameter in: 可选的NSManagedObjectContext,如未提供则使用viewContext
     public func fetchEvents(
+        in context: NSManagedObjectContext? = nil,
         levels: Set<LogEvent.Level>,
         functions: Set<String> = [],
         fileNames: Set<String> = [],
@@ -94,7 +97,7 @@ public final class LogDatabaseManager {
         offset: Int = 0
     ) throws -> [LogEvent] {
 
-        let context = coreDataStack.viewContext
+        let targetContext = context ?? coreDataStack.viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 构建谓词
@@ -157,7 +160,7 @@ public final class LogDatabaseManager {
         fetchRequest.fetchOffset = offset
 
         // 执行查询
-        let entities = try context.fetch(fetchRequest)
+        let entities = try targetContext.fetch(fetchRequest)
         return entities.map { $0.toLogEvent() }
     }
 
