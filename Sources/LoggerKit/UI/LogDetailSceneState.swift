@@ -75,7 +75,13 @@ struct CategorizedSearchResults {
 @MainActor
 public class LogDetailSceneState: ObservableObject {
 
-    @Published var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error]
+    @Published var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error] {
+        didSet {
+            if selectedLevels != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
     @Published var events: [LogEvent] = [] {
         didSet {
             invalidateCache()
@@ -87,13 +93,55 @@ public class LogDetailSceneState: ObservableObject {
     @Published var loadingProgress: String = ""
 
     // MARK: - 多条件筛选状态
-    @Published var searchText: String = ""
-    @Published var selectedFunctions: Set<String> = []
-    @Published var selectedFileNames: Set<String> = []
-    @Published var selectedContexts: Set<String> = []
-    @Published var selectedThreads: Set<String> = []
-    @Published var selectedMessageKeywords: Set<String> = []
-    @Published var selectedSessionId: String? = nil
+    @Published var searchText: String = "" {
+        didSet {
+            if searchText != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
+    @Published var selectedFunctions: Set<String> = [] {
+        didSet {
+            if selectedFunctions != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
+    @Published var selectedFileNames: Set<String> = [] {
+        didSet {
+            if selectedFileNames != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
+    @Published var selectedContexts: Set<String> = [] {
+        didSet {
+            if selectedContexts != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
+    @Published var selectedThreads: Set<String> = [] {
+        didSet {
+            if selectedThreads != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
+    @Published var selectedMessageKeywords: Set<String> = [] {
+        didSet {
+            if selectedMessageKeywords != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
+    @Published var selectedSessionId: String? = nil {
+        didSet {
+            if selectedSessionId != oldValue {
+                Task { await reloadWithFilters() }
+            }
+        }
+    }
 
     // MARK: - 搜索配置
     @Published var searchFields: Set<SearchField> = [.message, .fileName, .function]
@@ -702,6 +750,12 @@ public class LogDetailSceneState: ObservableObject {
         Task {
             await loadLogsFromDatabase(resetPagination: true)
         }
+    }
+
+    /// 过滤条件变化时重新加载
+    private func reloadWithFilters() async {
+        // 重置分页并重新加载
+        await loadLogsFromDatabase(resetPagination: true)
     }
 
     /// 获取筛选选项

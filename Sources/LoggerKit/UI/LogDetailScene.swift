@@ -69,7 +69,7 @@ public struct LogDetailScene: View {
             } else {
                 // 1️⃣ 筛选结果统计
                 HStack {
-                    Text(String(format: totalCountFormat, sceneState.filteredEvents.count))
+                    Text(String(format: totalCountFormat, sceneState.displayEvents.count))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if sceneState.activeFilterCount > 0 {
@@ -84,14 +84,26 @@ public struct LogDetailScene: View {
 
                 Divider()
 
-                // 2️⃣ 日志列表
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(sceneState.filteredEvents, id: \.id) { logEvent in
-                            LogRowView(event: logEvent)
-                        }
+                // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
+                List {
+                    ForEach(sceneState.displayEvents, id: \.id) { logEvent in
+                        LogRowView(event: logEvent)
+                            .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                            .listRowSeparator(.hidden)
+                            .onAppear {
+                                // 滚动到底部时加载更多
+                                if logEvent.id == sceneState.displayEvents.last?.id {
+                                    Task {
+                                        await sceneState.loadMore()
+                                    }
+                                }
+                            }
                     }
-                    .padding(.horizontal)
+                }
+                .listStyle(.plain)
+                .refreshable {
+                    // 下拉刷新
+                    await sceneState.loadLogsFromDatabase(resetPagination: true)
                 }
             }
         }
