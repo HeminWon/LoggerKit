@@ -156,111 +156,97 @@ public class LogDetailSceneState: ObservableObject {
     // MARK: - 统计信息
     @Published var statistics: LogStatistics?
 
-    // MARK: - 缓存属性
-    private var _cachedFunctions: [String]?
-    private var _cachedFileNames: [String]?
-    private var _cachedContexts: [String]?
-    private var _cachedThreads: [String]?
-    private var _cachedFunctionCounts: [String: Int]?
-    private var _cachedFileNameCounts: [String: Int]?
-    private var _cachedContextCounts: [String: Int]?
-    private var _cachedThreadCounts: [String: Int]?
+    // MARK: - 缓存管理器
+    private let cache = FilterOptionsCache()
 
     /// 清除所有缓存
     private func invalidateCache() {
-        _cachedFunctions = nil
-        _cachedFileNames = nil
-        _cachedContexts = nil
-        _cachedThreads = nil
-        _cachedFunctionCounts = nil
-        _cachedFileNameCounts = nil
-        _cachedContextCounts = nil
-        _cachedThreadCounts = nil
+        cache.invalidateAll()
     }
 
     // MARK: - 可选项列表（从日志数据中提取，带缓存）
     var availableFunctions: [String] {
-        if let cached = _cachedFunctions {
+        if let cached = cache.functions() {
             return cached
         }
         let result = Array(Set(events.map { $0.function })).sorted()
-        _cachedFunctions = result
+        cache.setFunctions(result)
         return result
     }
 
     var availableFileNames: [String] {
-        if let cached = _cachedFileNames {
+        if let cached = cache.fileNames() {
             return cached
         }
         let result = Array(Set(events.map { $0.fileName })).sorted()
-        _cachedFileNames = result
+        cache.setFileNames(result)
         return result
     }
 
     var availableContexts: [String] {
-        if let cached = _cachedContexts {
+        if let cached = cache.contexts() {
             return cached
         }
         let result = Array(Set(events.map { $0.context })).filter { !$0.isEmpty }.sorted()
-        _cachedContexts = result
+        cache.setContexts(result)
         return result
     }
 
     var availableThreads: [String] {
-        if let cached = _cachedThreads {
+        if let cached = cache.threads() {
             return cached
         }
         let result = Array(Set(events.map { $0.thread })).filter { !$0.isEmpty }.sorted()
-        _cachedThreads = result
+        cache.setThreads(result)
         return result
     }
 
     // MARK: - 计数缓存
     private var functionCounts: [String: Int] {
-        if let cached = _cachedFunctionCounts {
+        if let cached = cache.functionCounts() {
             return cached
         }
         var counts: [String: Int] = [:]
         for event in events {
             counts[event.function, default: 0] += 1
         }
-        _cachedFunctionCounts = counts
+        cache.setFunctionCounts(counts)
         return counts
     }
 
     private var fileNameCounts: [String: Int] {
-        if let cached = _cachedFileNameCounts {
+        if let cached = cache.fileNameCounts() {
             return cached
         }
         var counts: [String: Int] = [:]
         for event in events {
             counts[event.fileName, default: 0] += 1
         }
-        _cachedFileNameCounts = counts
+        cache.setFileNameCounts(counts)
         return counts
     }
 
     private var contextCounts: [String: Int] {
-        if let cached = _cachedContextCounts {
+        if let cached = cache.contextCounts() {
             return cached
         }
         var counts: [String: Int] = [:]
         for event in events {
             counts[event.context, default: 0] += 1
         }
-        _cachedContextCounts = counts
+        cache.setContextCounts(counts)
         return counts
     }
 
     private var threadCounts: [String: Int] {
-        if let cached = _cachedThreadCounts {
+        if let cached = cache.threadCounts() {
             return cached
         }
         var counts: [String: Int] = [:]
         for event in events {
             counts[event.thread, default: 0] += 1
         }
-        _cachedThreadCounts = counts
+        cache.setThreadCounts(counts)
         return counts
     }
 

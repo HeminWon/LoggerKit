@@ -87,17 +87,30 @@ public struct LogDetailScene: View {
                 // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
                 List {
                     ForEach(sceneState.displayEvents, id: \.id) { logEvent in
-                        LogRowView(event: logEvent)
-                            .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
-                            .listRowSeparator(.hidden)
-                            .onAppear {
-                                // 滚动到底部时加载更多
-                                if logEvent.id == sceneState.displayEvents.last?.id {
-                                    Task {
-                                        await sceneState.loadMore()
+                        if #available(iOS 15.0, macOS 13.0, *) {
+                            LogRowView(event: logEvent)
+                                .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                                .listRowSeparator(.hidden)
+                                .onAppear {
+                                    // 滚动到底部时加载更多
+                                    if logEvent.id == sceneState.displayEvents.last?.id {
+                                        Task {
+                                            await sceneState.loadMore()
+                                        }
                                     }
                                 }
-                            }
+                        } else {
+                            LogRowView(event: logEvent)
+                                .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                                .onAppear {
+                                    // 滚动到底部时加载更多
+                                    if logEvent.id == sceneState.displayEvents.last?.id {
+                                        Task {
+                                            await sceneState.loadMore()
+                                        }
+                                    }
+                                }
+                        }
                     }
                 }
                 .listStyle(.plain)
