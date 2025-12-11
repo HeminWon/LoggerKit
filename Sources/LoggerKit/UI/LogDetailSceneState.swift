@@ -588,6 +588,8 @@ public class LogDetailSceneState: ObservableObject {
                     // 切换到主线程更新 UI
                     Task { @MainActor [weak self] in
                         self?.events = events
+                        self?.displayEvents = events  // 同时更新displayEvents供UI显示
+                        self?.currentPage = 1
                         self?.isLoading = false
                         self?.loadingProgress = ""
                         continuation.resume()
@@ -626,6 +628,8 @@ public class LogDetailSceneState: ObservableObject {
             }.value
 
             self.events = events
+            self.displayEvents = events  // 同时更新displayEvents供UI显示
+            self.currentPage = 1
         } catch {
             self.error = error
             print("❌ Failed to load logs for date \(date): \(error)")
