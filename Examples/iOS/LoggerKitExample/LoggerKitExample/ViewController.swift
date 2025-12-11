@@ -68,6 +68,7 @@ class ViewController: UIViewController {
 
         addSeparator()
 
+        addButton(title: "生成200条测试日志", action: #selector(generate200Logs), backgroundColor: .systemOrange)
         addButton(title: "查看日志列表 (Push)", action: #selector(showLogList), backgroundColor: .systemGreen)
     }
 
@@ -160,6 +161,77 @@ class ViewController: UIViewController {
         log.info("用户操作: 点击按钮 [查看日志] 在页面 [ViewController]")
         log.debug("会话ID: \(UUID().uuidString)")
         showToast("已打印用户行为日志")
+    }
+
+    @objc private func generate200Logs() {
+        showToast("开始生成200条测试日志...")
+
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            for i in 1...200 {
+                // 变化的函数名
+                let functions = [
+                    "viewDidLoad()", "buttonTapped()", "dataFetched()", "userLogin()",
+                    "networkRequest()", "handleResponse()", "saveToDatabase()", "validateInput()",
+                    "refreshUI()", "loadCache()"
+                ]
+
+                // 变化的上下文
+                let contexts = [
+                    "ViewController", "NetworkManager", "DataManager", "AuthService",
+                    "APIClient", "CacheService", "ValidationEngine", "DatabaseHelper",
+                    "UIUpdater", "SessionManager"
+                ]
+
+                // 变化的动作
+                let actions = [
+                    "启动", "点击", "请求", "响应", "处理", "完成",
+                    "失败", "重试", "验证", "更新", "保存", "加载"
+                ]
+
+                // 变化的详细信息
+                let details = [
+                    "用户ID: \(1000 + i)",
+                    "耗时: \(arc4random_uniform(500))ms",
+                    "状态码: \(200 + Int(arc4random_uniform(5)) * 100)",
+                    "数据大小: \(arc4random_uniform(1000))KB",
+                    "重试次数: \(arc4random_uniform(4))",
+                    "线程: Thread-\(arc4random_uniform(10))"
+                ]
+
+                let function = functions[i % functions.count]
+                let context = contexts[i % contexts.count]
+                let action = actions[i % actions.count]
+                let detail = details[i % details.count]
+
+                // 按不同比例分配日志级别 (info最多, error最少)
+                let levelRandom = arc4random_uniform(100)
+                if levelRandom < 10 {
+                    // 10% Verbose
+                    log.verbose("[\(context)] \(action) - 详细信息 #\(i) | \(detail) | \(function)")
+                } else if levelRandom < 30 {
+                    // 20% Debug
+                    log.debug("[\(context)] \(action) - 调试信息 #\(i) | \(detail) | \(function)")
+                } else if levelRandom < 70 {
+                    // 40% Info
+                    log.info("[\(context)] \(action) - 常规信息 #\(i) | \(detail) | \(function)")
+                } else if levelRandom < 90 {
+                    // 20% Warning
+                    log.warning("[\(context)] \(action) - 警告信息 #\(i) | \(detail) | \(function)")
+                } else {
+                    // 10% Error
+                    log.error("[\(context)] \(action) - 错误信息 #\(i) | \(detail) | \(function)")
+                }
+
+                // 每50条日志暂停一下,避免过快
+                if i % 50 == 0 {
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
+            }
+
+            DispatchQueue.main.async {
+                self?.showToast("✅ 已生成200条测试日志")
+            }
+        }
     }
 
     @objc private func showLogList() {

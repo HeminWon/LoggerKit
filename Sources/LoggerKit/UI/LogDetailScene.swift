@@ -114,10 +114,6 @@ public struct LogDetailScene: View {
                     }
                 }
                 .listStyle(.plain)
-                .refreshable {
-                    // 下拉刷新
-                    await sceneState.loadLogsFromDatabase(resetPagination: true)
-                }
             }
         }
         .task {
