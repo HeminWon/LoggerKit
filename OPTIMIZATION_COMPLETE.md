@@ -66,6 +66,19 @@
   - `Sources/LoggerKit/UI/LogDetailScene.swift`
   - `Sources/LoggerKit/UI/LogDetailSceneState.swift`
 
+#### 4. 缓存管理重构
+- **提交**: `a563a52` - ♻️ refactor: 重构缓存管理为统一的FilterOptionsCache类
+- **优化内容**:
+  - ✅ 创建FilterOptionsCache类统一管理8个缓存变量
+  - ✅ 使用DispatchQueue实现并发安全(concurrent读 + barrier写)
+  - ✅ 强类型getter/setter方法,避免类型转换错误
+  - ✅ 代码行数减少约30行
+- **预期收益**: 代码清晰度提升,缓存管理更安全,易于维护
+- **文件**:
+  - `Sources/LoggerKit/UI/FilterOptionsCache.swift` (新增)
+  - `Sources/LoggerKit/UI/LogDetailSceneState.swift`
+  - `Sources/LoggerKit/UI/LogDetailScene.swift`
+
 ## 📊 优化成果汇总
 
 | 优化项 | 优化前 | 优化后 | 提升 |
@@ -76,6 +89,7 @@
 | 内存占用 | 全量加载 | 分页加载 | ↓ 70-90% |
 | 并发安全 | nonisolated(unsafe) | performBackgroundTask | ✅ 安全 |
 | CoreData线程安全 | 违规 | 符合规范 | ✅ 修复 |
+| 缓存管理 | 8个分散变量 | 统一FilterOptionsCache类 | ✅ 改进 |
 
 ## 🎯 架构改进
 
@@ -119,6 +133,7 @@ M  Sources/LoggerKit/Database/CoreDataStack.swift
 M  Sources/LoggerKit/Database/LogDatabaseManager.swift
 M  Sources/LoggerKit/UI/LogDetailSceneState.swift
 M  Sources/LoggerKit/UI/LogDetailScene.swift
+A  Sources/LoggerKit/UI/FilterOptionsCache.swift
 A  Tests/LoggerKitTests/PerformanceTests.swift
 A  Tests/LoggerKitTests/DatabaseOptimizationTests.swift
 A  openspec/changes/optimize-phase1-performance/PROGRESS.md
@@ -126,11 +141,7 @@ A  openspec/changes/optimize-phase1-performance/PROGRESS.md
 
 ## ⏭️ 待完成任务
 
-### 阶段1B剩余
-- [ ] 重构缓存管理(FilterOptionsCache) - **可选优化**
-  - 将8个缓存变量重构为统一的缓存类
-  - 强类型 + 同步barrier
-  - 代码清晰度提升
+### 阶段1B - 全部完成 ✅
 
 ### 建议后续优化
 1. **性能验证**: 在真实数据上运行性能测试
@@ -176,5 +187,5 @@ A  openspec/changes/optimize-phase1-performance/PROGRESS.md
 
 **最后更新**: 2025-12-11
 **当前分支**: feature/optimization_251210
-**提交数**: 3 commits
+**提交数**: 5 commits
 **构建状态**: ✅ 成功
