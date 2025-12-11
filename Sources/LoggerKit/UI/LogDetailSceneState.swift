@@ -78,7 +78,8 @@ public class LogDetailSceneState: ObservableObject {
     @Published var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error] {
         didSet {
             if selectedLevels != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
@@ -96,49 +97,56 @@ public class LogDetailSceneState: ObservableObject {
     @Published var searchText: String = "" {
         didSet {
             if searchText != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
     @Published var selectedFunctions: Set<String> = [] {
         didSet {
             if selectedFunctions != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
     @Published var selectedFileNames: Set<String> = [] {
         didSet {
             if selectedFileNames != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
     @Published var selectedContexts: Set<String> = [] {
         didSet {
             if selectedContexts != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
     @Published var selectedThreads: Set<String> = [] {
         didSet {
             if selectedThreads != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
     @Published var selectedMessageKeywords: Set<String> = [] {
         didSet {
             if selectedMessageKeywords != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
     @Published var selectedSessionId: String? = nil {
         didSet {
             if selectedSessionId != oldValue {
-                Task { await reloadWithFilters() }
+                loadTask?.cancel()
+                loadTask = Task { await reloadWithFilters() }
             }
         }
     }
@@ -149,6 +157,10 @@ public class LogDetailSceneState: ObservableObject {
     // MARK: - 分页
     private var currentPage = 0
     private let pageSize = 500
+    private var hasMoreData = true  // 是否还有更多数据
+
+    // MARK: - 加载控制
+    private var loadTask: Task<Void, Never>?
 
     // MARK: - 数据库管理器
     private var databaseManager: LogDatabaseManager?
@@ -640,11 +652,18 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 从数据库加载日志数据
     func loadLogsFromDatabase(resetPagination: Bool = true) async {
+        // 检查任务是否已被取消
+        if Task.isCancelled { return }
+
         // 在闭包前捕获必要的值,避免在闭包中访问@Published属性
         guard let dbManager = databaseManager else {
             print("⚠️ Database manager not available")
             return
         }
+
+        // 立即设置loading状态
+        isLoading = true
+        defer { isLoading = false }
 
         let shouldReset = resetPagination
         let levels = selectedLevels
@@ -658,7 +677,6 @@ public class LogDetailSceneState: ObservableObject {
         let page = shouldReset ? 0 : currentPage
         let offset = page * pageSize
 
-        isLoading = true
         loadingProgress = "正在查询..."
 
         // 使用 performBackgroundTask 确保线程安全
@@ -684,11 +702,18 @@ public class LogDetailSceneState: ObservableObject {
                         if shouldReset {
                             self?.displayEvents = events
                             self?.currentPage = 1
+                            // 重置时恢复hasMoreData标志
+                            self?.hasMoreData = true
                         } else {
                             self?.displayEvents.append(contentsOf: events)
                             self?.currentPage += 1
                         }
-                        self?.isLoading = false
+
+                        // 判断是否还有更多数据: 如果返回数量小于请求数量,说明没有更多了
+                        if events.count < limit {
+                            self?.hasMoreData = false
+                        }
+
                         self?.loadingProgress = ""
                         continuation.resume()
                     }
@@ -697,7 +722,6 @@ public class LogDetailSceneState: ObservableObject {
                     Task { @MainActor [weak self] in
                         print("❌ Failed to load logs from database: \(error)")
                         self?.error = error
-                        self?.isLoading = false
                         self?.loadingProgress = ""
                         continuation.resume()
                     }
@@ -708,6 +732,9 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 加载更多日志
     func loadMore() async {
+        // 如果没有更多数据或正在加载中,直接返回
+        guard hasMoreData && !isLoading else { return }
+
         await loadLogsFromDatabase(resetPagination: false)
     }
 
@@ -744,7 +771,7 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 过滤条件变化时重新加载
     private func reloadWithFilters() async {
-        // 重置分页并重新加载
+        // 重置分页并重新加载(isReloading检查在loadLogsFromDatabase中)
         await loadLogsFromDatabase(resetPagination: true)
     }
 

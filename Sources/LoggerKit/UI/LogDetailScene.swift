@@ -86,9 +86,9 @@ public struct LogDetailScene: View {
 
                 // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
                 List {
-                    ForEach(sceneState.displayEvents, id: \.id) { logEvent in
+                    ForEach(Array(sceneState.displayEvents.enumerated()), id: \.element.id) { index, logEvent in
                         if #available(iOS 15.0, macOS 13.0, *) {
-                            LogRowView(event: logEvent)
+                            LogRowView(event: logEvent, index: index + 1)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .listRowSeparator(.hidden)
                                 .onAppear {
@@ -100,7 +100,7 @@ public struct LogDetailScene: View {
                                     }
                                 }
                         } else {
-                            LogRowView(event: logEvent)
+                            LogRowView(event: logEvent, index: index + 1)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .onAppear {
                                     // 滚动到底部时加载更多
@@ -201,12 +201,14 @@ public struct LogDetailScene: View {
 
 struct LogRowView: View {
     let event: LogEvent
+    let index: Int
 
     // 缓存计算的颜色,避免每次重绘都计算
     private let cachedSessionColor: Color
 
-    public init(event: LogEvent) {
+    public init(event: LogEvent, index: Int) {
         self.event = event
+        self.index = index
         self.cachedSessionColor = Self.sessionColor(for: event.sessionId)
     }
 
@@ -214,6 +216,9 @@ struct LogRowView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(event.sessionId)
                 .foregroundColor(cachedSessionColor)
+                .font(.system(size: 9))
+            + Text(" #\(index)")
+                .foregroundColor(.secondary)
                 .font(.system(size: 9))
             + Text(" ")
                 .font(.system(size: 9))
