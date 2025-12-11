@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "mcp__thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []
