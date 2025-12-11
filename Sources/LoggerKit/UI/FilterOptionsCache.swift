@@ -109,16 +109,16 @@ final class FilterOptionsCache {
         write(.threadCounts, value: value)
     }
 
-    /// 清除所有缓存
+    /// 清除所有缓存 (使用同步 barrier)
     func invalidateAll() {
-        queue.async(flags: .barrier) { [weak self] in
+        queue.sync(flags: .barrier) { [weak self] in
             self?.storage.removeAll()
         }
     }
 
-    /// 清除特定键的缓存
+    /// 清除特定键的缓存 (使用同步 barrier)
     private func invalidate(_ key: CacheKey) {
-        queue.async(flags: .barrier) { [weak self] in
+        _ = queue.sync(flags: .barrier) { [weak self] in
             self?.storage.removeValue(forKey: key)
         }
     }
@@ -132,9 +132,9 @@ final class FilterOptionsCache {
         }
     }
 
-    /// 并发安全的写入 (使用 barrier)
+    /// 并发安全的写入 (使用同步 barrier)
     private func write(_ key: CacheKey, value: Any) {
-        queue.async(flags: .barrier) { [weak self] in
+        queue.sync(flags: .barrier) { [weak self] in
             self?.storage[key] = value
         }
     }

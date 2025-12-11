@@ -86,7 +86,7 @@ public struct LogDetailScene: View {
 
                 // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
                 List {
-                    ForEach(Array(sceneState.displayEvents.enumerated()), id: \.element.id) { index, logEvent in
+                    ForEach(Array(zip(sceneState.displayEvents.indices, sceneState.displayEvents)), id: \.1.id) { index, logEvent in
                         if #available(iOS 15.0, macOS 13.0, *) {
                             LogRowView(event: logEvent, index: index + 1)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
@@ -181,7 +181,7 @@ public struct LogDetailScene: View {
     }
 
     private var activityItem: URL {
-        LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: sceneState.filteredEvents)
+        LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: sceneState.displayEvents)
     }
 
     private func copyToClipboard(text: String) {

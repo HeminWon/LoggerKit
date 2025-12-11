@@ -92,6 +92,7 @@ public final class LogDatabaseManager {
         threads: Set<String> = [],
         sessionId: String? = nil,
         searchText: String = "",
+        messageKeywords: Set<String> = [],
         sortDescriptors: [NSSortDescriptor] = [],
         limit: Int = 1000,
         offset: Int = 0
@@ -141,6 +142,15 @@ public final class LogDatabaseManager {
                 searchText, searchText, searchText
             )
             predicates.append(searchPredicate)
+        }
+
+        // 消息关键词筛选 (OR逻辑: 任意一个关键词匹配即可)
+        if !messageKeywords.isEmpty {
+            let keywordPredicates = messageKeywords.map { keyword in
+                NSPredicate(format: "message CONTAINS[cd] %@", keyword)
+            }
+            let orPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: keywordPredicates)
+            predicates.append(orPredicate)
         }
 
         // 组合谓词

@@ -262,69 +262,6 @@ public class LogDetailSceneState: ObservableObject {
         return counts
     }
 
-    // MARK: - 筛选后的事件
-    var filteredEvents: [LogEvent] {
-        // 预计算搜索文本，避免在循环中重复计算
-        let lowercasedSearch = searchText.lowercased()
-        let lowercasedKeywords = selectedMessageKeywords.map { $0.lowercased() }
-
-        return events.filter { event in
-            // 日志等级筛选
-            guard selectedLevels.contains(event.level) else { return false }
-
-            // 函数名筛选（空集合表示不限制）
-            if !selectedFunctions.isEmpty && !selectedFunctions.contains(event.function) {
-                return false
-            }
-
-            // 文件名筛选
-            if !selectedFileNames.isEmpty && !selectedFileNames.contains(event.fileName) {
-                return false
-            }
-
-            // 模块筛选
-            if !selectedContexts.isEmpty && !selectedContexts.contains(event.context) {
-                return false
-            }
-
-            // 线程筛选
-            if !selectedThreads.isEmpty && !selectedThreads.contains(event.thread) {
-                return false
-            }
-
-            // 会话筛选
-            if let sessionId = selectedSessionId, event.sessionId != sessionId {
-                return false
-            }
-
-            // 关键词搜索
-            if !searchText.isEmpty {
-                let lowercasedMessage = event.message.lowercased()
-                let lowercasedFunction = event.function.lowercased()
-                let lowercasedFile = event.fileName.lowercased()
-                let matchesMessage = lowercasedMessage.contains(lowercasedSearch)
-                let matchesFunction = lowercasedFunction.contains(lowercasedSearch)
-                let matchesFile = lowercasedFile.contains(lowercasedSearch)
-                if !matchesMessage && !matchesFunction && !matchesFile {
-                    return false
-                }
-            }
-
-            // 消息关键词筛选
-            if !lowercasedKeywords.isEmpty {
-                let lowercasedMessage = event.message.lowercased()
-                let matchesAnyKeyword = lowercasedKeywords.contains { keyword in
-                    lowercasedMessage.contains(keyword)
-                }
-                if !matchesAnyKeyword {
-                    return false
-                }
-            }
-
-            return true
-        }
-    }
-
     // MARK: - 筛选统计
     var activeFilterCount: Int {
         var count = 0
@@ -673,6 +610,7 @@ public class LogDetailSceneState: ObservableObject {
         let threads = selectedThreads
         let sessionId = selectedSessionId
         let search = searchText
+        let messageKeywords = selectedMessageKeywords
         let limit = pageSize
         let page = shouldReset ? 0 : currentPage
         let offset = page * pageSize
@@ -693,6 +631,7 @@ public class LogDetailSceneState: ObservableObject {
                         threads: threads,
                         sessionId: sessionId,
                         searchText: search,
+                        messageKeywords: messageKeywords,
                         limit: limit,
                         offset: offset
                     )

@@ -97,7 +97,7 @@ struct LogFilterSheet: View {
                     VStack(spacing: 2) {
                         Text(String(localized: "filter_title", bundle: .module))
                             .font(.headline)
-                        Text(String(format: String(localized: "match_count", bundle: .module), sceneState.filteredEvents.count))
+                        Text(String(format: String(localized: "match_count", bundle: .module), sceneState.displayEvents.count))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
