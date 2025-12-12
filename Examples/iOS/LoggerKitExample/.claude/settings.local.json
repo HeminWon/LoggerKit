@@ -10,7 +10,8 @@
       "Bash(openspec list:*)",
       "Bash(openspec show:*)",
       "Bash(openspec validate:*)",
-      "Bash(openspec archive:*)"
+      "Bash(openspec archive:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
