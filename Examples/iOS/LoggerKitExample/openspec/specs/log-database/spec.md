@@ -1,5 +1,8 @@
-## ADDED Requirements
+# log-database Specification
 
+## Purpose
+TBD - created by archiving change optimize-phase1-performance. Update Purpose after archive.
+## Requirements
 ### Requirement: 统计查询优化
 
 系统 SHALL 使用单次或最少次数的数据库查询获取日志统计信息。
@@ -227,3 +230,4 @@
 - **THEN** NSPredicate应正确转义
 - **AND** 不应导致查询错误
 - **AND** 不应存在SQL注入风险
+

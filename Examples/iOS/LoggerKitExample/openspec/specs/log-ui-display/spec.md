@@ -1,48 +1,8 @@
-## ADDED Requirements
+# log-ui-display Specification
 
-### Requirement: 过滤结果缓存(条件性)
-
-**注**: 此要求在采用数据库层过滤后可能不再需要。如果实施阶段1B后filteredEvents改为简单的@Published数组,则此缓存机制可移除。
-
-系统 MAY 对内存中的日志过滤结果进行缓存,避免重复计算(仅在未采用数据库层过滤时适用)。
-
-过滤结果 SHOULD 在以下情况下重新计算:
-- 原始日志数据 (events) 发生变化
-- 任何过滤条件发生变化(日志级别、搜索文本、函数、文件名、上下文、线程、消息关键词、会话ID)
-
-过滤结果缓存 SHOULD 在条件未变化时直接返回缓存值,避免重复遍历日志数组。
-
-缓存机制 MUST 是线程安全的,支持主线程和后台线程访问(如果实施)。
-
-#### Scenario: 初次过滤计算结果
-
-- **WHEN** 首次访问 filteredEvents 且未有缓存
-- **THEN** 执行过滤计算并遍历所有日志
-- **AND** 将结果缓存起来
-- **AND** 返回过滤后的日志数组
-
-#### Scenario: 缓存命中返回结果
-
-- **WHEN** 再次访问 filteredEvents 且过滤条件未变化
-- **THEN** 直接返回缓存的结果
-- **AND** 不重新遍历日志数组
-- **AND** 性能提升 80-90%
-
-#### Scenario: 条件变化触发缓存失效
-
-- **WHEN** 用户修改任一过滤条件(如 searchText 变化)
-- **THEN** 缓存被标记为无效
-- **AND** 下次访问 filteredEvents 时重新计算
-- **AND** 新结果被缓存
-
-#### Scenario: 原始数据变化触发缓存失效
-
-- **WHEN** 原始日志数据 (events) 发生变化
-- **THEN** 所有缓存(过滤结果、选项列表)被清空
-- **AND** 下次访问时重新计算
-
----
-
+## Purpose
+TBD - created by archiving change optimize-phase1-performance. Update Purpose after archive.
+## Requirements
 ### Requirement: 分页加载日志
 
 系统 SHALL 支持分页加载日志,避免一次性加载所有日志到内存。
@@ -295,3 +255,4 @@ CoreData 的 `viewContext` MUST 仅在主线程访问。
 - **AND** 不会出现重复的日志
 - **AND** 不会遗漏日志
 - **AND** 数据顺序保持一致
+
