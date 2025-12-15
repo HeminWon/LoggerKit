@@ -14,7 +14,7 @@ struct LogFilterSheet: View {
 
     /// 是否处于预览模式：有搜索文本且有匹配结果
     private var isInPreviewMode: Bool {
-        !sceneState.searchText.isEmpty && !sceneState.searchResults.isEmpty
+        !sceneState.searchState.searchText.isEmpty && !sceneState.searchResults.isEmpty
     }
 
     var body: some View {
@@ -24,7 +24,7 @@ struct LogFilterSheet: View {
                     // 搜索区域（含实时预览）
                     SearchPreviewSection(sceneState: sceneState) {
                         // 添加筛选后清空搜索框，退出预览模式
-                        sceneState.searchText = ""
+                        sceneState.searchState.searchText = ""
                     }
 
                     // 预览模式下不显示其他筛选条件
@@ -32,7 +32,7 @@ struct LogFilterSheet: View {
                         Divider()
 
                         // 消息关键词筛选
-                        if !sceneState.selectedMessageKeywords.isEmpty {
+                        if !sceneState.filterState.selectedMessageKeywords.isEmpty {
                             messageKeywordsSection
                             Divider()
                         }
@@ -47,7 +47,7 @@ struct LogFilterSheet: View {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_context", bundle: .module),
                                 options: sceneState.availableContexts,
-                                selectedOptions: $sceneState.selectedContexts
+                                selectedOptions: $sceneState.filterState.selectedContexts
                             )
                             Divider()
                         }
@@ -57,7 +57,7 @@ struct LogFilterSheet: View {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_file", bundle: .module),
                                 options: sceneState.availableFileNames,
-                                selectedOptions: $sceneState.selectedFileNames
+                                selectedOptions: $sceneState.filterState.selectedFileNames
                             )
                             Divider()
                         }
@@ -67,7 +67,7 @@ struct LogFilterSheet: View {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_function", bundle: .module),
                                 options: sceneState.availableFunctions,
-                                selectedOptions: $sceneState.selectedFunctions
+                                selectedOptions: $sceneState.filterState.selectedFunctions
                             )
                             Divider()
                         }
@@ -81,7 +81,7 @@ struct LogFilterSheet: View {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_thread", bundle: .module),
                                 options: sceneState.availableThreads,
-                                selectedOptions: $sceneState.selectedThreads
+                                selectedOptions: $sceneState.filterState.selectedThreads
                             )
                         }
                     }
@@ -124,12 +124,12 @@ struct LogFilterSheet: View {
                 Text(String(localized: "message_keywords", bundle: .module))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("(\(sceneState.selectedMessageKeywords.count))")
+                Text("(\(sceneState.filterState.selectedMessageKeywords.count))")
                     .font(.caption)
                     .foregroundColor(.blue)
                 Spacer()
                 Button(String(localized: "clear_button", bundle: .module)) {
-                    sceneState.selectedMessageKeywords.removeAll()
+                    sceneState.filterState.selectedMessageKeywords.removeAll()
                 }
                 .font(.caption)
                 .foregroundColor(.red)
@@ -137,13 +137,13 @@ struct LogFilterSheet: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(Array(sceneState.selectedMessageKeywords).sorted(), id: \.self) { keyword in
+                    ForEach(Array(sceneState.filterState.selectedMessageKeywords).sorted(), id: \.self) { keyword in
                         HStack(spacing: 4) {
                             Text(keyword)
                                 .font(.caption)
                                 .lineLimit(1)
                             Button(action: {
-                                sceneState.selectedMessageKeywords.remove(keyword)
+                                sceneState.filterState.selectedMessageKeywords.remove(keyword)
                             }) {
                                 Image(systemName: "xmark")
                                     .font(.caption2)
@@ -172,11 +172,11 @@ struct LogFilterSheet: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                Button(sceneState.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
-                    if sceneState.selectedLevels.count == 5 {
-                        sceneState.selectedLevels.removeAll()
+                Button(sceneState.filterState.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
+                    if sceneState.filterState.selectedLevels.count == 5 {
+                        sceneState.filterState.selectedLevels.removeAll()
                     } else {
-                        sceneState.selectedLevels = [.verbose, .debug, .info, .warning, .error]
+                        sceneState.filterState.selectedLevels = [.verbose, .debug, .info, .warning, .error]
                     }
                 }
                 .font(.caption)
@@ -188,7 +188,7 @@ struct LogFilterSheet: View {
                     ForEach([LogEvent.Level.verbose, .debug, .info, .warning, .error], id: \.self) { level in
                         FilterChip(
                             title: level.severity,
-                            isSelected: sceneState.selectedLevels.contains(level),
+                            isSelected: sceneState.filterState.selectedLevels.contains(level),
                             color: level.color
                         ) {
                             sceneState.toggleLevel(level)
@@ -214,9 +214,9 @@ struct SessionFilterSection: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                if let _ = sceneState.selectedSessionId {
+                if let _ = sceneState.filterState.selectedSessionId {
                     Button(String(localized: "clear_button", bundle: .module)) {
-                        sceneState.selectedSessionId = nil
+                        sceneState.filterState.selectedSessionId = nil
                     }
                     .font(.caption)
                     .foregroundColor(.red)
@@ -241,12 +241,12 @@ struct SessionFilterSection: View {
                         ForEach(sessions) { session in
                             SessionChip(
                                 session: session,
-                                isSelected: sceneState.selectedSessionId == session.id
+                                isSelected: sceneState.filterState.selectedSessionId == session.id
                             ) {
-                                if sceneState.selectedSessionId == session.id {
-                                    sceneState.selectedSessionId = nil
+                                if sceneState.filterState.selectedSessionId == session.id {
+                                    sceneState.filterState.selectedSessionId = nil
                                 } else {
-                                    sceneState.selectedSessionId = session.id
+                                    sceneState.filterState.selectedSessionId = session.id
                                 }
                             }
                         }

@@ -28,7 +28,7 @@ public struct LogStatistics {
     public let topFunctions: [(String, Int)]
 }
 
-public final class LogDatabaseManager {
+public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
     private let coreDataStack: CoreDataStack
 

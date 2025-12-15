@@ -21,7 +21,7 @@ struct SearchPreviewSection: View {
             searchFieldsSelector
 
             // 搜索结果预览
-            if !sceneState.searchText.isEmpty {
+            if !sceneState.searchState.searchText.isEmpty {
                 searchResultsPreview
             }
         }
@@ -37,13 +37,13 @@ struct SearchPreviewSection: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
-                TextField(String(localized: "search_placeholder", bundle: .module), text: $sceneState.searchText)
+                TextField(String(localized: "search_placeholder", bundle: .module), text: $sceneState.searchState.searchText)
                     .autocorrectionDisabled()
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
                     #endif
-                if !sceneState.searchText.isEmpty {
-                    Button(action: { sceneState.searchText = "" }) {
+                if !sceneState.searchState.searchText.isEmpty {
+                    Button(action: { sceneState.searchState.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                     }
@@ -65,7 +65,7 @@ struct SearchPreviewSection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(SearchField.allCases) { field in
-                        Button(action: { sceneState.toggleSearchField(field) }) {
+                        Button(action: { sceneState.searchState.toggleSearchField(field) }) {
                             HStack(spacing: 4) {
                                 Image(systemName: field.icon)
                                 Text(field.localizedName)
@@ -74,12 +74,12 @@ struct SearchPreviewSection: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
-                                sceneState.searchFields.contains(field)
+                                sceneState.searchState.searchFields.contains(field)
                                     ? Color.blue.opacity(0.2)
                                     : Color.gray.opacity(0.1)
                             )
                             .foregroundColor(
-                                sceneState.searchFields.contains(field)
+                                sceneState.searchState.searchFields.contains(field)
                                     ? .blue
                                     : .primary
                             )
@@ -87,7 +87,7 @@ struct SearchPreviewSection: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(
-                                        sceneState.searchFields.contains(field)
+                                        sceneState.searchState.searchFields.contains(field)
                                             ? Color.blue
                                             : Color.clear,
                                         lineWidth: 1
@@ -180,8 +180,8 @@ struct SearchPreviewSection: View {
     private func messageResultCategory(
         items: [SearchResultItem]
     ) -> some View {
-        let keyword = sceneState.searchText
-        let isKeywordSelected = sceneState.selectedMessageKeywords.contains(keyword)
+        let keyword = sceneState.searchState.searchText
+        let isKeywordSelected = sceneState.filterState.selectedMessageKeywords.contains(keyword)
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -194,9 +194,9 @@ struct SearchPreviewSection: View {
                 // 添加/移除搜索词按钮
                 Button(action: {
                     if isKeywordSelected {
-                        sceneState.selectedMessageKeywords.remove(keyword)
+                        sceneState.filterState.selectedMessageKeywords.remove(keyword)
                     } else {
-                        sceneState.selectedMessageKeywords.insert(keyword)
+                        sceneState.filterState.selectedMessageKeywords.insert(keyword)
                         onFilterAdded?()
                     }
                 }) {
@@ -268,9 +268,9 @@ struct SearchPreviewSection: View {
     private func highlightedText(_ text: String) -> AttributedString {
         var attributedString = AttributedString(text)
 
-        if let range = text.lowercased().range(of: sceneState.searchText.lowercased()) {
+        if let range = text.lowercased().range(of: sceneState.searchState.searchText.lowercased()) {
             let startIndex = text.distance(from: text.startIndex, to: range.lowerBound)
-            let length = sceneState.searchText.count
+            let length = sceneState.searchState.searchText.count
 
             if let attrRange = Range(NSRange(location: startIndex, length: length), in: attributedString) {
                 attributedString[attrRange].backgroundColor = .yellow.opacity(0.3)

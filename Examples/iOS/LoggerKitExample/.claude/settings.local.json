@@ -11,7 +11,8 @@
       "Bash(openspec show:*)",
       "Bash(openspec validate:*)",
       "Bash(openspec archive:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(xcodebuild:*)"
     ],
     "deny": [],
     "ask": []

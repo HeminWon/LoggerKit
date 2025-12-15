@@ -50,7 +50,7 @@ public struct LogDetailScene: View {
 
     public var body: some View {
         VStack {
-            if sceneState.isLoading {
+            if case .loading = sceneState.loadingState {
                 Spacer()
                 ProgressView(loadingText)
                 Spacer()
@@ -114,7 +114,7 @@ public struct LogDetailScene: View {
                     }
 
                     // 分页加载指示器
-                    if sceneState.isLoadingMore {
+                    if sceneState.loadingState == .loadingMore {
                         if #available(iOS 15.0, macOS 13.0, *) {
                             HStack {
                                 Spacer()

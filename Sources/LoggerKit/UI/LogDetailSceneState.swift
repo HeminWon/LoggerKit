@@ -10,16 +10,16 @@ import Combine
 
 // MARK: - 搜索字段枚举
 /// 搜索字段枚举
-enum SearchField: String, CaseIterable, Identifiable {
+public enum SearchField: String, CaseIterable, Identifiable {
     case message = "message"
     case fileName = "fileName"
     case function = "function"
     case context = "context"
     case thread = "thread"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var localizedName: String {
+    public var localizedName: String {
         switch self {
         case .message:
             return String(localized: "search_field_message", bundle: .module)
@@ -34,7 +34,7 @@ enum SearchField: String, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .message: return "text.bubble"
         case .fileName: return "doc"
@@ -47,113 +47,59 @@ enum SearchField: String, CaseIterable, Identifiable {
 
 // MARK: - 搜索结果项
 /// 搜索结果项
-struct SearchResultItem: Identifiable {
-    let id = UUID()
-    let field: SearchField
-    let value: String
-    let matchCount: Int
+public struct SearchResultItem: Identifiable {
+    public let id = UUID()
+    public let field: SearchField
+    public let value: String
+    public let matchCount: Int
+
+    public init(field: SearchField, value: String, matchCount: Int) {
+        self.field = field
+        self.value = value
+        self.matchCount = matchCount
+    }
 }
 
 // MARK: - 分类搜索结果
 /// 分类搜索结果
-struct CategorizedSearchResults {
-    var message: [SearchResultItem] = []
-    var fileName: [SearchResultItem] = []
-    var function: [SearchResultItem] = []
-    var context: [SearchResultItem] = []
-    var thread: [SearchResultItem] = []
+public struct CategorizedSearchResults {
+    public var message: [SearchResultItem] = []
+    public var fileName: [SearchResultItem] = []
+    public var function: [SearchResultItem] = []
+    public var context: [SearchResultItem] = []
+    public var thread: [SearchResultItem] = []
 
-    var totalCount: Int {
+    public var totalCount: Int {
         message.count + fileName.count + function.count + context.count + thread.count
     }
 
-    var isEmpty: Bool {
+    public var isEmpty: Bool {
         totalCount == 0
     }
+
+    public init() {}
 }
 
 @MainActor
 public class LogDetailSceneState: ObservableObject {
 
-    @Published var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error] {
-        didSet {
-            if selectedLevels != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
+    // MARK: - FilterState 集成
+    @ObservedObject public var filterState: FilterState
+
+    // MARK: - SearchState 集成
+    @ObservedObject public var searchState: SearchState
+
+    // MARK: - DataLoader 集成
+    private let dataLoader: LogDataLoaderProtocol
+
     @Published var events: [LogEvent] = [] {
         didSet {
             invalidateCache()
         }
     }
     @Published var displayEvents: [LogEvent] = []
-    @Published var isLoading: Bool = false
-    @Published var isLoadingMore: Bool = false  // 分页加载状态
+    @Published var loadingState: LoadingState = .idle
     @Published var error: Error?
-    @Published var loadingProgress: String = ""
-
-    // MARK: - 多条件筛选状态
-    @Published var searchText: String = "" {
-        didSet {
-            if searchText != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-    @Published var selectedFunctions: Set<String> = [] {
-        didSet {
-            if selectedFunctions != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-    @Published var selectedFileNames: Set<String> = [] {
-        didSet {
-            if selectedFileNames != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-    @Published var selectedContexts: Set<String> = [] {
-        didSet {
-            if selectedContexts != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-    @Published var selectedThreads: Set<String> = [] {
-        didSet {
-            if selectedThreads != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-    @Published var selectedMessageKeywords: Set<String> = [] {
-        didSet {
-            if selectedMessageKeywords != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-    @Published var selectedSessionId: String? = nil {
-        didSet {
-            if selectedSessionId != oldValue {
-                loadTask?.cancel()
-                loadTask = Task { await reloadWithFilters() }
-            }
-        }
-    }
-
-    // MARK: - 搜索配置
-    @Published var searchFields: Set<SearchField> = [.message, .fileName, .function]
 
     // MARK: - 分页
     private var currentPage = 0
@@ -162,9 +108,6 @@ public class LogDetailSceneState: ObservableObject {
 
     // MARK: - 加载控制
     private var loadTask: Task<Void, Never>?
-
-    // MARK: - 数据库管理器
-    private var databaseManager: LogDatabaseManager?
 
     // MARK: - 统计信息
     @Published var statistics: LogStatistics?
@@ -265,130 +208,74 @@ public class LogDetailSceneState: ObservableObject {
 
     // MARK: - 筛选统计
     var activeFilterCount: Int {
-        var count = 0
-        if !searchText.isEmpty { count += 1 }
-        if !selectedFunctions.isEmpty { count += 1 }
-        if !selectedFileNames.isEmpty { count += 1 }
-        if !selectedContexts.isEmpty { count += 1 }
-        if !selectedThreads.isEmpty { count += 1 }
-        if !selectedMessageKeywords.isEmpty { count += 1 }
-        if selectedSessionId != nil { count += 1 }
+        var count = filterState.activeFilterCount
+        if !searchState.searchText.isEmpty { count += 1 }
         return count
     }
 
     // MARK: - 搜索结果计算属性
     var searchResults: CategorizedSearchResults {
-        guard !searchText.isEmpty else { return CategorizedSearchResults() }
-
-        let lowercasedSearch = searchText.lowercased()
-        var results = CategorizedSearchResults()
-
-        // 消息匹配
-        if searchFields.contains(.message) {
-            let matchedMessages = events
-                .filter { $0.message.lowercased().contains(lowercasedSearch) }
-                .prefix(5)
-                .map { SearchResultItem(field: .message, value: $0.message, matchCount: 1) }
-            results.message = Array(matchedMessages)
-        }
-
-        // 文件匹配 - 使用预计算的计数
-        if searchFields.contains(.fileName) {
-            let counts = fileNameCounts
-            let matchedFiles = availableFileNames
-                .filter { $0.lowercased().contains(lowercasedSearch) }
-                .map { fileName in
-                    let count = counts[fileName] ?? 0
-                    return SearchResultItem(field: .fileName, value: fileName, matchCount: count)
-                }
-            results.fileName = matchedFiles
-        }
-
-        // 函数匹配 - 使用预计算的计数
-        if searchFields.contains(.function) {
-            let counts = functionCounts
-            let matchedFunctions = availableFunctions
-                .filter { $0.lowercased().contains(lowercasedSearch) }
-                .map { function in
-                    let count = counts[function] ?? 0
-                    return SearchResultItem(field: .function, value: function, matchCount: count)
-                }
-            results.function = matchedFunctions
-        }
-
-        // 模块匹配 - 使用预计算的计数
-        if searchFields.contains(.context) {
-            let counts = contextCounts
-            let matchedContexts = availableContexts
-                .filter { $0.lowercased().contains(lowercasedSearch) }
-                .map { context in
-                    let count = counts[context] ?? 0
-                    return SearchResultItem(field: .context, value: context, matchCount: count)
-                }
-            results.context = matchedContexts
-        }
-
-        // 线程匹配 - 使用预计算的计数
-        if searchFields.contains(.thread) {
-            let counts = threadCounts
-            let matchedThreads = availableThreads
-                .filter { $0.lowercased().contains(lowercasedSearch) }
-                .map { thread in
-                    let count = counts[thread] ?? 0
-                    return SearchResultItem(field: .thread, value: thread, matchCount: count)
-                }
-            results.thread = matchedThreads
-        }
-
-        return results
+        return searchState.computeResults(
+            from: events,
+            functionCounts: functionCounts,
+            fileNameCounts: fileNameCounts,
+            contextCounts: contextCounts,
+            threadCounts: threadCounts
+        )
     }
 
     // MARK: - 检查项是否已在筛选中
     func isInFilter(_ item: SearchResultItem) -> Bool {
+        let filterItem: FilterItem
         switch item.field {
         case .fileName:
-            return selectedFileNames.contains(item.value)
+            filterItem = .fileName(item.value)
         case .function:
-            return selectedFunctions.contains(item.value)
+            filterItem = .function(item.value)
         case .context:
-            return selectedContexts.contains(item.value)
+            filterItem = .context(item.value)
         case .thread:
-            return selectedThreads.contains(item.value)
+            filterItem = .thread(item.value)
         case .message:
-            return selectedMessageKeywords.contains(item.value)
+            filterItem = .messageKeyword(item.value)
         }
+        return filterState.isInFilter(filterItem)
     }
 
     // MARK: - 添加搜索结果到筛选
     func addToFilter(_ item: SearchResultItem) {
+        let filterItem: FilterItem
         switch item.field {
         case .fileName:
-            selectedFileNames.insert(item.value)
+            filterItem = .fileName(item.value)
         case .function:
-            selectedFunctions.insert(item.value)
+            filterItem = .function(item.value)
         case .context:
-            selectedContexts.insert(item.value)
+            filterItem = .context(item.value)
         case .thread:
-            selectedThreads.insert(item.value)
+            filterItem = .thread(item.value)
         case .message:
-            selectedMessageKeywords.insert(item.value)
+            filterItem = .messageKeyword(item.value)
         }
+        filterState.addToFilter(filterItem)
     }
 
     // MARK: - 从筛选中移除
     func removeFromFilter(_ item: SearchResultItem) {
+        let filterItem: FilterItem
         switch item.field {
         case .fileName:
-            selectedFileNames.remove(item.value)
+            filterItem = .fileName(item.value)
         case .function:
-            selectedFunctions.remove(item.value)
+            filterItem = .function(item.value)
         case .context:
-            selectedContexts.remove(item.value)
+            filterItem = .context(item.value)
         case .thread:
-            selectedThreads.remove(item.value)
+            filterItem = .thread(item.value)
         case .message:
-            selectedMessageKeywords.remove(item.value)
+            filterItem = .messageKeyword(item.value)
         }
+        filterState.removeFromFilter(filterItem)
     }
 
     // MARK: - 切换筛选状态
@@ -400,26 +287,11 @@ public class LogDetailSceneState: ObservableObject {
         }
     }
 
-    // MARK: - 切换搜索字段
-    func toggleSearchField(_ field: SearchField) {
-        if searchFields.contains(field) {
-            searchFields.remove(field)
-        } else {
-            searchFields.insert(field)
-        }
-    }
-
     // MARK: - 重置筛选
     func resetFilters() {
-        searchText = ""
-        selectedLevels = [.verbose, .debug, .info, .warning, .error]
-        selectedFunctions = []
-        selectedFileNames = []
-        selectedContexts = []
-        selectedThreads = []
-        selectedMessageKeywords = []
-        selectedSessionId = nil
-        searchFields = [.message, .fileName, .function] // 重置搜索范围
+        searchState.searchText = ""
+        searchState.searchFields = [.message, .fileName, .function] // 重置搜索范围
+        filterState.resetFilters()
     }
 
     var exportFileName: String {
@@ -454,7 +326,7 @@ public class LogDetailSceneState: ObservableObject {
     private(set) var identifier: String
 
     /// 初始化（默认方式，从数据库加载所有日志）
-    public init(prefix: String? = nil, identifier: String? = nil) {
+    public init(prefix: String? = nil, identifier: String? = nil, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
         // 创建一个空的URL作为占位符
         self.logFileURL = URL(fileURLWithPath: "")
         self.logDate = nil
@@ -474,31 +346,88 @@ public class LogDetailSceneState: ObservableObject {
             UserDefaults.standard.set(logIdentifier, forKey: Constants.UserDefaultsKeys.logIdentifier)
         }
 
-        // 获取数据库管理器
-        self.databaseManager = LoggerEngine.shared.getDatabaseManager()
+        // 初始化 FilterState
+        self.filterState = filterState ?? FilterState()
+
+        // 初始化 SearchState
+        self.searchState = searchState ?? SearchState()
+
+        // 初始化 DataLoader
+        if let dataLoader = dataLoader {
+            self.dataLoader = dataLoader
+        } else {
+            let dbManager = LoggerEngine.shared.getDatabaseManager()!
+            self.dataLoader = LogDataLoader(databaseManager: dbManager)
+        }
+
+        // 设置 FilterState 和 SearchState 变化回调
+        setupFilterStateBinding()
+    }
+
+    /// 设置 FilterState 和 SearchState 变化订阅
+    private func setupFilterStateBinding() {
+        filterState.onFilterChanged = { [weak self] in
+            guard let self = self else { return }
+            self.loadTask?.cancel()
+            self.loadTask = Task { await self.reloadWithFilters() }
+        }
+
+        searchState.onSearchChanged = { [weak self] in
+            guard let self = self else { return }
+            // 搜索变化时,触发searchResults计算属性重新计算
+            self.objectWillChange.send()
+        }
     }
 
     /// 初始化（使用文件URL，兼容旧方式）
-    public init(logFileURL: URL, prefix: String, identifier: String) {
+    public init(logFileURL: URL, prefix: String, identifier: String, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
         self.logFileURL = logFileURL
         self.logDate = nil
         self.prefix = prefix
         self.identifier = identifier
 
-        // 获取数据库管理器
-        self.databaseManager = LoggerEngine.shared.getDatabaseManager()
+        // 初始化 FilterState
+        self.filterState = filterState ?? FilterState()
+
+        // 初始化 SearchState
+        self.searchState = searchState ?? SearchState()
+
+        // 初始化 DataLoader
+        if let dataLoader = dataLoader {
+            self.dataLoader = dataLoader
+        } else {
+            let dbManager = LoggerEngine.shared.getDatabaseManager()!
+            self.dataLoader = LogDataLoader(databaseManager: dbManager)
+        }
+
+        // 设置 FilterState 和 SearchState 变化回调
+        setupFilterStateBinding()
     }
 
     /// 初始化（使用日期，从数据库查询）
-    public init(logDate: String, prefix: String, identifier: String) {
+    public init(logDate: String, prefix: String, identifier: String, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
         // 创建一个空的URL作为占位符
         self.logFileURL = URL(fileURLWithPath: "")
         self.logDate = logDate
         self.prefix = prefix
         self.identifier = identifier
 
-        // 获取数据库管理器
-        self.databaseManager = LoggerEngine.shared.getDatabaseManager()
+        // 初始化 FilterState
+        self.filterState = filterState ?? FilterState()
+
+        // 初始化 SearchState
+        self.searchState = searchState ?? SearchState()
+
+        // 初始化 DataLoader
+        if let dataLoader = dataLoader {
+            self.dataLoader = dataLoader
+        } else {
+            let dbManager = LoggerEngine.shared.getDatabaseManager()!
+            self.dataLoader = LogDataLoader(databaseManager: dbManager)
+        }
+
+        // 设置 FilterState 和 SearchState 变化回调
+        setupFilterStateBinding()
     }
 
     /// 异步加载日志文件
@@ -515,19 +444,18 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 从数据库加载所有日志
     private func loadAllLogsFromDatabase() async {
-        // 在闭包前捕获必要的值,避免在闭包中访问@Published属性
-        guard let dbManager = databaseManager else {
-            print("⚠️ Database manager not available")
-            return
-        }
-
-        isLoading = true
-        loadingProgress = "正在加载所有日志..."
+        loadingState = .loading(progress: "正在加载所有日志...")
 
         // 使用 performBackgroundTask 确保线程安全
         await withCheckedContinuation { continuation in
             CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
+                guard let self = self else {
+                    continuation.resume()
+                    return
+                }
+
                 do {
+                    let dbManager = LoggerEngine.shared.getDatabaseManager()!
                     // 在后台 context 中执行查询
                     let events = try dbManager.fetchEvents(
                         in: context,
@@ -540,8 +468,7 @@ public class LogDetailSceneState: ObservableObject {
                         self?.events = events
                         self?.displayEvents = events  // 同时更新displayEvents供UI显示
                         self?.currentPage = 1
-                        self?.isLoading = false
-                        self?.loadingProgress = ""
+                        self?.loadingState = .loaded
                         continuation.resume()
                     }
                 } catch {
@@ -549,8 +476,7 @@ public class LogDetailSceneState: ObservableObject {
                     Task { @MainActor [weak self] in
                         print("❌ Failed to load all logs: \(error)")
                         self?.error = error
-                        self?.isLoading = false
-                        self?.loadingProgress = ""
+                        self?.loadingState = .failed(error)
                         continuation.resume()
                     }
                 }
@@ -560,19 +486,10 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 从数据库加载指定日期的日志
     private func loadLogsForDate(_ date: String) async {
-        isLoading = true
-        loadingProgress = "正在加载日志..."
-        defer {
-            isLoading = false
-            loadingProgress = ""
-        }
+        loadingState = .loading(progress: "正在加载日志...")
 
         do {
-            guard let dbManager = databaseManager else {
-                print("⚠️ Database manager not available")
-                return
-            }
-
+            let dbManager = LoggerEngine.shared.getDatabaseManager()!
             let events: [LogEvent] = try await Task.detached {
                 try dbManager.fetchEvents(forDate: date)
             }.value
@@ -580,8 +497,10 @@ public class LogDetailSceneState: ObservableObject {
             self.events = events
             self.displayEvents = events  // 同时更新displayEvents供UI显示
             self.currentPage = 1
+            self.loadingState = .loaded
         } catch {
             self.error = error
+            self.loadingState = .failed(error)
             print("❌ Failed to load logs for date \(date): \(error)")
         }
     }
@@ -593,125 +512,64 @@ public class LogDetailSceneState: ObservableObject {
         // 检查任务是否已被取消
         if Task.isCancelled { return }
 
-        // 在闭包前捕获必要的值,避免在闭包中访问@Published属性
-        guard let dbManager = databaseManager else {
-            print("⚠️ Database manager not available")
-            return
-        }
-
         // 根据是否重置分页来设置不同的loading状态
         if resetPagination {
-            isLoading = true
+            loadingState = .loading(progress: "正在查询...")
         } else {
-            isLoadingMore = true
+            loadingState = .loadingMore
         }
 
-        let shouldReset = resetPagination
-        let levels = selectedLevels
-        let functions = selectedFunctions
-        let fileNames = selectedFileNames
-        let contexts = selectedContexts
-        let threads = selectedThreads
-        let sessionId = selectedSessionId
-        let search = searchText
-        let messageKeywords = selectedMessageKeywords
-        let limit = pageSize
-        let page = shouldReset ? 0 : currentPage
+        let page = resetPagination ? 0 : currentPage
         let offset = page * pageSize
 
-        loadingProgress = "正在查询..."
+        do {
+            // 使用 DataLoader 加载数据
+            let events = try await dataLoader.loadEvents(
+                sessionId: filterState.selectedSessionId,
+                filterState: filterState,
+                searchText: searchState.searchText,
+                offset: offset,
+                limit: pageSize
+            )
 
-        // 使用 performBackgroundTask 确保线程安全
-        await withCheckedContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
-                do {
-                    // 在后台 context 中执行查询
-                    let events = try dbManager.fetchEvents(
-                        in: context,
-                        levels: levels,
-                        functions: functions,
-                        fileNames: fileNames,
-                        contexts: contexts,
-                        threads: threads,
-                        sessionId: sessionId,
-                        searchText: search,
-                        messageKeywords: messageKeywords,
-                        limit: limit,
-                        offset: offset
-                    )
-
-                    // 切换到主线程更新 UI
-                    Task { @MainActor [weak self] in
-                        if shouldReset {
-                            self?.displayEvents = events
-                            self?.currentPage = 1
-                            // 重置时恢复hasMoreData标志
-                            self?.hasMoreData = true
-                            self?.isLoading = false
-                        } else {
-                            self?.displayEvents.append(contentsOf: events)
-                            self?.currentPage += 1
-                            self?.isLoadingMore = false
-                        }
-
-                        // 判断是否还有更多数据: 如果返回数量小于请求数量,说明没有更多了
-                        if events.count < limit {
-                            self?.hasMoreData = false
-                        }
-
-                        self?.loadingProgress = ""
-                        continuation.resume()
-                    }
-                } catch {
-                    // 错误处理
-                    Task { @MainActor [weak self] in
-                        print("❌ Failed to load logs from database: \(error)")
-                        self?.error = error
-                        self?.loadingProgress = ""
-
-                        // 重置 loading 状态
-                        if shouldReset {
-                            self?.isLoading = false
-                        } else {
-                            self?.isLoadingMore = false
-                        }
-
-                        continuation.resume()
-                    }
-                }
+            // 更新显示数据
+            if resetPagination {
+                displayEvents = events
+                currentPage = 1
+                hasMoreData = true
+            } else {
+                displayEvents.append(contentsOf: events)
+                currentPage += 1
             }
+
+            // 判断是否还有更多数据
+            if events.count < pageSize {
+                hasMoreData = false
+            }
+
+            loadingState = .loaded
+        } catch {
+            print("❌ Failed to load logs from database: \(error)")
+            self.error = error
+            loadingState = .failed(error)
         }
     }
 
     /// 加载更多日志
     func loadMore() async {
         // 如果没有更多数据或正在加载中,直接返回
-        guard hasMoreData && !isLoadingMore else { return }
+        guard hasMoreData, loadingState != .loadingMore else { return }
 
         await loadLogsFromDatabase(resetPagination: false)
     }
 
     /// 加载统计信息
     func loadStatistics() async {
-        guard let dbManager = databaseManager else { return }
-
-        await withCheckedContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
-                do {
-                    // fetchStatistics()内部使用自己的viewContext,这里只需要在后台线程调用
-                    let stats = try dbManager.fetchStatistics()
-
-                    Task { @MainActor [weak self] in
-                        self?.statistics = stats
-                        continuation.resume()
-                    }
-                } catch {
-                    print("❌ Failed to load statistics: \(error)")
-                    Task { @MainActor in
-                        continuation.resume()
-                    }
-                }
-            }
+        do {
+            let stats = try await dataLoader.loadStatistics()
+            self.statistics = stats
+        } catch {
+            print("❌ Failed to load statistics: \(error)")
         }
     }
 
@@ -731,7 +589,7 @@ public class LogDetailSceneState: ObservableObject {
     /// 获取筛选选项
     func loadFilterOptions() async {
         do {
-            guard let dbManager = databaseManager else { return }
+            let dbManager = LoggerEngine.shared.getDatabaseManager()!
 
             _ = try await Task.detached {
                 try dbManager.fetchUniqueValues(for: "function")
@@ -758,10 +616,6 @@ public class LogDetailSceneState: ObservableObject {
     }
 
     func toggleLevel(_ level: LogEvent.Level) {
-        if selectedLevels.contains(level) {
-            selectedLevels.remove(level)
-        } else {
-            selectedLevels.insert(level)
-        }
+        filterState.toggleLevel(level)
     }
 }
