@@ -3,82 +3,59 @@
 ## 📅 文档信息
 
 - **创建日期**: 2025-12-12
-- **最后更新**: 2025-12-12
+- **最后更新**: 2025-12-15
 - **当前分支**: feature/optimization_251210
-- **整体进度**: 7/18 = 39%
+- **当前进度**: 1/5 任务已完成 ✅
+- **剩余工作量**: ~3.5-4小时 (核心任务)
 
 ---
 
-## 🎯 优化总览
+## 🎯 优化概览
 
-### 整体进度
+### 当前状态
 
 ```
-✅ 阶段1 (性能优化):     7/7  = 100% ✅
-⚠️  阶段2 (代码质量):     0/5  =   0% ⚠️
-❌ 阶段3 (架构重构):     0/3  =   0% ❌
+✅ 阶段1 (性能优化): 已完成
+✅ 阶段3 (架构重构): 已完成
+🚧 阶段2 (代码质量): 进行中 - 4个任务待完成
 
-总计: 7/15 = 47%
-预计剩余工作量: ~22小时
+✅ 已完成: 1个任务 (P0 Timer泄漏修复)
+🚧 剩余核心任务: 2个任务, ~3-4小时
+🚧 可选任务: 2个任务, ~2小时
 ```
 
----
+### 优先级说明
 
-## ✅ 阶段1: 核心性能优化 (已完成)
-
-**状态**: ✅ 完成
-**完成日期**: 2025-12-12
-**工作量**: ~8小时
-**分支**: feature/optimization_251210
-
-### 已完成任务
-
-| # | 任务 | 状态 | 提交 | 收益 |
-|---|------|------|------|------|
-| 1.1 | 数据库查询合并 | ✅ | 0d812ea | 9次→2次，查询时间-80% |
-| 1.2 | CoreDataStack资源优化 | ✅ | 0d812ea | 静态缓存，启动时间微幅改善 |
-| 1.3 | 数据库层过滤实现 | ✅ | 84d7680 | 内存占用-70-90% |
-| 1.4 | 并发安全修复 | ✅ | 84d7680 | 消除CoreData多线程风险 |
-| 1.5 | 列表虚拟化渲染 | ✅ | 2e7aa0f | List + 分页加载 |
-| 1.6 | 缓存管理重构 | ✅ | a563a52 | FilterOptionsCache统一管理 |
-| 1.7 | 后续Bug修复 | ✅ | ea39cd7 | messageKeywords过滤等3个缺陷 |
-
-### 关键成果
-
-- **性能提升**: 数据库查询80%，过滤逻辑数据库层处理
-- **内存优化**: 大数据集内存占用减少70-90%
-- **并发安全**: 修复CoreData多线程访问隐患
-- **代码质量**: 删除61行死代码，统一缓存管理
-
-### 相关文件
-
-- 📄 [PROGRESS.md](./Examples/iOS/LoggerKitExample/openspec/changes/archive/2025-12-12-optimize-phase1-performance/PROGRESS.md)
-- 📋 提交历史: 0d812ea, 84d7680, 2e7aa0f, a563a52, ea39cd7
+| 优先级 | 标识 | 说明 | 建议 |
+|-------|------|------|------|
+| P0 | 🔥 | 关键 - 稳定性/安全性问题 | 必须立即完成 |
+| P1 | 🚀 | 高 - 显著性能提升 | 强烈推荐完成 |
+| P2 | 🛠️ | 中 - 代码质量改进 | 推荐完成 |
+| P3 | 💡 | 低 - 可选优化 | 根据时间决定 |
 
 ---
 
-## ⚠️ 阶段2: 代码质量优化 (待开始)
+## 🚧 待完成任务
 
-**状态**: ⚠️ 待开始
-**优先级**: 中-高
-**预计工作量**: ~6小时
-**建议时间**: 1-2周内完成
+### ✅ 任务1: Timer 内存泄漏修复 (已完成)
 
-### 任务清单
+**优先级**: P0 - 🔥 **关键** (稳定性问题)
+**完成日期**: 2025-12-15
+**实际工作量**: 30分钟
+**风险**: 低
 
-#### 🔥 2.1 Timer 泄漏修复 (最高优先级)
+#### 问题诊断
 
-**工作量**: 1小时
-**优先级**: 🔥 高 (稳定性关键)
+- **文件**: `Sources/LoggerKit/Database/CoreDataDestination.swift:40-49`
+- **问题**: Foundation.Timer 通过 RunLoop 强引用,存在潜在内存泄漏风险
+- **实际情况**: 代码已有 `deinit` 使用 `invalidate()`,但仍存在隐患:
+  1. `Timer.scheduledTimer` 会被 main RunLoop 强引用
+  2. 不必要地依赖主线程
+  3. RunLoop 生命周期管理复杂
 
-**问题描述**:
-- 文件: `Sources/LoggerKit/Database/CoreDataDestination.swift:40-49`
-- Timer 可能导致引用循环和内存泄漏
-- 当前使用 Foundation.Timer，在 main thread 创建
+#### 原有实现
 
-**优化方案**:
 ```swift
-// 当前代码
 private var flushTimer: Timer?
 
 private func setupFlushTimer() {
@@ -91,178 +68,250 @@ private func setupFlushTimer() {
         }
     }
 }
+
+deinit {
+    flushTimer?.invalidate()  // 依赖 RunLoop 的生命周期
+    flush()
+}
 ```
 
-**修复代码**:
+#### 修复方案 (已实施)
+
 ```swift
-// 优化后 - 使用DispatchSourceTimer
 private var flushTimer: DispatchSourceTimer?
 
 private func setupFlushTimer() {
-    let queue = DispatchQueue(label: "com.loggerkit.flush", qos: .utility)
+    // 使用 DispatchSourceTimer 替代 Foundation.Timer
+    // 优势: 1) 不依赖 RunLoop, 避免引用循环 2) 更好的线程控制
     let timer = DispatchSource.makeTimerSource(queue: queue)
 
     timer.setEventHandler { [weak self] in
-        self?.flush()
+        self?.flushPendingEvents()
     }
 
-    timer.schedule(deadline: .now(), repeating: 5.0)
+    // 每 5 秒触发一次
+    timer.schedule(deadline: .now() + 5.0, repeating: 5.0)
     timer.resume()
 
     self.flushTimer = timer
 }
 
 deinit {
+    // 取消定时器并最后一次刷新,确保数据不丢失
     flushTimer?.cancel()
     flushTimer = nil
-    flush()  // 最后一次刷新
+    flush()
 }
 ```
 
-**预期收益**:
-- ✅ 消除内存泄漏隐患
-- ✅ 更好的线程控制
-- ✅ 自动清理机制
+#### 修复详情
 
-**风险**: 低
+**代码修改**:
+1. 将 `Timer?` 替换为 `DispatchSourceTimer?`
+2. 使用现有的 `queue` 队列,统一线程管理
+3. 优化 deinit: 使用 `cancel()` 代替 `invalidate()`
+
+**技术优势**:
+- ✅ 完全避免 RunLoop 引用循环
+- ✅ 不依赖主线程,统一使用 utility 队列
+- ✅ 更清晰的资源管理 (cancel vs invalidate)
+- ✅ 更好的线程一致性 (所有 flush 操作都在同一队列)
+
+#### 验证结果
+
+- ✅ 编译通过: `swift build` 成功
+- ✅ iOS 示例编译通过: `xcodebuild` 成功
+- ✅ 无新增警告或错误
 
 ---
 
-#### 🚀 2.2 搜索结果单次遍历优化
+### P1 🚀 任务2: 搜索结果单次遍历优化
 
+**优先级**: P1 - 🚀 **高** (性能提升50-70%)
 **工作量**: 2小时
-**优先级**: 🚀 中-高 (性能提升)
+**风险**: 低
+**收益**: 搜索响应时间减少50-70%，用户体验显著提升
 
-**问题描述**:
-- 文件: `Sources/LoggerKit/UI/LogDetailSceneState.swift:296-360`
-- 每个搜索字段独立遍历 events 数组
-- 如果有5个字段，就遍历5次，复杂度 O(n*m)
+#### 问题描述
 
-**当前代码**:
+- **文件**: `Sources/LoggerKit/UI/LogDetailSceneState.swift:296-360`
+- **问题**: 每个搜索字段独立遍历 events 数组
+- **复杂度**: O(n*m) - 5个字段 = 5次完整遍历
+- **影响**: 大数据集搜索延迟明显
+
+#### 当前实现 (伪代码)
+
 ```swift
 var searchResults: SearchResults {
     var results = SearchResults()
 
-    // 遍历1: message
+    // ❌ 遍历1: message
     for event in events {
         if event.message.contains(searchText) {
             results.message.insert(event.message)
         }
     }
 
-    // 遍历2: function
+    // ❌ 遍历2: function
     for event in events {
         if event.function.contains(searchText) {
             results.function.insert(event.function)
         }
     }
 
-    // ... 其他字段也各自遍历一次
+    // ... 还有 fileName, context, thread 各自遍历一次
 }
 ```
 
-**优化方案**:
+#### 优化方案
+
 ```swift
 var searchResults: SearchResults {
     var results = SearchResults()
     let lowercased = searchText.lowercased()
 
+    // 用字典统计匹配次数
     var messageCounts: [String: Int] = [:]
     var functionCounts: [String: Int] = [:]
-    // ... 其他计数器
+    var fileNameCounts: [String: Int] = [:]
+    var contextCounts: [String: Int] = [:]
+    var threadCounts: [String: Int] = [:]
 
-    // 单次遍历
+    // ✅ 单次遍历，同时检查所有字段
     for event in events {
-        if searchFields.contains(.message) && event.message.lowercased().contains(lowercased) {
+        if searchFields.contains(.message) &&
+           event.message.lowercased().contains(lowercased) {
             messageCounts[event.message, default: 0] += 1
         }
 
-        if searchFields.contains(.function) && event.function.lowercased().contains(lowercased) {
+        if searchFields.contains(.function) &&
+           event.function.lowercased().contains(lowercased) {
             functionCounts[event.function, default: 0] += 1
         }
 
-        // ... 其他字段
+        if searchFields.contains(.fileName) &&
+           event.fileName.lowercased().contains(lowercased) {
+            fileNameCounts[event.fileName, default: 0] += 1
+        }
+
+        if searchFields.contains(.context) &&
+           event.context.lowercased().contains(lowercased) {
+            contextCounts[event.context, default: 0] += 1
+        }
+
+        if searchFields.contains(.thread) &&
+           event.thread.lowercased().contains(lowercased) {
+            threadCounts[event.thread, default: 0] += 1
+        }
     }
 
     // 构建结果
     results.message = messageCounts.map {
         SearchResultItem(field: .message, value: $0.key, matchCount: $0.value)
     }
-    // ... 其他字段
+    results.function = functionCounts.map {
+        SearchResultItem(field: .function, value: $0.key, matchCount: $0.value)
+    }
+    // ... 其他字段同理
 
     return results
 }
 ```
 
-**预期收益**:
-- ✅ 搜索响应时间减少 50-70%
-- ✅ 减少临时对象分配
-- ✅ 添加匹配计数信息
+#### 实施步骤
 
-**风险**: 低
+1. 重构搜索逻辑为单次遍历
+2. 添加匹配计数功能 (额外收益)
+3. 测试验证结果一致性
+4. 性能基准测试对比
+
+#### 预期收益
+
+- ✅ 搜索时间减少 50-70% (5次遍历 → 1次)
+- ✅ 减少临时对象分配
+- ✅ 附加功能: 显示匹配次数
 
 ---
 
-#### 🛠️ 2.3 错误处理统一化
+### P2 🛠️ 任务3: 错误处理统一化
 
+**优先级**: P2 - 🛠️ **中** (可观测性提升)
 **工作量**: 1-2小时
-**优先级**: 🛠️ 中 (可观测性)
+**风险**: 极低
+**收益**: 生产环境错误可追踪，便于诊断问题
 
-**问题描述**:
-- 多个文件使用 `print()` 进行错误处理
-- 生产环境难以追踪和调试
-- 缺乏统一的日志级别管理
+#### 问题描述
 
-**影响文件**:
-- `LogDatabaseManager.swift`: 309, 312, 340, 343, 367, 370行
-- `LogDetailSceneState.swift`: 558, 584, 643, 663, 699行
-- `CoreDataStack.swift`: 89行
+- **问题**: 多处使用 `print()` 进行错误处理
+- **影响**: 生产环境无法追踪错误，调试困难
+- **范围**: 6个文件，约11处 print()
 
-**当前代码**:
+#### 影响文件统计
+
+| 文件 | 行号 | 数量 |
+|------|------|------|
+| LogDatabaseManager.swift | 344, 346, 375, 377, 402, 404 | 6处 |
+| LogDetailSceneState.swift | 477, 504, 552, 572, 614 | 5处 |
+| CoreDataStack.swift | 待检查 | ? |
+| CoreDataDestination.swift | 待检查 | ? |
+| LogDestination.swift | 待检查 | ? |
+| LogDatabaseRotationManager.swift | 待检查 | ? |
+
+#### 当前问题代码
+
 ```swift
 do {
     try context.save()
 } catch {
-    print("Failed to save: \(error)")  // ❌ 使用print
+    print("Failed to save: \(error)")  // ❌ 使用 print
 }
 ```
 
-**优化方案**:
+#### 修复方案
+
 ```swift
 do {
     try context.save()
 } catch {
     Logger(context: "CoreData").error("Failed to save logs: \(error)")  // ✅
-    throw LoggerKitError.databaseWriteFailed(underlying: error)
+    // 根据情况决定是否抛出异常
 }
 ```
 
-**实施步骤**:
-1. 全局搜索 `print(` 找到所有位置
-2. 根据错误类型选择合适的日志级别 (error/warning)
-3. 使用 Logger 替换 print
-4. 考虑是否需要抛出异常
+#### 实施步骤
 
-**预期收益**:
+1. **第一步**: 全局搜索 `print(` 找出所有位置
+2. **第二步**: 分类处理
+   - 错误情况 → `Logger.error()`
+   - 警告情况 → `Logger.warning()`
+   - 调试信息 → `Logger.debug()`
+3. **第三步**: 考虑是否需要抛出异常
+4. **第四步**: 测试验证日志正常输出
+
+#### 预期收益
+
 - ✅ 生产环境错误可追踪
-- ✅ 统一日志格式
-- ✅ 支持日志级别过滤
-
-**风险**: 极低
+- ✅ 统一日志格式和级别
+- ✅ 支持日志过滤和分析
+- ✅ 提升问题诊断效率
 
 ---
 
-#### 📦 2.4 fileName 计算优化 (可选)
+### P3 💡 任务4: fileName 计算优化 (可选)
 
+**优先级**: P3 - 💡 **低** (微优化)
 **工作量**: 1小时
-**优先级**: ⭕ 中-低 (性能微优化)
+**风险**: 低
+**收益**: 减少重复字符串操作，微幅性能提升
 
-**问题描述**:
-- 文件: `Sources/LoggerKit/Parser/LogParser.swift:80-86`
-- `fileName` 是计算属性，每次访问都重新计算
-- 字符串 split 操作被重复执行
+#### 问题描述
 
-**当前代码**:
+- **文件**: `Sources/LoggerKit/Parser/LogParser.swift:80-86`
+- **问题**: `fileName` 是计算属性，每次访问都重新计算
+- **影响**: 如果频繁访问会产生不必要的字符串操作
+
+#### 当前实现
+
 ```swift
 public struct LogEvent {
     public let file: String
@@ -277,7 +326,8 @@ public struct LogEvent {
 }
 ```
 
-**优化方案**:
+#### 优化方案
+
 ```swift
 public struct LogEvent {
     public let file: String
@@ -293,51 +343,66 @@ public struct LogEvent {
         } else {
             self.fileName = ""
         }
+
+        // ... 其他初始化
     }
 }
 ```
 
-**预期收益**:
+#### 注意事项
+
+⚠️ **需要更新所有创建 LogEvent 的地方**，确保所有初始化路径都正确
+
+#### 预期收益
+
 - ✅ 减少重复字符串操作
-- ✅ 微幅改善内存效率
-
-**风险**: 低 (需要修改 LogEvent 结构体，确保所有初始化路径都更新)
-
-**注意**: 需要更新所有创建 LogEvent 的地方
+- ✅ 微幅内存效率提升
+- ⚠️ 需要仔细测试所有初始化路径
 
 ---
 
-#### 📝 2.5 Magic Numbers 提取 (可选)
+### P3 💡 任务5: Magic Numbers 提取 (可选)
 
+**优先级**: P3 - 💡 **低** (代码整洁)
 **工作量**: 1小时
-**优先级**: ⭕ 低 (可维护性)
+**风险**: 极低
+**收益**: 提升可维护性，便于参数调整
 
-**问题描述**:
-- 硬编码数值散落在代码中
-- 修改时需要在多处查找替换
-- 不便于全局调整
+#### 问题描述
 
-**当前硬编码位置**:
+- **问题**: 硬编码数值散落在多个文件中
+- **影响**: 修改配置需要多处查找替换
+- **现状**: Constants.swift 已存在，需要扩展
+
+#### 硬编码位置统计
+
 ```swift
 // LogDetailSceneState.swift
-let pageSize = 500                    // 第 103 行
-let limit: Int = 10000                // 第 551 行
+let pageSize = 500
+let limit: Int = 10000
 
 // CoreDataDestination.swift
-batchSize: Int = 50                   // 第 25 行
+batchSize: Int = 50
+flushInterval: 5.0
 
 // LogFilterSheet.swift
-.fetchLimit = 100                     // 第 197 行
+.fetchLimit = 100
 
 // LoggerEngineConfiguration
 maxDatabaseSize: Int64 = 100 * 1024 * 1024
 maxRetentionDays: Int = 30
 ```
 
-**优化方案**:
+#### 优化方案
+
+扩展现有的 `Sources/LoggerKit/Utilities/Constants.swift`:
+
 ```swift
-// 新增文件: Sources/LoggerKit/Utilities/LoggerKitConstants.swift
-public enum LoggerKitConstants {
+public enum Constants {
+    // 现有常量
+    public static let logDirectoryName = "LoggerKit"
+
+    // 新增: 数据库常量
     public enum Database {
         public static let maxDatabaseSize: Int64 = 100 * 1024 * 1024  // 100MB
         public static let maxRetentionDays: Int = 30
@@ -346,342 +411,105 @@ public enum LoggerKitConstants {
         public static let topFunctionsLimit: Int = 100
     }
 
+    // 新增: UI常量
     public enum UI {
         public static let searchPreviewLimit: Int = 5
         public static let initialLogLoadLimit: Int = 10000
+        public static let filterFetchLimit: Int = 100
     }
 
+    // 新增: 性能常量
     public enum Performance {
         public static let flushInterval: TimeInterval = 5.0
     }
-}
 
-// 使用
-let pageSize = LoggerKitConstants.Database.defaultPageSize
-let batchSize = LoggerKitConstants.Database.batchWriteSize
+    // 保持现有的 UserDefaultsKeys
+    public enum UserDefaultsKeys {
+        public static let logIdentifier = "com.loggerkit.identifier"
+    }
+}
 ```
 
-**预期收益**:
-- ✅ 提升可维护性
+#### 使用示例
+
+```swift
+// 替换前
+let pageSize = 500
+
+// 替换后
+let pageSize = Constants.Database.defaultPageSize
+```
+
+#### 预期收益
+
+- ✅ 提升代码可维护性
 - ✅ 便于全局调整参数
 - ✅ 代码意图更清晰
-
-**风险**: 极低
-
----
-
-### 阶段2总结
-
-**推荐优先级排序**:
-1. 🔥 2.1 Timer 泄漏修复 (必须 - 稳定性)
-2. 🚀 2.2 搜索结果单次遍历 (推荐 - 性能)
-3. 🛠️ 2.3 错误处理统一化 (推荐 - 可观测性)
-4. ⭕ 2.4 fileName 优化 (可选 - 微优化)
-5. ⭕ 2.5 Magic Numbers (可选 - 维护性)
-
-**最小必做集**: 2.1 + 2.2 + 2.3 = ~4小时
+- ✅ 减少魔法数字
 
 ---
 
-## ❌ 阶段3: 架构重构 (计划中)
+## 📋 任务优先级总结
 
-**状态**: ❌ 未开始
-**优先级**: 中-低
-**预计工作量**: ~16小时
-**建议时间**: 1-2个月内完成
+### 推荐执行顺序
 
-### 任务清单
+```
+第一周 (核心任务 - 必做):
+├─ Day 1     → ✅ P0: Timer泄漏修复 (已完成 - 30min) 🔥
+├─ Day 2-3   → P1: 搜索单次遍历 (2h) 🚀
+└─ Day 4-5   → P2: 错误处理统一 (1-2h) 🛠️
 
-#### 3.1 单元测试框架搭建
+第二周 (可选任务):
+├─ Day 1     → P3: fileName优化 (1h) 💡
+└─ Day 2     → P3: Magic Numbers (1h) 💡
+```
 
-**工作量**: 4-6小时
-**优先级**: 中 (为后续重构建立安全网)
+### 最小必做集
 
-**目标**:
-- 为核心业务逻辑添加测试覆盖
-- 建立重构保护机制
-- 提升代码质量信心
+**核心3项 (P0-P2)**: ~3.5-4小时 (剩余)
+- ✅ 修复稳定性问题 (P0已完成)
+- 🚧 提升性能50-70% (P1待完成)
+- 🚧 改善可观测性 (P2待完成)
 
-**测试范围**:
+完成后项目质量显著提升，可考虑发布新版本。
 
-1. **LogDatabaseManager 测试**
-   - fetchEvents() 各种过滤条件
-   - fetchStatistics() 统计准确性
-   - deleteOldLogs() 清理逻辑
-   - 分页功能验证
+### 完整任务集
 
-2. **LogParser 测试**
-   - 日志解析正确性
-   - 边界条件处理
-   - 错误输入容错
-
-3. **FilterOptionsCache 测试**
-   - 并发读写安全性
-   - 缓存失效逻辑
-   - 类型安全验证
-
-**测试工具**:
-- XCTest
-- 可能需要 CoreData in-memory store
-
-**预期收益**:
-- ✅ 测试覆盖率 0% → 60%+
-- ✅ 为重构建立安全网
-- ✅ 防止功能回归
-
-**前置条件**: 无
+**全部5项 (P0-P3)**: ~5.5-6小时 (剩余)
+- ✅ P0 完成 (稳定性修复)
+- 🚧 P1-P3 待完成 (4个任务)
+- 完成后代码达到生产级别标准
 
 ---
 
-#### 3.2 LogDetailSceneState 职责拆分
+## 🎯 成功标准
 
-**工作量**: 6-8小时
-**优先级**: 中 (长期可维护性)
+### 任务完成标准
 
-**问题描述**:
-- 文件: `Sources/LoggerKit/UI/LogDetailSceneState.swift` (700+行)
-- 单个类承担太多职责:
-  - UI 状态管理
-  - 数据加载
-  - 过滤逻辑
-  - 缓存管理
-  - 数据库交互
+| 任务 | 状态 | 验证方法 |
+|------|------|---------|
+| Timer修复 | ✅ | 编译通过,使用DispatchSourceTimer |
+| 搜索优化 | 🚧 | 性能测试显示50%+提升 |
+| 错误处理 | 🚧 | 全局搜索无残留print() |
+| fileName优化 | 🚧 | 所有测试通过 |
+| Magic Numbers | 🚧 | 代码审查通过 |
 
-**重构方案**:
+### 质量指标目标
 
-```
-LogDetailSceneState (700+行)
-    ↓
-    ↓ 拆分
-    ↓
-├─ LogDetailSceneState (200行)       - UI状态管理
-├─ LogDataRepository (150行)         - 数据加载
-└─ LogFilterService (100行)          - 过滤逻辑
-```
-
-**详细设计**:
-
-```swift
-// 1. 数据仓库 - 负责数据加载
-protocol LogDataRepositoryProtocol {
-    func fetchEvents(
-        sessionId: String,
-        levels: Set<LogEvent.Level>,
-        search: String,
-        filters: LogFilters,
-        offset: Int,
-        limit: Int
-    ) async throws -> [LogEvent]
-
-    func fetchStatistics(sessionId: String) async throws -> LogStatistics
-}
-
-final class LogDataRepository: LogDataRepositoryProtocol {
-    private let databaseManager: LogDatabaseManager
-
-    // 实现数据加载逻辑
-}
-
-// 2. 过滤服务 - 负责过滤逻辑
-protocol LogFilterServiceProtocol {
-    func applyFilters(
-        events: [LogEvent],
-        search: String,
-        levels: Set<LogEvent.Level>,
-        filters: LogFilters
-    ) -> [LogEvent]
-}
-
-final class LogFilterService: LogFilterServiceProtocol {
-    // 实现过滤逻辑（如果需要内存过滤）
-}
-
-// 3. 简化的 State - 只负责UI状态
-@MainActor
-public class LogDetailSceneState: ObservableObject {
-    // UI状态
-    @Published public var selectedLevels: Set<LogEvent.Level>
-    @Published public var searchText: String = ""
-    @Published public var displayEvents: [LogEvent] = []
-
-    // 依赖注入
-    private let repository: LogDataRepositoryProtocol
-    private let filterService: LogFilterServiceProtocol
-
-    // 简化的业务逻辑
-    public func loadLogs() async {
-        // 调用 repository
-    }
-}
-```
-
-**实施步骤**:
-1. 创建 LogDataRepository，迁移数据加载逻辑
-2. 创建 LogFilterService，迁移过滤逻辑
-3. 简化 LogDetailSceneState，只保留 UI 状态
-4. 使用单元测试验证功能不变
-5. 更新 UI 层调用
-
-**预期收益**:
-- ✅ 代码行数减少 60%
-- ✅ 单一职责原则
-- ✅ 易于单元测试
-- ✅ 提升可维护性
-
-**前置条件**: 3.1 完成 (有测试保护)
-
----
-
-#### 3.3 依赖注入实现
-
-**工作量**: 4-6小时
-**优先级**: 中 (提升灵活性)
-
-**目标**:
-- 使用协议抽象依赖
-- 支持单元测试 mock
-- 降低组件耦合
-
-**重构范围**:
-
-```swift
-// 1. 定义协议
-protocol LogDatabaseManagerProtocol {
-    func fetchEvents(...) async throws -> [LogEvent]
-    func fetchStatistics(...) async throws -> LogStatistics
-}
-
-// 2. LogDatabaseManager 遵循协议
-extension LogDatabaseManager: LogDatabaseManagerProtocol {
-    // 已有实现
-}
-
-// 3. 依赖注入
-public class LogDetailSceneState: ObservableObject {
-    private let databaseManager: LogDatabaseManagerProtocol
-
-    public init(
-        sessionId: String,
-        databaseManager: LogDatabaseManagerProtocol = LogDatabaseManager.shared
-    ) {
-        self.databaseManager = databaseManager
-        // ...
-    }
-}
-
-// 4. 测试时使用 Mock
-class MockDatabaseManager: LogDatabaseManagerProtocol {
-    var mockEvents: [LogEvent] = []
-
-    func fetchEvents(...) async throws -> [LogEvent] {
-        return mockEvents
-    }
-}
-
-// 测试
-func testLoadLogs() async {
-    let mock = MockDatabaseManager()
-    mock.mockEvents = [/* test data */]
-
-    let state = LogDetailSceneState(
-        sessionId: "test",
-        databaseManager: mock
-    )
-
-    await state.loadLogs()
-
-    XCTAssertEqual(state.displayEvents.count, mock.mockEvents.count)
-}
-```
-
-**预期收益**:
-- ✅ 单元测试更容易
-- ✅ 降低耦合度
-- ✅ 支持替换实现
-
-**前置条件**: 3.2 完成
-
----
-
-### 阶段3总结
-
-**推荐执行顺序**:
-1. 3.1 单元测试 (先建立安全网)
-2. 3.2 职责拆分 (有测试保护)
-3. 3.3 依赖注入 (进一步解耦)
-
-**注意事项**:
-- 建议分3个独立 PR 提交
-- 每个 PR 都要确保测试通过
-- 重构前后功能保持一致
-
----
-
-## 📈 整体时间规划
-
-### 近期 (1-2周)
-
-**目标**: 完成阶段2核心任务
-
-```
-Week 1:
-  Day 1-2: 2.1 Timer 泄漏修复 (1h)
-  Day 3-4: 2.2 搜索单次遍历 (2h)
-  Day 5:   2.3 错误处理统一化 (1-2h)
-
-Week 2:
-  Day 1-2: 验证和测试
-  Day 3-5: (可选) 2.4, 2.5
-```
-
-**里程碑**: 阶段2完成，性能和稳定性进一步提升
-
-### 中期 (1-2月)
-
-**目标**: 启动阶段3架构重构
-
-```
-Month 1:
-  Week 1-2: 3.1 单元测试框架 (4-6h)
-  Week 3-4: 规划详细重构方案
-
-Month 2:
-  Week 1-2: 3.2 职责拆分 (6-8h)
-  Week 3-4: 3.3 依赖注入 (4-6h)
-```
-
-**里程碑**: 架构重构完成，可测试性和可维护性显著提升
-
----
-
-## 🎯 关键指标追踪
-
-### 性能指标
-
-| 指标 | 优化前 | 阶段1后 | 阶段2目标 |
-|------|--------|---------|-----------|
-| 数据库查询次数 | 9次 | 2次 ✅ | - |
-| 列表渲染 | 全量 | 虚拟化+分页 ✅ | - |
-| 搜索响应时间 | 300ms | - | <150ms |
-| 内存占用 | 80-100MB | 20-30MB ✅ | - |
-
-### 代码质量指标
-
-| 指标 | 当前 | 阶段2目标 | 阶段3目标 |
-|------|------|-----------|-----------|
-| LogDetailSceneState 行数 | 700+ | - | 200-300 |
-| 测试覆盖率 | 0% | - | 60%+ |
-| print() 错误处理 | 15+ | 0 | - |
-| Timer 泄漏风险 | 存在 | 消除 | - |
+| 指标 | 修复前 | 当前 | 目标 |
+|------|------|------|------|
+| Timer 泄漏风险 | ⚠️ 存在 | ✅ 消除 | ✅ 消除 |
+| 搜索响应时间 | ~300ms | ~300ms | <150ms |
+| print() 错误处理 | 11+ 处 | 11+ 处 | 0 处 |
+| 魔法数字 | 分散 | 分散 | 集中管理 |
 
 ---
 
 ## 📚 相关文档
 
-- 📊 [分析总结](./ANALYSIS_SUMMARY.txt) - 整体分析结果
-- 📝 [详细分析报告](./CODE_ANALYSIS_REPORT.md) - 所有问题详情
-- 🚀 [阶段1进度](./Examples/iOS/LoggerKitExample/openspec/changes/archive/2025-12-12-optimize-phase1-performance/PROGRESS.md) - 已完成工作
-- 🔍 [快速参考](./OPTIMIZATION_QUICK_REFERENCE.md) - 快速查找代码片段
+- 📊 [阶段1完成记录](./Examples/iOS/LoggerKitExample/openspec/changes/archive/2025-12-12-optimize-phase1-performance/PROGRESS.md)
+- 🏗️ [架构重构记录](查看 LogDataLoader, FilterState, SearchState 等文件)
+- 🧪 [测试框架](./Tests/LoggerKitTests/)
 
 ---
 
@@ -689,8 +517,11 @@ Month 2:
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
-| 2025-12-12 | 1.0 | 初始创建，阶段1完成后重新规划 |
+| 2025-12-12 | 1.0 | 初始创建 |
+| 2025-12-15 | 2.0 | 阶段3完成后更新 |
+| 2025-12-15 | 3.0 | 精简版: 删除已完成项，重新标记优先级 |
+| 2025-12-15 | 3.1 | ✅ **P0完成**: Timer泄漏修复 (DispatchSourceTimer) |
 
 ---
 
-**总结**: 阶段1的核心性能优化已成功完成，剩余工作分为阶段2(代码质量)和阶段3(架构重构)两个清晰的阶段。建议优先完成阶段2的关键任务(Timer修复、搜索优化、错误处理)，然后根据实际需求决定是否启动阶段3的架构重构。
+**下一步**: 推荐开始 **P1: 搜索单次遍历优化** (2小时) - 性能提升50-70%

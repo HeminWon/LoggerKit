@@ -16,7 +16,7 @@ public final class CoreDataDestination: BaseDestination {
     private let batchSize: Int
     private var pendingEvents: [LogEvent] = []
     private let queue = DispatchQueue(label: "com.loggerkit.coredata", qos: .utility)
-    private var flushTimer: Timer?
+    private var flushTimer: DispatchSourceTimer?
 
     // 会话信息
     private let sessionId: String
@@ -38,14 +38,19 @@ public final class CoreDataDestination: BaseDestination {
     }
 
     private func setupFlushTimer() {
-        DispatchQueue.main.async { [weak self] in
-            self?.flushTimer = Timer.scheduledTimer(
-                withTimeInterval: 5.0,
-                repeats: true
-            ) { [weak self] _ in
-                self?.flush()
-            }
+        // 使用 DispatchSourceTimer 替代 Foundation.Timer
+        // 优势: 1) 不依赖 RunLoop, 避免引用循环 2) 更好的线程控制
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+
+        timer.setEventHandler { [weak self] in
+            self?.flushPendingEvents()
         }
+
+        // 每 5 秒触发一次
+        timer.schedule(deadline: .now() + 5.0, repeating: 5.0)
+        timer.resume()
+
+        self.flushTimer = timer
     }
 
     override public func send(
@@ -128,7 +133,9 @@ public final class CoreDataDestination: BaseDestination {
     }
 
     deinit {
-        flushTimer?.invalidate()
+        // 取消定时器并最后一次刷新,确保数据不丢失
+        flushTimer?.cancel()
+        flushTimer = nil
         flush()
     }
 }
