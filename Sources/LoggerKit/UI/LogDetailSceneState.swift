@@ -258,7 +258,9 @@ public class LogDetailSceneState: ObservableObject {
         case .thread:
             filterItem = .thread(item.value)
         case .message:
-            filterItem = .messageKeyword(item.value)
+            // 添加当前搜索的关键词,而非完整的 message 文本
+            let keyword = searchState.searchText.trimmingCharacters(in: .whitespaces)
+            filterItem = .messageKeyword(keyword.isEmpty ? item.value : keyword)
         }
         filterState.addToFilter(filterItem)
     }
@@ -486,7 +488,10 @@ public class LogDetailSceneState: ObservableObject {
 
             // 更新显示数据
             if resetPagination {
-                // 重置分页:转换为 ViewModel,从 1 开始编号
+                // 重置分页:更新 events 数组(用于搜索结果计算)
+                self.events = events
+
+                // 转换为 ViewModel,从 1 开始编号
                 let viewModels = events.enumerated().map { index, event in
                     LogRowViewModel(event: event, index: index + 1)
                 }
@@ -497,7 +502,10 @@ public class LogDetailSceneState: ObservableObject {
                 // 查询总数
                 totalCount = await fetchTotalCount()
             } else {
-                // 追加分页:计算起始 index 保持连续
+                // 追加分页:追加到 events 数组
+                self.events.append(contentsOf: events)
+
+                // 计算起始 index 保持连续
                 let startIndex = displayEvents.count + 1
                 let viewModels = events.enumerated().map { offset, event in
                     LogRowViewModel(event: event, index: startIndex + offset)

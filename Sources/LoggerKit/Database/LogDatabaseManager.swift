@@ -135,22 +135,28 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
         }
 
-        // 搜索文本 (在 message, function, fileName 中搜索)
-        if !searchText.isEmpty {
-            let searchPredicate = NSPredicate(
-                format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
-                searchText, "function", searchText, searchText
-            )
-            predicates.append(searchPredicate)
-        }
+        // 搜索文本和消息关键词筛选 (OR逻辑: searchText 或 messageKeywords 任一匹配即可)
+        if !searchText.isEmpty || !messageKeywords.isEmpty {
+            var messagePredicates: [NSPredicate] = []
 
-        // 消息关键词筛选 (OR逻辑: 任意一个关键词匹配即可)
-        if !messageKeywords.isEmpty {
-            let keywordPredicates = messageKeywords.map { keyword in
-                NSPredicate(format: "message CONTAINS[cd] %@", keyword)
+            // 搜索文本 (在 message, function, fileName 中搜索)
+            if !searchText.isEmpty {
+                messagePredicates.append(NSPredicate(
+                    format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
+                    searchText, "function", searchText, searchText
+                ))
             }
-            let orPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: keywordPredicates)
-            predicates.append(orPredicate)
+
+            // 消息关键词筛选 (每个关键词独立匹配)
+            if !messageKeywords.isEmpty {
+                for keyword in messageKeywords {
+                    messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
+                }
+            }
+
+            // 组合为 OR 关系
+            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+            predicates.append(combinedPredicate)
         }
 
         // 组合谓词
@@ -294,22 +300,28 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
         }
 
-        // 搜索文本
-        if !searchText.isEmpty {
-            let searchPredicate = NSPredicate(
-                format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
-                searchText, "function", searchText, searchText
-            )
-            predicates.append(searchPredicate)
-        }
+        // 搜索文本和消息关键词筛选 (OR逻辑: searchText 或 messageKeywords 任一匹配即可)
+        if !searchText.isEmpty || !messageKeywords.isEmpty {
+            var messagePredicates: [NSPredicate] = []
 
-        // 消息关键词筛选
-        if !messageKeywords.isEmpty {
-            let keywordPredicates = messageKeywords.map { keyword in
-                NSPredicate(format: "message CONTAINS[cd] %@", keyword)
+            // 搜索文本 (在 message, function, fileName 中搜索)
+            if !searchText.isEmpty {
+                messagePredicates.append(NSPredicate(
+                    format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
+                    searchText, "function", searchText, searchText
+                ))
             }
-            let orPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: keywordPredicates)
-            predicates.append(orPredicate)
+
+            // 消息关键词筛选 (每个关键词独立匹配)
+            if !messageKeywords.isEmpty {
+                for keyword in messageKeywords {
+                    messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
+                }
+            }
+
+            // 组合为 OR 关系
+            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+            predicates.append(combinedPredicate)
         }
 
         // 组合谓词
