@@ -12,7 +12,8 @@
       "Bash(openspec validate:*)",
       "Bash(openspec archive:*)",
       "Bash(mkdir:*)",
-      "Bash(xcodebuild:*)"
+      "Bash(xcodebuild:*)",
+      "SlashCommand(/openspec:proposal)"
     ],
     "deny": [],
     "ask": []

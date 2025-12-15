@@ -49,18 +49,20 @@ TBD - created by archiving change optimize-phase1-performance. Update Purpose af
 
 ### Requirement: 虚拟化列表渲染
 
-系统 SHALL 使用虚拟化列表组件渲染日志,仅渲染可见区域的日志。
+系统 SHALL 使用虚拟化列表组件渲染日志，仅渲染可见区域的日志。
 
 列表组件 MUST 使用 SwiftUI 的 `List` 或等效的虚拟化组件。
 
-列表 MUST 仅创建可见区域内的视图,不为屏幕外的日志创建视图。
+列表 MUST 仅创建可见区域内的视图，不为屏幕外的日志创建视图。
 
-滚动性能 MUST 达到 60fps,即使在大数据量场景下(10000+ 条日志)。
+滚动性能 MUST 达到 60fps，即使在大数据量场景下（10000+ 条日志）。
+
+列表迭代 MUST 直接使用 LogRowViewModel 数组，不使用 zip 或 enumerated 等辅助操作。
 
 #### Scenario: 仅渲染可见日志
 
 - **WHEN** 列表展示 1000 条日志
-- **THEN** 仅为屏幕可见区域的日志(约 10-20 条)创建视图
+- **THEN** 仅为屏幕可见区域的日志（约 10-20 条）创建视图
 - **AND** 屏幕外的日志不创建视图
 - **AND** 内存占用保持在合理范围
 
@@ -69,7 +71,7 @@ TBD - created by archiving change optimize-phase1-performance. Update Purpose af
 - **WHEN** 用户滚动列表
 - **THEN** 新进入可见区域的日志动态创建视图
 - **AND** 离开可见区域的日志视图被销毁或复用
-- **AND** 滚动流畅,帧率保持 60fps
+- **AND** 滚动流畅，帧率保持 60fps
 
 #### Scenario: 大数据量性能保障
 
@@ -77,6 +79,13 @@ TBD - created by archiving change optimize-phase1-performance. Update Purpose af
 - **THEN** 初始加载时间 < 1 秒
 - **AND** 滚动帧率保持 60fps
 - **AND** 内存占用 < 100MB
+
+#### Scenario: 简化 ForEach 迭代逻辑
+
+- **WHEN** 渲染日志列表
+- **THEN** 使用 `ForEach(displayEvents) { viewModel in ... }` 直接迭代
+- **AND** 不使用 `zip(indices, events)` 等复杂操作
+- **AND** 代码可读性提升
 
 ---
 
@@ -255,4 +264,159 @@ CoreData 的 `viewContext` MUST 仅在主线程访问。
 - **AND** 不会出现重复的日志
 - **AND** 不会遗漏日志
 - **AND** 数据顺序保持一致
+
+### Requirement: LogRow 显示数据模型
+
+系统 SHALL 使用专用 ViewModel 封装 LogRow 的显示数据，避免在 View 层执行计算逻辑。
+
+LogRowViewModel MUST 实现 `Identifiable` 协议，使用 LogEvent.id 作为唯一标识。
+
+LogRowViewModel MUST 封装以下数据：
+- `event: LogEvent` - 原始日志数据
+- `index: Int` - 显示序号（从 1 开始）
+- `cachedColor: Color` - 预计算的 session 颜色
+
+sessionColor 计算 MUST 在 ViewModel 初始化时执行，而不是在 View 渲染时执行。
+
+#### Scenario: ViewModel 封装显示数据
+
+- **WHEN** 从数据库加载日志数据
+- **THEN** 为每条 LogEvent 创建对应的 LogRowViewModel
+- **AND** ViewModel 包含 event、index 和 cachedColor
+- **AND** index 从 1 开始连续递增
+
+#### Scenario: 预计算 session 颜色
+
+- **WHEN** 创建 LogRowViewModel
+- **THEN** 在 init 方法中计算并缓存 sessionColor
+- **AND** sessionColor 基于 event.sessionId 稳定生成
+- **AND** 相同 sessionId 始终生成相同颜色
+
+#### Scenario: 使用 event.id 作为唯一标识
+
+- **WHEN** ForEach 迭代 LogRowViewModel 数组
+- **THEN** 使用 ViewModel.id（即 event.id）作为标识符
+- **AND** SwiftUI 正确识别每个 row 的身份
+- **AND** 数据更新时 row 复用逻辑正确
+
+#### Scenario: 分页加载时 index 连续性
+
+- **WHEN** 加载第二页数据（第 501-1000 条）
+- **THEN** 新 ViewModel 的 index 从 501 开始
+- **AND** index 不会重新从 1 开始
+- **AND** 所有 ViewModel 的 index 唯一且连续
+
+---
+
+### Requirement: 全量日志导出
+
+系统 SHALL 提供导出功能，允许用户导出所有日志到文件。
+
+导出功能 MUST 使用专有查询，独立于分页加载逻辑。
+
+导出查询 MUST 返回所有符合当前筛选条件的日志，不受分页限制。
+
+导出查询 MUST 在后台线程执行，避免阻塞主线程。
+
+导出过程 SHOULD 显示加载指示器，提供用户反馈。
+
+#### Scenario: 导出全部日志而不仅是分页数据
+
+- **WHEN** 用户仅加载了第一页（500 条日志）
+- **AND** 用户点击导出按钮
+- **THEN** 系统执行全量查询，获取所有日志（不止 500 条）
+- **AND** 导出的文件包含所有日志
+- **AND** 不仅导出已显示的分页数据
+
+#### Scenario: 导出尊重筛选条件
+
+- **WHEN** 用户设置了筛选条件（如只显示 ERROR 级别）
+- **AND** 用户点击导出按钮
+- **THEN** 导出的日志仅包含符合筛选条件的日志（ERROR 级别）
+- **AND** 不包含其他级别的日志
+
+#### Scenario: 后台执行导出查询
+
+- **WHEN** 用户点击导出按钮
+- **THEN** 系统在后台线程执行全量查询
+- **AND** 不阻塞主线程
+- **AND** UI 保持响应
+
+#### Scenario: 导出加载反馈
+
+- **WHEN** 用户点击导出按钮
+- **AND** 全量查询正在执行
+- **THEN** UI 显示加载指示器
+- **AND** 用户知道系统正在准备导出数据
+- **AND** 查询完成后显示分享界面
+
+---
+
+### Requirement: 初始加载使用分页
+
+系统 SHALL 在首次打开日志界面时使用分页加载，而不是全量加载。
+
+初始加载 MUST 仅加载第一页（默认 500 条），而不是一次性加载全部日志。
+
+`loadAllLogsFromDatabase()` 和 `loadLogsForDate()` MUST 复用 `loadLogsFromDatabase(resetPagination: true)` 的分页逻辑。
+
+初始加载时间 SHOULD 显著缩短（相比全量加载减少 50-70%）。
+
+#### Scenario: 首屏分页加载
+
+- **WHEN** 用户首次打开日志界面
+- **THEN** 系统仅加载第一页（500 条日志）
+- **AND** 不加载全部 10000 条日志
+- **AND** 加载速度明显快于全量加载
+
+#### Scenario: 统一分页逻辑
+
+- **WHEN** 调用 `loadAllLogsFromDatabase()` 或 `loadLogsForDate()`
+- **THEN** 内部调用 `loadLogsFromDatabase(resetPagination: true)`
+- **AND** 不执行独立的全量查询
+- **AND** 逻辑统一，易于维护
+
+---
+
+### Requirement: 显示符合筛选条件的日志总数
+
+系统 SHALL 显示符合当前筛选条件的日志总数，而不仅是已加载的数量。
+
+系统 MUST 提供 `totalCount` 属性，表示数据库中符合筛选条件的日志总数。
+
+UI MUST 显示"已加载 X / 总计 Y 条"格式的统计信息。
+
+系统 MUST 在重置分页时（首次加载、筛选条件变化）查询并更新 `totalCount`。
+
+总数查询 MUST 使用 COUNT 查询，不加载实际数据，确保性能。
+
+#### Scenario: 显示准确的总数统计
+
+- **WHEN** 用户打开日志界面，仅加载了第一页（500 条）
+- **AND** 数据库中实际有 5000 条日志
+- **THEN** UI 显示"已加载 500 / 总计 5000 条"
+- **AND** 不显示"总计 500 条"（误导用户）
+
+#### Scenario: 分页加载后统计更新
+
+- **WHEN** 用户滚动加载更多，已加载变为 1000 条
+- **AND** 总数仍为 5000 条
+- **THEN** UI 显示"已加载 1000 / 总计 5000 条"
+- **AND** 总数不变
+
+#### Scenario: 筛选后总数重新计算
+
+- **WHEN** 用户应用筛选条件（如只显示 ERROR 级别）
+- **AND** 符合条件的日志仅有 200 条
+- **THEN** 系统重新查询总数
+- **AND** UI 显示"已加载 100 / 总计 200 条"（假设加载了 100 条）
+
+#### Scenario: COUNT 查询性能
+
+- **WHEN** 系统查询总数
+- **THEN** 使用 COUNT 查询，不加载实际 LogEvent 数据
+- **AND** 查询速度快（< 100ms）
+- **AND** 不影响 UI 响应
+
+---
 

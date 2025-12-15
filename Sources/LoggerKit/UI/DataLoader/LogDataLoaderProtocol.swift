@@ -30,6 +30,30 @@ public protocol LogDataLoaderProtocol {
     /// - Returns: 日志统计信息
     func loadStatistics() async throws -> LogStatistics
 
+    /// 统计符合条件的日志总数
+    /// - Parameters:
+    ///   - sessionId: 会话ID过滤
+    ///   - filterState: 过滤状态
+    ///   - searchText: 搜索文本
+    /// - Returns: 日志总数
+    func countEvents(
+        sessionId: String?,
+        filterState: FilterState,
+        searchText: String
+    ) async throws -> Int
+
+    /// 加载所有符合条件的日志事件(用于导出)
+    /// - Parameters:
+    ///   - sessionId: 会话ID过滤
+    ///   - filterState: 过滤状态
+    ///   - searchText: 搜索文本
+    /// - Returns: 所有符合条件的日志事件数组
+    func loadAllEvents(
+        sessionId: String?,
+        filterState: FilterState,
+        searchText: String
+    ) async throws -> [LogEvent]
+
     /// 取消当前加载任务
     func cancelCurrentTask()
 }

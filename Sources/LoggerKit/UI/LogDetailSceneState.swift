@@ -97,7 +97,10 @@ public class LogDetailSceneState: ObservableObject {
             invalidateCache()
         }
     }
-    @Published var displayEvents: [LogEvent] = []
+    /// 显示用的 ViewModel 数组,封装了 event、index 和预计算的颜色
+    @Published var displayEvents: [LogRowViewModel] = []
+    /// 符合当前筛选条件的日志总数(不受分页限制)
+    @Published var totalCount: Int = 0
     @Published var loadingState: LoadingState = .idle
     @Published var error: Error?
 
@@ -442,67 +445,16 @@ public class LogDetailSceneState: ObservableObject {
         await loadAllLogsFromDatabase()
     }
 
-    /// 从数据库加载所有日志
+    /// 从数据库加载所有日志（使用分页）
     private func loadAllLogsFromDatabase() async {
-        loadingState = .loading(progress: "正在加载所有日志...")
-
-        // 使用 performBackgroundTask 确保线程安全
-        await withCheckedContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { [weak self] context in
-                guard let self = self else {
-                    continuation.resume()
-                    return
-                }
-
-                do {
-                    let dbManager = LoggerEngine.shared.getDatabaseManager()!
-                    // 在后台 context 中执行查询
-                    let events = try dbManager.fetchEvents(
-                        in: context,
-                        levels: [.verbose, .debug, .info, .warning, .error, .critical, .fault],
-                        limit: 10000
-                    )
-
-                    // 切换到主线程更新 UI
-                    Task { @MainActor [weak self] in
-                        self?.events = events
-                        self?.displayEvents = events  // 同时更新displayEvents供UI显示
-                        self?.currentPage = 1
-                        self?.loadingState = .loaded
-                        continuation.resume()
-                    }
-                } catch {
-                    // 错误处理
-                    Task { @MainActor [weak self] in
-                        print("❌ Failed to load all logs: \(error)")
-                        self?.error = error
-                        self?.loadingState = .failed(error)
-                        continuation.resume()
-                    }
-                }
-            }
-        }
+        loadingState = .loading(progress: "正在加载日志...")
+        await loadLogsFromDatabase(resetPagination: true)
     }
 
-    /// 从数据库加载指定日期的日志
+    /// 从数据库加载指定日期的日志（使用分页）
     private func loadLogsForDate(_ date: String) async {
         loadingState = .loading(progress: "正在加载日志...")
-
-        do {
-            let dbManager = LoggerEngine.shared.getDatabaseManager()!
-            let events: [LogEvent] = try await Task.detached {
-                try dbManager.fetchEvents(forDate: date)
-            }.value
-
-            self.events = events
-            self.displayEvents = events  // 同时更新displayEvents供UI显示
-            self.currentPage = 1
-            self.loadingState = .loaded
-        } catch {
-            self.error = error
-            self.loadingState = .failed(error)
-            print("❌ Failed to load logs for date \(date): \(error)")
-        }
+        await loadLogsFromDatabase(resetPagination: true)
     }
 
     // MARK: - 数据库查询方法
@@ -534,11 +486,23 @@ public class LogDetailSceneState: ObservableObject {
 
             // 更新显示数据
             if resetPagination {
-                displayEvents = events
+                // 重置分页:转换为 ViewModel,从 1 开始编号
+                let viewModels = events.enumerated().map { index, event in
+                    LogRowViewModel(event: event, index: index + 1)
+                }
+                displayEvents = viewModels
                 currentPage = 1
                 hasMoreData = true
+
+                // 查询总数
+                totalCount = await fetchTotalCount()
             } else {
-                displayEvents.append(contentsOf: events)
+                // 追加分页:计算起始 index 保持连续
+                let startIndex = displayEvents.count + 1
+                let viewModels = events.enumerated().map { offset, event in
+                    LogRowViewModel(event: event, index: startIndex + offset)
+                }
+                displayEvents.append(contentsOf: viewModels)
                 currentPage += 1
             }
 
@@ -612,6 +576,34 @@ public class LogDetailSceneState: ObservableObject {
 
         } catch {
             print("❌ Failed to load filter options: \(error)")
+        }
+    }
+
+    /// 查询符合当前筛选条件的日志总数
+    private func fetchTotalCount() async -> Int {
+        do {
+            return try await dataLoader.countEvents(
+                sessionId: filterState.selectedSessionId,
+                filterState: filterState,
+                searchText: searchState.searchText
+            )
+        } catch {
+            print("❌ Failed to fetch total count: \(error)")
+            return 0
+        }
+    }
+
+    /// 导出所有符合条件的日志事件(用于导出功能)
+    func exportAllEvents() async -> [LogEvent] {
+        do {
+            return try await dataLoader.loadAllEvents(
+                sessionId: filterState.selectedSessionId,
+                filterState: filterState,
+                searchText: searchState.searchText
+            )
+        } catch {
+            print("❌ Failed to export all events: \(error)")
+            return []
         }
     }
 

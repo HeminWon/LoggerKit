@@ -38,6 +38,19 @@ public protocol LogDatabaseManagerProtocol {
     /// 获取统计信息
     func fetchStatistics() throws -> LogStatistics
 
+    /// 统计符合条件的日志总数
+    func countEvents(
+        in context: NSManagedObjectContext?,
+        levels: Set<LogEvent.Level>,
+        functions: Set<String>,
+        fileNames: Set<String>,
+        contexts: Set<String>,
+        threads: Set<String>,
+        sessionId: String?,
+        searchText: String,
+        messageKeywords: Set<String>
+    ) throws -> Int
+
     /// 获取指定字段的唯一值
     func fetchUniqueValues(for field: String) throws -> [String]
 

@@ -245,6 +245,82 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         )
     }
 
+    /// 统计符合条件的日志总数
+    public func countEvents(
+        in context: NSManagedObjectContext? = nil,
+        levels: Set<LogEvent.Level>,
+        functions: Set<String> = [],
+        fileNames: Set<String> = [],
+        contexts: Set<String> = [],
+        threads: Set<String> = [],
+        sessionId: String? = nil,
+        searchText: String = "",
+        messageKeywords: Set<String> = []
+    ) throws -> Int {
+        let targetContext = context ?? coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        // 构建谓词(复用 fetchEvents 的逻辑)
+        var predicates: [NSPredicate] = []
+
+        // 日志等级筛选
+        if !levels.isEmpty {
+            let levelValues = levels.map { Int16($0.rawValue) }
+            predicates.append(NSPredicate(format: "level IN %@", levelValues))
+        }
+
+        // 函数名筛选
+        if !functions.isEmpty {
+            predicates.append(NSPredicate(format: "%K IN %@", "function", Array(functions)))
+        }
+
+        // 文件名筛选
+        if !fileNames.isEmpty {
+            predicates.append(NSPredicate(format: "fileName IN %@", Array(fileNames)))
+        }
+
+        // Context 筛选
+        if !contexts.isEmpty {
+            predicates.append(NSPredicate(format: "context IN %@", Array(contexts)))
+        }
+
+        // 线程筛选
+        if !threads.isEmpty {
+            predicates.append(NSPredicate(format: "thread IN %@", Array(threads)))
+        }
+
+        // 会话筛选
+        if let sessionId = sessionId {
+            predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
+        }
+
+        // 搜索文本
+        if !searchText.isEmpty {
+            let searchPredicate = NSPredicate(
+                format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
+                searchText, "function", searchText, searchText
+            )
+            predicates.append(searchPredicate)
+        }
+
+        // 消息关键词筛选
+        if !messageKeywords.isEmpty {
+            let keywordPredicates = messageKeywords.map { keyword in
+                NSPredicate(format: "message CONTAINS[cd] %@", keyword)
+            }
+            let orPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: keywordPredicates)
+            predicates.append(orPredicate)
+        }
+
+        // 组合谓词
+        if !predicates.isEmpty {
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        }
+
+        // 执行 COUNT 查询
+        return try targetContext.count(for: fetchRequest)
+    }
+
     /// 获取唯一值列表
     public func fetchUniqueValues(for keyPath: String) throws -> [String] {
         let context = coreDataStack.viewContext

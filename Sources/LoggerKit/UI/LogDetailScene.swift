@@ -18,6 +18,8 @@ public struct LogDetailScene: View {
 
     @State var isSharePresented: Bool = false
     @State var isFilterPresented: Bool = false
+    @State var exportURL: URL?
+    @State var isExporting: Bool = false
 
     public init(sceneState: LogDetailSceneState? = nil) {
         self.sceneState = sceneState ?? LogDetailSceneState()
@@ -69,9 +71,15 @@ public struct LogDetailScene: View {
             } else {
                 // 1️⃣ 筛选结果统计
                 HStack {
-                    Text(String(format: totalCountFormat, sceneState.displayEvents.count))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if sceneState.totalCount > 0 {
+                        Text("已加载 \(sceneState.displayEvents.count) / 总计 \(sceneState.totalCount) 条")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(String(format: totalCountFormat, sceneState.displayEvents.count))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     if sceneState.activeFilterCount > 0 {
                         Text(String(format: filterCountFormat, sceneState.activeFilterCount))
                             .font(.caption)
@@ -86,25 +94,25 @@ public struct LogDetailScene: View {
 
                 // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
                 List {
-                    ForEach(Array(zip(sceneState.displayEvents.indices, sceneState.displayEvents)), id: \.1.id) { index, logEvent in
+                    ForEach(sceneState.displayEvents) { viewModel in
                         if #available(iOS 15.0, macOS 13.0, *) {
-                            LogRowView(event: logEvent, index: index + 1)
+                            LogRowView(viewModel: viewModel)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .listRowSeparator(.hidden)
                                 .onAppear {
                                     // 滚动到底部时加载更多
-                                    if logEvent.id == sceneState.displayEvents.last?.id {
+                                    if viewModel.id == sceneState.displayEvents.last?.id {
                                         Task {
                                             await sceneState.loadMore()
                                         }
                                     }
                                 }
                         } else {
-                            LogRowView(event: logEvent, index: index + 1)
+                            LogRowView(viewModel: viewModel)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .onAppear {
                                     // 滚动到底部时加载更多
-                                    if logEvent.id == sceneState.displayEvents.last?.id {
+                                    if viewModel.id == sceneState.displayEvents.last?.id {
                                         Task {
                                             await sceneState.loadMore()
                                         }
@@ -152,15 +160,17 @@ public struct LogDetailScene: View {
         }
         #if canImport(UIKit)
         .sheet(isPresented: $isSharePresented) {
-            let shareSheet = ShareSheet(activityItems: [activityItem]) {
-                isSharePresented = false
-            }
-            if #available(iOS 16.0, *) {
-                shareSheet
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            } else  {
-                shareSheet
+            if let url = exportURL {
+                let shareSheet = ShareSheet(activityItems: [url]) {
+                    isSharePresented = false
+                }
+                if #available(iOS 16.0, *) {
+                    shareSheet
+                        .presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
+                } else  {
+                    shareSheet
+                }
             }
         }
         #endif
@@ -196,14 +206,21 @@ public struct LogDetailScene: View {
     // MARK: - Subviews
     private var shareButton: some View {
         Button {
-            isSharePresented = true
+            Task {
+                isExporting = true
+                let events = await sceneState.exportAllEvents()
+                exportURL = LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: events)
+                isExporting = false
+                isSharePresented = true
+            }
         } label: {
-            Label(shareLogText, systemImage: "square.and.arrow.up")
+            if isExporting {
+                ProgressView()
+            } else {
+                Label(shareLogText, systemImage: "square.and.arrow.up")
+            }
         }
-    }
-
-    private var activityItem: URL {
-        LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: sceneState.displayEvents)
+        .disabled(isExporting)
     }
 
     private func copyToClipboard(text: String) {
@@ -217,46 +234,19 @@ public struct LogDetailScene: View {
 
 }
 
-struct LogRowView: View {
-    let event: LogEvent
-    let index: Int
+// MARK: - LogRowViewModel
+/// LogRowView 的专用数据模型,封装了显示所需的 event、index 和预计算的颜色
+struct LogRowViewModel: Identifiable {
+    let id: UUID              // 使用 event.id 作为唯一标识
+    let event: LogEvent       // 原始日志数据
+    let index: Int            // 显示序号
+    let cachedColor: Color    // 预计算的 session 颜色
 
-    // 缓存计算的颜色,避免每次重绘都计算
-    private let cachedSessionColor: Color
-
-    public init(event: LogEvent, index: Int) {
+    init(event: LogEvent, index: Int) {
+        self.id = event.id
         self.event = event
         self.index = index
-        self.cachedSessionColor = Self.sessionColor(for: event.sessionId)
-    }
-
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(event.sessionId)
-                .foregroundColor(cachedSessionColor)
-                .font(.system(size: 9))
-            + Text(" #\(index)")
-                .foregroundColor(.secondary)
-                .font(.system(size: 9))
-            + Text(" ")
-                .font(.system(size: 9))
-            + Text(event.prefix)
-                .foregroundColor(.gray)
-                .font(.system(size: 9))
-
-            Text(event.message)
-                .foregroundColor(event.level.color)
-                .font(.caption2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 1)
-        // 长按弹出复制菜单
-        .contextMenu {
-            Button(action: { copyLog() }) {
-                Label(String(localized: "copy_log", bundle: .module), systemImage: "doc.on.doc")
-            }
-        }
+        self.cachedColor = Self.sessionColor(for: event.sessionId)
     }
 
     // 根据 sessionId 生成一致的柔和随机颜色
@@ -279,15 +269,52 @@ struct LogRowView: View {
         // 返回柔和的颜色,前景色使用完全不透明
         return Color(hue: hue, saturation: saturation, brightness: brightness, opacity: 1.0)
     }
-    
+}
+
+struct LogRowView: View {
+    let viewModel: LogRowViewModel
+
+    public init(viewModel: LogRowViewModel) {
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(viewModel.event.sessionId)
+                .foregroundColor(viewModel.cachedColor)
+                .font(.system(size: 9))
+            + Text(" #\(viewModel.index)")
+                .foregroundColor(.secondary)
+                .font(.system(size: 9))
+            + Text(" ")
+                .font(.system(size: 9))
+            + Text(viewModel.event.prefix)
+                .foregroundColor(.gray)
+                .font(.system(size: 9))
+
+            Text(viewModel.event.message)
+                .foregroundColor(viewModel.event.level.color)
+                .font(.caption2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 1)
+        // 长按弹出复制菜单
+        .contextMenu {
+            Button(action: { copyLog() }) {
+                Label(String(localized: "copy_log", bundle: .module), systemImage: "doc.on.doc")
+            }
+        }
+    }
+
     private func copyLog() {
         #if canImport(UIKit)
         let pasteboard = UIPasteboard.general
         // 复制完整日志内容：前缀 + message
-        pasteboard.string = "\(event.prefix) - \(event.message)"
+        pasteboard.string = "\(viewModel.event.prefix) - \(viewModel.event.message)"
         #elseif canImport(AppKit)
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("\(event.prefix) - \(event.message)", forType: .string)
+        NSPasteboard.general.setString("\(viewModel.event.prefix) - \(viewModel.event.message)", forType: .string)
         #endif
     }
 }

@@ -85,6 +85,87 @@ public class LogDataLoader: LogDataLoaderProtocol {
         }
     }
 
+    public func countEvents(
+        sessionId: String?,
+        filterState: FilterState,
+        searchText: String
+    ) async throws -> Int {
+        // 在主线程捕获需要的值
+        let dbManager = self.databaseManager
+        let levels = filterState.selectedLevels
+        let functions = filterState.selectedFunctions
+        let fileNames = filterState.selectedFileNames
+        let contexts = filterState.selectedContexts
+        let threads = filterState.selectedThreads
+        let messageKeywords = filterState.selectedMessageKeywords
+
+        // 使用 performBackgroundTask 确保线程安全
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    // 在后台 context 中执行 COUNT 查询
+                    let count = try dbManager.countEvents(
+                        in: context,
+                        levels: levels,
+                        functions: functions,
+                        fileNames: fileNames,
+                        contexts: contexts,
+                        threads: threads,
+                        sessionId: sessionId,
+                        searchText: searchText,
+                        messageKeywords: messageKeywords
+                    )
+
+                    continuation.resume(returning: count)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func loadAllEvents(
+        sessionId: String?,
+        filterState: FilterState,
+        searchText: String
+    ) async throws -> [LogEvent] {
+        // 在主线程捕获需要的值
+        let dbManager = self.databaseManager
+        let levels = filterState.selectedLevels
+        let functions = filterState.selectedFunctions
+        let fileNames = filterState.selectedFileNames
+        let contexts = filterState.selectedContexts
+        let threads = filterState.selectedThreads
+        let messageKeywords = filterState.selectedMessageKeywords
+
+        // 使用 performBackgroundTask 确保线程安全
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    // 在后台 context 中执行全量查询(使用大数值作为 limit)
+                    let events = try dbManager.fetchEvents(
+                        in: context,
+                        levels: levels,
+                        functions: functions,
+                        fileNames: fileNames,
+                        contexts: contexts,
+                        threads: threads,
+                        sessionId: sessionId,
+                        searchText: searchText,
+                        messageKeywords: messageKeywords,
+                        sortDescriptors: [],
+                        limit: 100000,  // 使用大数值代替无限制
+                        offset: 0
+                    )
+
+                    continuation.resume(returning: events)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     public func cancelCurrentTask() {
         currentTask?.cancel()
         currentTask = nil
