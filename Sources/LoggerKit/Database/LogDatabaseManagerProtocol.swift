@@ -18,7 +18,7 @@ public protocol LogDatabaseManagerProtocol {
         fileNames: Set<String>,
         contexts: Set<String>,
         threads: Set<String>,
-        sessionId: String?,
+        sessionIds: Set<String>,
         messageKeywords: Set<String>,
         sortDescriptors: [NSSortDescriptor],
         limit: Int,
@@ -37,7 +37,7 @@ public protocol LogDatabaseManagerProtocol {
     /// 查询所有日志事件用于搜索预览
     func fetchAllEventsForSearchPreview(
         in context: NSManagedObjectContext?,
-        sessionId: String?,
+        sessionIds: Set<String>,
         limit: Int
     ) throws -> [LogEvent]
 
@@ -52,7 +52,7 @@ public protocol LogDatabaseManagerProtocol {
         fileNames: Set<String>,
         contexts: Set<String>,
         threads: Set<String>,
-        sessionId: String?,
+        sessionIds: Set<String>,
         messageKeywords: Set<String>
     ) throws -> Int
 

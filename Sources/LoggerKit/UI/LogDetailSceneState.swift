@@ -504,7 +504,7 @@ public class LogDetailSceneState: ObservableObject {
         do {
             // 使用 DataLoader 加载数据
             let events = try await dataLoader.loadEvents(
-                sessionId: filterState.selectedSessionId,
+                sessionIds: filterState.selectedSessionIds,
                 filterState: filterState,
                 offset: offset,
                 limit: pageSize
@@ -609,7 +609,7 @@ public class LogDetailSceneState: ObservableObject {
     private func loadAllEventsForSearchPreview() async {
         do {
             let events = try await dataLoader.loadAllEventsForSearchPreview(
-                sessionId: filterState.selectedSessionId,
+                sessionIds: filterState.selectedSessionIds,
                 limit: 10000
             )
             self.allEventsForSearchPreview = events
@@ -674,7 +674,7 @@ public class LogDetailSceneState: ObservableObject {
     ) async -> Int {
         do {
             let count = try await dataLoader.countEvents(
-                sessionId: filterState.selectedSessionId,
+                sessionIds: filterState.selectedSessionIds,
                 filterState: filterState
             )
 
@@ -705,7 +705,7 @@ public class LogDetailSceneState: ObservableObject {
     ) async throws -> URL {
         // 首先查询总数
         let totalCount = try await dataLoader.countEvents(
-            sessionId: filterState.selectedSessionId,
+            sessionIds: filterState.selectedSessionIds,
             filterState: filterState
         )
 
@@ -716,7 +716,7 @@ public class LogDetailSceneState: ObservableObject {
 
         // 获取第一条日志以获取时间戳
         let firstBatch = try await dataLoader.loadEvents(
-            sessionId: filterState.selectedSessionId,
+            sessionIds: filterState.selectedSessionIds,
             filterState: filterState,
             offset: 0,
             limit: 1
@@ -745,7 +745,7 @@ public class LogDetailSceneState: ObservableObject {
 
                 // 分批查询日志
                 return try await self.dataLoader.loadEvents(
-                    sessionId: self.filterState.selectedSessionId,
+                    sessionIds: self.filterState.selectedSessionIds,
                     filterState: self.filterState,
                     offset: offset,
                     limit: limit

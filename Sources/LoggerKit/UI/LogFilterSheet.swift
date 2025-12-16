@@ -213,10 +213,13 @@ struct SessionFilterSection: View {
                 Text(String(localized: "session_filter_title", bundle: .module))
                     .font(.subheadline)
                     .fontWeight(.medium)
+                Text("(\(sceneState.filterState.selectedSessionIds.count))")
+                    .font(.caption)
+                    .foregroundColor(.blue)
                 Spacer()
-                if let _ = sceneState.filterState.selectedSessionId {
+                if !sceneState.filterState.selectedSessionIds.isEmpty {
                     Button(String(localized: "clear_button", bundle: .module)) {
-                        sceneState.filterState.selectedSessionId = nil
+                        sceneState.filterState.selectedSessionIds.removeAll()
                     }
                     .font(.caption)
                     .foregroundColor(.red)
@@ -241,12 +244,12 @@ struct SessionFilterSection: View {
                         ForEach(sessions) { session in
                             SessionChip(
                                 session: session,
-                                isSelected: sceneState.filterState.selectedSessionId == session.id
+                                isSelected: sceneState.filterState.selectedSessionIds.contains(session.id)
                             ) {
-                                if sceneState.filterState.selectedSessionId == session.id {
-                                    sceneState.filterState.selectedSessionId = nil
+                                if sceneState.filterState.selectedSessionIds.contains(session.id) {
+                                    sceneState.filterState.selectedSessionIds.remove(session.id)
                                 } else {
-                                    sceneState.filterState.selectedSessionId = session.id
+                                    sceneState.filterState.selectedSessionIds.insert(session.id)
                                 }
                             }
                         }

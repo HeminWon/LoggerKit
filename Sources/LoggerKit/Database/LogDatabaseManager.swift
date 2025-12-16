@@ -90,7 +90,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         fileNames: Set<String> = [],
         contexts: Set<String> = [],
         threads: Set<String> = [],
-        sessionId: String? = nil,
+        sessionIds: Set<String> = [],
         messageKeywords: Set<String> = [],
         sortDescriptors: [NSSortDescriptor] = [],
         limit: Int = 1000,
@@ -130,8 +130,8 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         }
 
         // 会话筛选
-        if let sessionId = sessionId {
-            predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
+        if !sessionIds.isEmpty {
+            predicates.append(NSPredicate(format: "sessionId IN %@", Array(sessionIds)))
         }
 
         // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)
@@ -169,20 +169,20 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
     /// 查询所有日志事件用于搜索预览 (不应用任何过滤条件,仅用于全局搜索)
     /// - Parameters:
     ///   - context: 可选的NSManagedObjectContext
-    ///   - sessionId: 可选的会话ID筛选
+    ///   - sessionIds: 可选的会话ID集合筛选
     ///   - limit: 查询数量限制,默认10000条
     /// - Returns: 日志事件数组
     public func fetchAllEventsForSearchPreview(
         in context: NSManagedObjectContext? = nil,
-        sessionId: String? = nil,
+        sessionIds: Set<String> = [],
         limit: Int = 10000
     ) throws -> [LogEvent] {
         let targetContext = context ?? coreDataStack.viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 只应用会话筛选(如果有)
-        if let sessionId = sessionId {
-            fetchRequest.predicate = NSPredicate(format: "sessionId == %@", sessionId)
+        if !sessionIds.isEmpty {
+            fetchRequest.predicate = NSPredicate(format: "sessionId IN %@", Array(sessionIds))
         }
 
         // 按时间倒序
@@ -275,7 +275,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         fileNames: Set<String> = [],
         contexts: Set<String> = [],
         threads: Set<String> = [],
-        sessionId: String? = nil,
+        sessionIds: Set<String> = [],
         messageKeywords: Set<String> = []
     ) throws -> Int {
         let targetContext = context ?? coreDataStack.viewContext
@@ -311,8 +311,8 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         }
 
         // 会话筛选
-        if let sessionId = sessionId {
-            predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
+        if !sessionIds.isEmpty {
+            predicates.append(NSPredicate(format: "sessionId IN %@", Array(sessionIds)))
         }
 
         // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)

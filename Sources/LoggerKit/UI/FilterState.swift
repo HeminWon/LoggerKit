@@ -29,7 +29,7 @@ public class FilterState: ObservableObject {
     @Published public var selectedContexts: Set<String> = []
     @Published public var selectedThreads: Set<String> = []
     @Published public var selectedMessageKeywords: Set<String> = []
-    @Published public var selectedSessionId: String? = nil
+    @Published public var selectedSessionIds: Set<String> = []
 
     // MARK: - 回调机制
 
@@ -57,7 +57,7 @@ public class FilterState: ObservableObject {
             $selectedContexts.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             $selectedThreads.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             $selectedMessageKeywords.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            $selectedSessionId.dropFirst().map { _ in () }.eraseToAnyPublisher()
+            $selectedSessionIds.dropFirst().map { _ in () }.eraseToAnyPublisher()
         )
         .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
         .sink { [weak self] _ in
@@ -76,7 +76,7 @@ public class FilterState: ObservableObject {
         if !selectedContexts.isEmpty { count += 1 }
         if !selectedThreads.isEmpty { count += 1 }
         if !selectedMessageKeywords.isEmpty { count += 1 }
-        if selectedSessionId != nil { count += 1 }
+        if !selectedSessionIds.isEmpty { count += 1 }
         return count
     }
 
@@ -90,7 +90,7 @@ public class FilterState: ObservableObject {
         selectedContexts = []
         selectedThreads = []
         selectedMessageKeywords = []
-        selectedSessionId = nil
+        selectedSessionIds = []
     }
 
     /// 检查项是否在过滤器中

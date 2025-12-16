@@ -26,7 +26,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
     // MARK: - LogDataLoaderProtocol
 
     public func loadEvents(
-        sessionId: String?,
+        sessionIds: Set<String>,
         filterState: FilterState,
         offset: Int,
         limit: Int
@@ -52,7 +52,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         fileNames: fileNames,
                         contexts: contexts,
                         threads: threads,
-                        sessionId: sessionId,
+                        sessionIds: sessionIds,
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: limit,
@@ -84,7 +84,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
     }
 
     public func countEvents(
-        sessionId: String?,
+        sessionIds: Set<String>,
         filterState: FilterState
     ) async throws -> Int {
         // 在主线程捕获需要的值
@@ -108,7 +108,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         fileNames: fileNames,
                         contexts: contexts,
                         threads: threads,
-                        sessionId: sessionId,
+                        sessionIds: sessionIds,
                         messageKeywords: messageKeywords
                     )
 
@@ -121,7 +121,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
     }
 
     public func loadAllEvents(
-        sessionId: String?,
+        sessionIds: Set<String>,
         filterState: FilterState
     ) async throws -> [LogEvent] {
         // 在主线程捕获需要的值
@@ -145,7 +145,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         fileNames: fileNames,
                         contexts: contexts,
                         threads: threads,
-                        sessionId: sessionId,
+                        sessionIds: sessionIds,
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: 100000,  // 使用大数值代替无限制
@@ -161,7 +161,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
     }
 
     public func loadAllEventsForSearchPreview(
-        sessionId: String?,
+        sessionIds: Set<String>,
         limit: Int
     ) async throws -> [LogEvent] {
         let dbManager = self.databaseManager
@@ -173,7 +173,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                     // 在后台 context 中执行全量查询
                     let events = try dbManager.fetchAllEventsForSearchPreview(
                         in: context,
-                        sessionId: sessionId,
+                        sessionIds: sessionIds,
                         limit: limit
                     )
 
