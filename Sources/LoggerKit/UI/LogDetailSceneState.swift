@@ -406,7 +406,7 @@ public class LogDetailSceneState: ObservableObject {
         // 组装文件名: 如果 identifier 为空,则格式为 {bundleId}_{date}_{time}.log
         // 否则为 {bundleId}_{identifier}_{date}_{time}.log
         var components = [prefix]
-        if !identifier.isEmpty {
+        if let identifier = identifier, !identifier.isEmpty {
             components.append(identifier)
         }
         components.append(contentsOf: [dateString, timeString])
@@ -419,7 +419,7 @@ public class LogDetailSceneState: ObservableObject {
     }
 
     private(set) var prefix: String
-    private(set) var identifier: String
+    private(set) var identifier: String?
 
     /// 初始化（从数据库加载所有日志）
     public init(prefix: String? = nil, identifier: String? = nil, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
@@ -430,8 +430,8 @@ public class LogDetailSceneState: ObservableObject {
             self.prefix = bundleId
         }
 
-        // 直接使用传入的 identifier,如果为 nil 则设置为空字符串
-        self.identifier = identifier ?? ""
+        // 直接使用传入的 identifier
+        self.identifier = identifier
 
         // 初始化 FilterState
         self.filterState = filterState ?? FilterState()
