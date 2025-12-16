@@ -91,10 +91,13 @@ public struct LogEvent: Codable, Identifiable, Sendable {
     }
     
     var prefix: String {
+        // 只显示前8位 sessionID
+        let shortSessionId = String(sessionId.prefix(8))
+
         if thread.isEmpty {
-            return "\(formattedDate) [\(level.severity)] - (\(function) at \(fileName):\(line))"
+            return "\(formattedDate) [\(shortSessionId)] [\(level.severity)] - (\(function) at \(fileName):\(line))"
         }
-        return "\(formattedDate) [\(level.severity)] <\(context)> \(thread) - (\(function) at \(fileName):\(line))"
+        return "\(formattedDate) [\(shortSessionId)] [\(level.severity)] <\(context)> \(thread) - (\(function) at \(fileName):\(line))"
     }
 }
 
