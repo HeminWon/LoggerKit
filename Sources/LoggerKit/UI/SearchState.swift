@@ -47,7 +47,7 @@ public class SearchState: ObservableObject {
             $searchText.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             $searchFields.dropFirst().map { _ in () }.eraseToAnyPublisher()
         )
-        .debounce(for: .milliseconds(300), scheduler: RunLoop.main)  // 增加到 300ms 避免频繁触发
+        .debounce(for: .milliseconds(100), scheduler: RunLoop.main)  // 100ms 防抖,保持实时性
         .sink { [weak self] _ in
             self?.onSearchChanged?()
         }
@@ -120,8 +120,7 @@ public class SearchState: ObservableObject {
 
             // 回到主线程更新结果
             await MainActor.run {
-                // 强制触发 @Published 更新
-                self.objectWillChange.send()
+                // @Published 会自动触发更新通知
                 self.cachedResults = results
                 print("📋 搜索预览结果更新: totalCount=\(results.totalCount), message=\(results.message.count), fileName=\(results.fileName.count), function=\(results.function.count)")
             }
@@ -221,16 +220,4 @@ public class SearchState: ObservableObject {
         return results
     }
 
-    /// 【已废弃】同步计算搜索结果 - 请使用 computeResultsAsync
-    /// 此方法保留用于兼容性,但会立即返回缓存结果
-    @available(*, deprecated, message: "使用 computeResultsAsync 替代,避免主线程阻塞")
-    public func computeResults(
-        from events: [LogEvent],
-        functionCounts: [String: Int],
-        fileNameCounts: [String: Int],
-        contextCounts: [String: Int],
-        threadCounts: [String: Int]
-    ) -> CategorizedSearchResults {
-        return cachedResults
-    }
 }

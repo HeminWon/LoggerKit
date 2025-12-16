@@ -809,22 +809,6 @@ public class LogDetailSceneState: ObservableObject {
         )
     }
 
-    /// 【已废弃】导出所有符合条件的日志事件
-    ///
-    /// 此方法会将所有日志加载到内存,导致高内存占用。
-    /// 请使用 `exportAllEventsStreaming` 替代。
-    @available(*, deprecated, message: "使用 exportAllEventsStreaming 避免内存峰值")
-    func exportAllEvents() async -> [LogEvent] {
-        do {
-            return try await dataLoader.loadAllEvents(
-                sessionId: filterState.selectedSessionId,
-                filterState: filterState
-            )
-        } catch {
-            print("❌ Failed to export all events: \(error)")
-            return []
-        }
-    }
 
     func toggleLevel(_ level: LogEvent.Level) {
         filterState.toggleLevel(level)

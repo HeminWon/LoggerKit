@@ -186,24 +186,6 @@ public struct LogParser {
         return tempFile
     }
 
-    // MARK: - 一次性导出 (已废弃)
-
-    /// 【已废弃】一次性导出日志到临时文件
-    ///
-    /// 此方法会将所有日志加载到内存,导致高内存占用。
-    /// 请使用 `logEventToTempFileStreaming` 替代,避免内存峰值。
-    ///
-    /// - Parameters:
-    ///   - fileName: 导出文件名
-    ///   - events: 要导出的日志数组
-    /// - Returns: 导出文件的 URL
-    @available(*, deprecated, message: "使用 logEventToTempFileStreaming 避免内存峰值")
-    public static func logEventToTempFile(fileName: String, events: [LogEvent]) -> URL {
-        let tempFile = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
-        let lines = events.map { "\($0.prefix) - \($0.message)" }.joined(separator: "\n")
-        try? lines.write(to: tempFile, atomically: true, encoding: .utf8)
-        return tempFile
-    }
 }
 
 // MARK: - 导出错误
