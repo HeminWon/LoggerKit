@@ -333,7 +333,6 @@ struct SessionChip: View {
 
 #Preview {
     LogFilterSheet(sceneState: LogDetailSceneState(
-        logFileURL: URL(fileURLWithPath: "/tmp/test.log"),
         prefix: "test",
         identifier: "123"
     ))

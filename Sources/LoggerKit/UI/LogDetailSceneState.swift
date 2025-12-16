@@ -386,42 +386,19 @@ public class LogDetailSceneState: ObservableObject {
     }
 
     var exportFileName: String {
-        if let logDate = logDate {
-            return [prefix, identifier, logDate].joined(separator: "_")
-        } else {
-            let fileName = logFileURL.lastPathComponent
-            if fileName.isEmpty || fileName == "/" {
-                return [prefix, identifier, "all_logs"].joined(separator: "_")
-            }
-            return [prefix, identifier, fileName].joined(separator: "_")
-        }
+        return [prefix, identifier, "all_logs"].joined(separator: "_")
     }
 
     /// 显示标题
     var displayTitle: String {
-        if let logDate = logDate {
-            return logDate
-        }
-
-        let path = logFileURL.path
-        if path.isEmpty || path == "/" {
-            return "Logs"
-        }
-
-        return logFileURL.lastPathComponent
+        return "Logs"
     }
 
-    let logFileURL: URL
-    let logDate: String?
     private(set) var prefix: String
     private(set) var identifier: String
 
-    /// 初始化（默认方式，从数据库加载所有日志）
+    /// 初始化（从数据库加载所有日志）
     public init(prefix: String? = nil, identifier: String? = nil, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
-        // 创建一个空的URL作为占位符
-        self.logFileURL = URL(fileURLWithPath: "")
-        self.logDate = nil
-
         if let prefix = prefix {
             self.prefix = prefix
         } else {
@@ -473,77 +450,8 @@ public class LogDetailSceneState: ObservableObject {
         }
     }
 
-    /// 初始化（使用文件URL，兼容旧方式）
-    public init(logFileURL: URL, prefix: String, identifier: String, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
-        self.logFileURL = logFileURL
-        self.logDate = nil
-        self.prefix = prefix
-        self.identifier = identifier
-
-        // 初始化 FilterState
-        self.filterState = filterState ?? FilterState()
-
-        // 初始化 SearchState
-        self.searchState = searchState ?? SearchState()
-
-        // 初始化 DataLoader
-        if let dataLoader = dataLoader {
-            self.dataLoader = dataLoader
-        } else {
-            let dbManager = LoggerEngine.shared.getDatabaseManager()!
-            self.dataLoader = LogDataLoader(databaseManager: dbManager)
-        }
-
-        // 设置 FilterState 和 SearchState 变化回调
-        setupFilterStateBinding()
-    }
-
-    /// 初始化（使用日期，从数据库查询）
-    public init(logDate: String, prefix: String, identifier: String, filterState: FilterState? = nil, searchState: SearchState? = nil, dataLoader: LogDataLoaderProtocol? = nil) {
-        // 创建一个空的URL作为占位符
-        self.logFileURL = URL(fileURLWithPath: "")
-        self.logDate = logDate
-        self.prefix = prefix
-        self.identifier = identifier
-
-        // 初始化 FilterState
-        self.filterState = filterState ?? FilterState()
-
-        // 初始化 SearchState
-        self.searchState = searchState ?? SearchState()
-
-        // 初始化 DataLoader
-        if let dataLoader = dataLoader {
-            self.dataLoader = dataLoader
-        } else {
-            let dbManager = LoggerEngine.shared.getDatabaseManager()!
-            self.dataLoader = LogDataLoader(databaseManager: dbManager)
-        }
-
-        // 设置 FilterState 和 SearchState 变化回调
-        setupFilterStateBinding()
-    }
-
     /// 异步加载日志文件
     func loadLogFile() async {
-        // 如果有日期，使用数据库查询方式
-        if let date = logDate {
-            await loadLogsForDate(date)
-            return
-        }
-
-        // 加载所有日志（现在统一使用数据库）
-        await loadAllLogsFromDatabase()
-    }
-
-    /// 从数据库加载所有日志（使用分页）
-    private func loadAllLogsFromDatabase() async {
-        loadingState = .loading(progress: "正在加载日志...")
-        await loadLogsFromDatabase(resetPagination: true)
-    }
-
-    /// 从数据库加载指定日期的日志（使用分页）
-    private func loadLogsForDate(_ date: String) async {
         loadingState = .loading(progress: "正在加载日志...")
         await loadLogsFromDatabase(resetPagination: true)
     }
