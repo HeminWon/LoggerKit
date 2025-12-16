@@ -218,9 +218,8 @@ public struct LogDetailScene: View {
                 totalExportCount = 0
 
                 do {
-                    // 使用流式导出
+                    // 使用流式导出（文件名会在内部根据第一条日志时间自动生成）
                     exportURL = try await sceneState.exportAllEventsStreaming(
-                        fileName: sceneState.exportFileName,
                         progressHandler: { written, total in
                             exportedCount = written
                             totalExportCount = total

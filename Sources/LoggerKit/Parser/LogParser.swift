@@ -193,4 +193,18 @@ public struct LogParser {
 public enum ExportError: Error {
     case fileCreationFailed
     case fileHandleCreationFailed
+    case emptyData
+}
+
+extension ExportError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .fileCreationFailed:
+            return "文件创建失败"
+        case .fileHandleCreationFailed:
+            return "文件句柄创建失败"
+        case .emptyData:
+            return "没有可导出的日志数据"
+        }
+    }
 }

@@ -385,8 +385,26 @@ public class LogDetailSceneState: ObservableObject {
         filterState.resetFilters()
     }
 
-    var exportFileName: String {
-        return [prefix, identifier, "all_logs"].joined(separator: "_")
+    /// 生成导出文件名
+    /// - Parameter firstLogTimestamp: 第一条日志的时间戳
+    /// - Returns: 格式为 `{bundleId}_{identifier}_{YYYY-MM-DD}_{HHmmss}.log` 的文件名
+    func generateExportFileName(firstLogTimestamp: TimeInterval) -> String {
+        let date = Date(timeIntervalSince1970: firstLogTimestamp)
+
+        // 日期格式化器 - YYYY-MM-DD
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        let dateString = dateFormatter.string(from: date)
+
+        // 时间格式化器 - HHmmss
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HHmmss"
+        timeFormatter.locale = Locale(identifier: "en_US_POSIX")
+        let timeString = timeFormatter.string(from: date)
+
+        // 组装文件名: {bundleId}_{identifier}_{date}_{time}.log
+        return "\(prefix)_\(identifier)_\(dateString)_\(timeString).log"
     }
 
     /// 显示标题
@@ -676,14 +694,13 @@ public class LogDetailSceneState: ObservableObject {
     /// 流式导出所有符合条件的日志到临时文件
     ///
     /// 使用分批查询和追加写入,避免全量内存加载,内存峰值 < 10MB。
+    /// 文件名格式: `{bundleId}_{identifier}_{YYYY-MM-DD}_{HHmmss}.log`
     ///
     /// - Parameters:
-    ///   - fileName: 导出文件名
     ///   - progressHandler: 进度回调 (已导出条数, 总条数)
     /// - Returns: 导出文件的 URL
-    /// - Throws: 导出过程中的错误
+    /// - Throws: 导出过程中的错误（包括数据为空的错误）
     func exportAllEventsStreaming(
-        fileName: String,
         progressHandler: @escaping (Int, Int) -> Void
     ) async throws -> URL {
         // 首先查询总数
@@ -691,6 +708,26 @@ public class LogDetailSceneState: ObservableObject {
             sessionId: filterState.selectedSessionId,
             filterState: filterState
         )
+
+        // 检查数据是否为空
+        guard totalCount > 0 else {
+            throw ExportError.emptyData
+        }
+
+        // 获取第一条日志以获取时间戳
+        let firstBatch = try await dataLoader.loadEvents(
+            sessionId: filterState.selectedSessionId,
+            filterState: filterState,
+            offset: 0,
+            limit: 1
+        )
+
+        guard let firstEvent = firstBatch.first else {
+            throw ExportError.emptyData
+        }
+
+        // 使用第一条日志的时间戳生成文件名
+        let fileName = generateExportFileName(firstLogTimestamp: firstEvent.timestamp)
 
         // 初始化进度
         progressHandler(0, totalCount)
