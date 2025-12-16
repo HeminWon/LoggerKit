@@ -20,6 +20,11 @@ public struct LogDetailScene: View {
     @State var isFilterPresented: Bool = false
     @State var exportURL: URL?
     @State var isExporting: Bool = false
+    @State var exportProgress: Double = 0.0
+    @State var exportedCount: Int = 0
+    @State var totalExportCount: Int = 0
+    @State var exportError: Error?
+    @State var showExportError: Bool = false
 
     public init(sceneState: LogDetailSceneState? = nil) {
         self.sceneState = sceneState ?? LogDetailSceneState()
@@ -208,19 +213,75 @@ public struct LogDetailScene: View {
         Button {
             Task {
                 isExporting = true
-                let events = await sceneState.exportAllEvents()
-                exportURL = LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: events)
-                isExporting = false
-                isSharePresented = true
+                exportProgress = 0.0
+                exportedCount = 0
+                totalExportCount = 0
+
+                do {
+                    // 使用流式导出
+                    exportURL = try await sceneState.exportAllEventsStreaming(
+                        fileName: sceneState.exportFileName,
+                        progressHandler: { written, total in
+                            exportedCount = written
+                            totalExportCount = total
+                            exportProgress = total > 0 ? Double(written) / Double(total) : 0.0
+                        }
+                    )
+                    isExporting = false
+                    isSharePresented = true
+                } catch {
+                    exportError = error
+                    showExportError = true
+                    isExporting = false
+                    print("❌ 导出失败: \(error)")
+                }
             }
         } label: {
-            if isExporting {
-                ProgressView()
-            } else {
-                Label(shareLogText, systemImage: "square.and.arrow.up")
+            // 使用固定尺寸的 ZStack 确保布局不会因图标切换而变化
+            ZStack {
+                if isExporting {
+                    // 圆环进度条
+                    if totalExportCount > 0 {
+                        ZStack {
+                            // 背景圆环
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 2.5)
+                                .frame(width: 24, height: 24)
+
+                            // 进度圆环
+                            Circle()
+                                .trim(from: 0, to: exportProgress)
+                                .stroke(Color.blue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                                .frame(width: 24, height: 24)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 0.1), value: exportProgress)
+
+                            // 百分比文字
+                            Text("\(Int(exportProgress * 100))")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(.blue)
+                        }
+                    } else {
+                        // 初始化阶段,显示不定进度的圆环
+                        ProgressView()
+                            .frame(width: 24, height: 24)
+                    }
+                } else {
+                    // 分享图标
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 17))
+                }
             }
+            .frame(width: 32, height: 32) // 固定尺寸,避免布局变化
         }
         .disabled(isExporting)
+        .alert("导出失败", isPresented: $showExportError) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            if let error = exportError {
+                Text(error.localizedDescription)
+            }
+        }
     }
 
     private func copyToClipboard(text: String) {

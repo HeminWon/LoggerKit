@@ -92,6 +92,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         threads: Set<String> = [],
         sessionId: String? = nil,
         searchText: String = "",
+        searchFields: Set<SearchField> = [.message, .fileName, .function],
         messageKeywords: Set<String> = [],
         sortDescriptors: [NSSortDescriptor] = [],
         limit: Int = 1000,
@@ -139,12 +140,31 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         if !searchText.isEmpty || !messageKeywords.isEmpty {
             var messagePredicates: [NSPredicate] = []
 
-            // 搜索文本 (在 message, function, fileName 中搜索)
+            // 搜索文本 (根据 searchFields 动态构建查询条件)
             if !searchText.isEmpty {
-                messagePredicates.append(NSPredicate(
-                    format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
-                    searchText, "function", searchText, searchText
-                ))
+                var fieldPredicates: [NSPredicate] = []
+
+                // 根据用户选择的搜索范围构建谓词
+                if searchFields.contains(.message) {
+                    fieldPredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", searchText))
+                }
+                if searchFields.contains(.fileName) {
+                    fieldPredicates.append(NSPredicate(format: "fileName CONTAINS[cd] %@", searchText))
+                }
+                if searchFields.contains(.function) {
+                    fieldPredicates.append(NSPredicate(format: "%K CONTAINS[cd] %@", "function", searchText))
+                }
+                if searchFields.contains(.context) {
+                    fieldPredicates.append(NSPredicate(format: "context CONTAINS[cd] %@", searchText))
+                }
+                if searchFields.contains(.thread) {
+                    fieldPredicates.append(NSPredicate(format: "thread CONTAINS[cd] %@", searchText))
+                }
+
+                // 将所有字段的搜索条件用 OR 组合
+                if !fieldPredicates.isEmpty {
+                    messagePredicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: fieldPredicates))
+                }
             }
 
             // 消息关键词筛选 (每个关键词独立匹配)
@@ -155,8 +175,10 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             }
 
             // 组合为 OR 关系
-            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
-            predicates.append(combinedPredicate)
+            if !messagePredicates.isEmpty {
+                let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+                predicates.append(combinedPredicate)
+            }
         }
 
         // 组合谓词
@@ -261,6 +283,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         threads: Set<String> = [],
         sessionId: String? = nil,
         searchText: String = "",
+        searchFields: Set<SearchField> = [.message, .fileName, .function],
         messageKeywords: Set<String> = []
     ) throws -> Int {
         let targetContext = context ?? coreDataStack.viewContext
@@ -304,12 +327,31 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         if !searchText.isEmpty || !messageKeywords.isEmpty {
             var messagePredicates: [NSPredicate] = []
 
-            // 搜索文本 (在 message, function, fileName 中搜索)
+            // 搜索文本 (根据 searchFields 动态构建查询条件)
             if !searchText.isEmpty {
-                messagePredicates.append(NSPredicate(
-                    format: "message CONTAINS[cd] %@ OR %K CONTAINS[cd] %@ OR fileName CONTAINS[cd] %@",
-                    searchText, "function", searchText, searchText
-                ))
+                var fieldPredicates: [NSPredicate] = []
+
+                // 根据用户选择的搜索范围构建谓词
+                if searchFields.contains(.message) {
+                    fieldPredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", searchText))
+                }
+                if searchFields.contains(.fileName) {
+                    fieldPredicates.append(NSPredicate(format: "fileName CONTAINS[cd] %@", searchText))
+                }
+                if searchFields.contains(.function) {
+                    fieldPredicates.append(NSPredicate(format: "%K CONTAINS[cd] %@", "function", searchText))
+                }
+                if searchFields.contains(.context) {
+                    fieldPredicates.append(NSPredicate(format: "context CONTAINS[cd] %@", searchText))
+                }
+                if searchFields.contains(.thread) {
+                    fieldPredicates.append(NSPredicate(format: "thread CONTAINS[cd] %@", searchText))
+                }
+
+                // 将所有字段的搜索条件用 OR 组合
+                if !fieldPredicates.isEmpty {
+                    messagePredicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: fieldPredicates))
+                }
             }
 
             // 消息关键词筛选 (每个关键词独立匹配)
@@ -320,8 +362,10 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             }
 
             // 组合为 OR 关系
-            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
-            predicates.append(combinedPredicate)
+            if !messagePredicates.isEmpty {
+                let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+                predicates.append(combinedPredicate)
+            }
         }
 
         // 组合谓词

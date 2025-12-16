@@ -15,6 +15,7 @@ public protocol LogDataLoaderProtocol {
     ///   - sessionId: 会话ID过滤
     ///   - filterState: 过滤状态
     ///   - searchText: 搜索文本
+    ///   - searchFields: 搜索范围
     ///   - offset: 分页偏移量
     ///   - limit: 每页数量
     /// - Returns: 日志事件数组
@@ -22,6 +23,7 @@ public protocol LogDataLoaderProtocol {
         sessionId: String?,
         filterState: FilterState,
         searchText: String,
+        searchFields: Set<SearchField>,
         offset: Int,
         limit: Int
     ) async throws -> [LogEvent]
@@ -35,11 +37,13 @@ public protocol LogDataLoaderProtocol {
     ///   - sessionId: 会话ID过滤
     ///   - filterState: 过滤状态
     ///   - searchText: 搜索文本
+    ///   - searchFields: 搜索范围
     /// - Returns: 日志总数
     func countEvents(
         sessionId: String?,
         filterState: FilterState,
-        searchText: String
+        searchText: String,
+        searchFields: Set<SearchField>
     ) async throws -> Int
 
     /// 加载所有符合条件的日志事件(用于导出)
@@ -47,11 +51,13 @@ public protocol LogDataLoaderProtocol {
     ///   - sessionId: 会话ID过滤
     ///   - filterState: 过滤状态
     ///   - searchText: 搜索文本
+    ///   - searchFields: 搜索范围
     /// - Returns: 所有符合条件的日志事件数组
     func loadAllEvents(
         sessionId: String?,
         filterState: FilterState,
-        searchText: String
+        searchText: String,
+        searchFields: Set<SearchField>
     ) async throws -> [LogEvent]
 
     /// 取消当前加载任务

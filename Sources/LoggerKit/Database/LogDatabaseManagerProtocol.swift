@@ -20,6 +20,7 @@ public protocol LogDatabaseManagerProtocol {
         threads: Set<String>,
         sessionId: String?,
         searchText: String,
+        searchFields: Set<SearchField>,
         messageKeywords: Set<String>,
         sortDescriptors: [NSSortDescriptor],
         limit: Int,
@@ -48,6 +49,7 @@ public protocol LogDatabaseManagerProtocol {
         threads: Set<String>,
         sessionId: String?,
         searchText: String,
+        searchFields: Set<SearchField>,
         messageKeywords: Set<String>
     ) throws -> Int
 

@@ -29,6 +29,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
         sessionId: String?,
         filterState: FilterState,
         searchText: String,
+        searchFields: Set<SearchField>,
         offset: Int,
         limit: Int
     ) async throws -> [LogEvent] {
@@ -55,6 +56,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         threads: threads,
                         sessionId: sessionId,
                         searchText: searchText,
+                        searchFields: searchFields,
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: limit,
@@ -88,7 +90,8 @@ public class LogDataLoader: LogDataLoaderProtocol {
     public func countEvents(
         sessionId: String?,
         filterState: FilterState,
-        searchText: String
+        searchText: String,
+        searchFields: Set<SearchField>
     ) async throws -> Int {
         // 在主线程捕获需要的值
         let dbManager = self.databaseManager
@@ -113,6 +116,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         threads: threads,
                         sessionId: sessionId,
                         searchText: searchText,
+                        searchFields: searchFields,
                         messageKeywords: messageKeywords
                     )
 
@@ -127,7 +131,8 @@ public class LogDataLoader: LogDataLoaderProtocol {
     public func loadAllEvents(
         sessionId: String?,
         filterState: FilterState,
-        searchText: String
+        searchText: String,
+        searchFields: Set<SearchField>
     ) async throws -> [LogEvent] {
         // 在主线程捕获需要的值
         let dbManager = self.databaseManager
@@ -152,6 +157,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         threads: threads,
                         sessionId: sessionId,
                         searchText: searchText,
+                        searchFields: searchFields,
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: 100000,  // 使用大数值代替无限制

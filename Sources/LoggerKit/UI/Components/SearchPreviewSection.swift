@@ -20,10 +20,16 @@ struct SearchPreviewSection: View {
             // 搜索范围配置
             searchFieldsSelector
 
-            // 搜索结果预览
+            // 搜索结果预览 - 使用搜索文本作为 id 强制刷新
             if !sceneState.searchState.searchText.isEmpty {
                 searchResultsPreview
+                    .id("\(sceneState.searchState.searchText)-\(sceneState.searchState.cachedResults.totalCount)")
             }
+        }
+        .onAppear {
+            // 确保在组件显示时触发一次搜索更新
+            // 解决首次打开筛选页面时，数据可能尚未加载完成的问题
+            sceneState.refreshSearch()
         }
     }
 
@@ -103,7 +109,8 @@ struct SearchPreviewSection: View {
 
     // MARK: - 搜索结果预览
     private var searchResultsPreview: some View {
-        let results = sceneState.searchResults
+        let results = sceneState.searchState.cachedResults
+        let _ = print("🖼️ UI渲染搜索预览: isEmpty=\(results.isEmpty), totalCount=\(results.totalCount), searchText='\(sceneState.searchState.searchText)'")
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {

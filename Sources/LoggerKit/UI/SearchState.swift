@@ -15,7 +15,10 @@ public class SearchState: ObservableObject {
     // MARK: - Published 属性
 
     @Published public var searchText: String = ""
-    @Published public var searchFields: Set<SearchField> = [.message, .fileName, .function]
+    @Published public var searchFields: Set<SearchField> = [.message, .fileName, .function, .context, .thread]
+
+    /// 缓存的搜索结果 - 在后台线程计算完成后更新
+    @Published public var cachedResults: CategorizedSearchResults = CategorizedSearchResults()
 
     // MARK: - 回调机制
 
@@ -25,6 +28,10 @@ public class SearchState: ObservableObject {
     // MARK: - 私有属性
 
     private var cancellables = Set<AnyCancellable>()
+    private var searchTask: Task<Void, Never>?
+
+    /// 后台搜索队列
+    private let searchQueue = DispatchQueue(label: "com.loggerkit.search", qos: .userInitiated)
 
     // MARK: - 初始化
 
@@ -40,7 +47,7 @@ public class SearchState: ObservableObject {
             $searchText.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             $searchFields.dropFirst().map { _ in () }.eraseToAnyPublisher()
         )
-        .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
+        .debounce(for: .milliseconds(300), scheduler: RunLoop.main)  // 增加到 300ms 避免频繁触发
         .sink { [weak self] _ in
             self?.onSearchChanged?()
         }
@@ -52,29 +59,83 @@ public class SearchState: ObservableObject {
     /// 切换搜索字段
     public func toggleSearchField(_ field: SearchField) {
         if searchFields.contains(field) {
-            searchFields.remove(field)
+            // 至少保留一个搜索字段，防止全部取消
+            if searchFields.count > 1 {
+                searchFields.remove(field)
+            }
         } else {
             searchFields.insert(field)
         }
     }
 
-    /// 计算搜索结果 - 单次遍历优化版本
+    /// 异步计算搜索结果 - 在后台线程执行,避免阻塞主线程
     /// - Parameters:
     ///   - events: 要搜索的事件列表
     ///   - functionCounts: 函数计数字典
     ///   - fileNameCounts: 文件名计数字典
     ///   - contextCounts: 上下文计数字典
     ///   - threadCounts: 线程计数字典
-    /// - Returns: 分类搜索结果
-    public func computeResults(
+    public func computeResultsAsync(
         from events: [LogEvent],
         functionCounts: [String: Int],
         fileNameCounts: [String: Int],
         contextCounts: [String: Int],
         threadCounts: [String: Int]
-    ) -> CategorizedSearchResults {
-        guard !searchText.isEmpty else { return CategorizedSearchResults() }
+    ) {
+        // 取消之前的搜索任务
+        searchTask?.cancel()
 
+        // 快速返回空结果
+        guard !searchText.isEmpty else {
+            cachedResults = CategorizedSearchResults()
+            return
+        }
+
+        // 捕获当前搜索条件的快照,避免闭包中访问 @Published 属性
+        let searchTextSnapshot = searchText
+        let searchFieldsSnapshot = searchFields
+
+        // 创建新的后台搜索任务
+        searchTask = Task { [weak self] in
+            guard let self = self else { return }
+
+            // 在后台线程执行密集计算
+            let results = await Task.detached(priority: .userInitiated) {
+                self.performSearch(
+                    events: events,
+                    searchText: searchTextSnapshot,
+                    searchFields: searchFieldsSnapshot,
+                    functionCounts: functionCounts,
+                    fileNameCounts: fileNameCounts,
+                    contextCounts: contextCounts,
+                    threadCounts: threadCounts
+                )
+            }.value
+
+            // 检查任务是否被取消
+            guard !Task.isCancelled else { return }
+
+            // 回到主线程更新结果
+            await MainActor.run {
+                // 强制触发 @Published 更新
+                self.objectWillChange.send()
+                self.cachedResults = results
+                print("📋 搜索预览结果更新: totalCount=\(results.totalCount), message=\(results.message.count), fileName=\(results.fileName.count), function=\(results.function.count)")
+            }
+        }
+    }
+
+    /// 执行搜索计算 - 纯函数,在后台线程执行
+    /// - Returns: 分类搜索结果
+    nonisolated private func performSearch(
+        events: [LogEvent],
+        searchText: String,
+        searchFields: Set<SearchField>,
+        functionCounts: [String: Int],
+        fileNameCounts: [String: Int],
+        contextCounts: [String: Int],
+        threadCounts: [String: Int]
+    ) -> CategorizedSearchResults {
         let lowercasedSearch = searchText.lowercased()
         var results = CategorizedSearchResults()
 
@@ -153,5 +214,18 @@ public class SearchState: ObservableObject {
         }
 
         return results
+    }
+
+    /// 【已废弃】同步计算搜索结果 - 请使用 computeResultsAsync
+    /// 此方法保留用于兼容性,但会立即返回缓存结果
+    @available(*, deprecated, message: "使用 computeResultsAsync 替代,避免主线程阻塞")
+    public func computeResults(
+        from events: [LogEvent],
+        functionCounts: [String: Int],
+        fileNameCounts: [String: Int],
+        contextCounts: [String: Int],
+        threadCounts: [String: Int]
+    ) -> CategorizedSearchResults {
+        return cachedResults
     }
 }

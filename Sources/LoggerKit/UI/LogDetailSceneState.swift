@@ -10,7 +10,7 @@ import Combine
 
 // MARK: - 搜索字段枚举
 /// 搜索字段枚举
-public enum SearchField: String, CaseIterable, Identifiable {
+public enum SearchField: String, CaseIterable, Identifiable, Sendable {
     case message = "message"
     case fileName = "fileName"
     case function = "function"
@@ -111,6 +111,12 @@ public class LogDetailSceneState: ObservableObject {
 
     // MARK: - 加载控制
     private var loadTask: Task<Void, Never>?
+
+    /// 查询序列号 - 用于识别最新的查询请求
+    private var querySequenceNumber: UInt64 = 0
+
+    /// 当前生效的查询序列号 - 只接受不小于此序列号的查询结果
+    private var activeQuerySequence: UInt64 = 0
 
     // MARK: - 统计信息
     @Published var statistics: LogStatistics?
@@ -217,14 +223,9 @@ public class LogDetailSceneState: ObservableObject {
     }
 
     // MARK: - 搜索结果计算属性
+    /// 直接返回缓存的搜索结果,避免主线程计算
     var searchResults: CategorizedSearchResults {
-        return searchState.computeResults(
-            from: events,
-            functionCounts: functionCounts,
-            fileNameCounts: fileNameCounts,
-            contextCounts: contextCounts,
-            threadCounts: threadCounts
-        )
+        return searchState.cachedResults
     }
 
     // MARK: - 检查项是否已在筛选中
@@ -295,7 +296,7 @@ public class LogDetailSceneState: ObservableObject {
     // MARK: - 重置筛选
     func resetFilters() {
         searchState.searchText = ""
-        searchState.searchFields = [.message, .fileName, .function] // 重置搜索范围
+        searchState.searchFields = [.message, .fileName, .function, .context, .thread] // 重置搜索范围为全部
         filterState.resetFilters()
     }
 
@@ -379,8 +380,11 @@ public class LogDetailSceneState: ObservableObject {
 
         searchState.onSearchChanged = { [weak self] in
             guard let self = self else { return }
-            // 搜索变化时,触发searchResults计算属性重新计算
-            self.objectWillChange.send()
+            // 搜索变化时,重新从数据库查询（和筛选条件变化一样的处理）
+            // 这样可以搜索整个数据库,而不仅仅是已加载的分页数据
+            print("🔍 搜索文本变化: '\(self.searchState.searchText)', 触发数据库查询")
+            self.loadTask?.cancel()
+            self.loadTask = Task { await self.reloadWithFilters() }
         }
     }
 
@@ -466,6 +470,20 @@ public class LogDetailSceneState: ObservableObject {
         // 检查任务是否已被取消
         if Task.isCancelled { return }
 
+        // 🔑 在函数开始时就捕获搜索参数的快照，避免在异步过程中值发生变化
+        let searchTextSnapshot = searchState.searchText
+        let searchFieldsSnapshot = searchState.searchFields
+
+        // 生成新的查询序列号
+        querySequenceNumber += 1
+        let currentSequence = querySequenceNumber
+
+        // 如果是重置分页(新查询),更新生效序列号
+        if resetPagination {
+            activeQuerySequence = currentSequence
+            print("📊 开始查询: seq=\(currentSequence), searchText='\(searchTextSnapshot)'")
+        }
+
         // 根据是否重置分页来设置不同的loading状态
         if resetPagination {
             loadingState = .loading(progress: "正在查询...")
@@ -477,14 +495,26 @@ public class LogDetailSceneState: ObservableObject {
         let offset = page * pageSize
 
         do {
-            // 使用 DataLoader 加载数据
+            // 使用 DataLoader 加载数据（使用快照值）
             let events = try await dataLoader.loadEvents(
                 sessionId: filterState.selectedSessionId,
                 filterState: filterState,
-                searchText: searchState.searchText,
+                searchText: searchTextSnapshot,
+                searchFields: searchFieldsSnapshot,
                 offset: offset,
                 limit: pageSize
             )
+
+            // 【关键】验证查询序列号 - 只接受最新的查询结果
+            guard currentSequence >= activeQuerySequence else {
+                print("⚠️ 丢弃过期查询结果: seq=\(currentSequence), active=\(activeQuerySequence), events.count=\(events.count)")
+                return
+            }
+
+            print("✅ 查询完成: seq=\(currentSequence), events.count=\(events.count), searchText='\(searchTextSnapshot)'")
+
+            // 再次检查任务是否被取消
+            if Task.isCancelled { return }
 
             // 更新显示数据
             if resetPagination {
@@ -499,8 +529,12 @@ public class LogDetailSceneState: ObservableObject {
                 currentPage = 1
                 hasMoreData = true
 
-                // 查询总数
-                totalCount = await fetchTotalCount()
+                // 查询总数 (传入当前序列号和搜索快照)
+                totalCount = await fetchTotalCount(
+                    sequence: currentSequence,
+                    searchText: searchTextSnapshot,
+                    searchFields: searchFieldsSnapshot
+                )
             } else {
                 // 追加分页:追加到 events 数组
                 self.events.append(contentsOf: events)
@@ -520,7 +554,16 @@ public class LogDetailSceneState: ObservableObject {
             }
 
             loadingState = .loaded
+
+            // 数据加载完成后,触发异步搜索更新
+            performAsyncSearch()
         } catch {
+            // 验证查询序列号 - 只处理最新查询的错误
+            guard currentSequence >= activeQuerySequence else {
+                print("⚠️ 丢弃过期查询错误: seq=\(currentSequence)")
+                return
+            }
+
             print("❌ Failed to load logs from database: \(error)")
             self.error = error
             loadingState = .failed(error)
@@ -558,6 +601,23 @@ public class LogDetailSceneState: ObservableObject {
         await loadLogsFromDatabase(resetPagination: true)
     }
 
+    /// 执行异步搜索 - 在后台线程计算搜索结果
+    private func performAsyncSearch() {
+        print("🔎 执行搜索预览计算: events.count=\(events.count), searchText='\(searchState.searchText)', searchFields=\(searchState.searchFields)")
+        searchState.computeResultsAsync(
+            from: events,
+            functionCounts: functionCounts,
+            fileNameCounts: fileNameCounts,
+            contextCounts: contextCounts,
+            threadCounts: threadCounts
+        )
+    }
+
+    /// 刷新搜索结果 - 公共接口，供 UI 组件调用
+    public func refreshSearch() {
+        performAsyncSearch()
+    }
+
     /// 获取筛选选项
     func loadFilterOptions() async {
         do {
@@ -588,26 +648,96 @@ public class LogDetailSceneState: ObservableObject {
     }
 
     /// 查询符合当前筛选条件的日志总数
-    private func fetchTotalCount() async -> Int {
+    /// - Parameters:
+    ///   - sequence: 查询序列号,用于验证结果有效性
+    ///   - searchText: 搜索文本快照
+    ///   - searchFields: 搜索范围快照
+    private func fetchTotalCount(
+        sequence: UInt64,
+        searchText: String,
+        searchFields: Set<SearchField>
+    ) async -> Int {
         do {
-            return try await dataLoader.countEvents(
+            let count = try await dataLoader.countEvents(
                 sessionId: filterState.selectedSessionId,
                 filterState: filterState,
-                searchText: searchState.searchText
+                searchText: searchText,
+                searchFields: searchFields
             )
+
+            // 验证序列号 - 只接受最新查询的总数
+            guard sequence >= activeQuerySequence else {
+                print("⚠️ 丢弃过期总数查询: seq=\(sequence), active=\(activeQuerySequence)")
+                return totalCount  // 返回当前值,不更新
+            }
+
+            return count
         } catch {
             print("❌ Failed to fetch total count: \(error)")
             return 0
         }
     }
 
-    /// 导出所有符合条件的日志事件(用于导出功能)
+    /// 流式导出所有符合条件的日志到临时文件
+    ///
+    /// 使用分批查询和追加写入,避免全量内存加载,内存峰值 < 10MB。
+    ///
+    /// - Parameters:
+    ///   - fileName: 导出文件名
+    ///   - progressHandler: 进度回调 (已导出条数, 总条数)
+    /// - Returns: 导出文件的 URL
+    /// - Throws: 导出过程中的错误
+    func exportAllEventsStreaming(
+        fileName: String,
+        progressHandler: @escaping (Int, Int) -> Void
+    ) async throws -> URL {
+        // 首先查询总数
+        let totalCount = try await dataLoader.countEvents(
+            sessionId: filterState.selectedSessionId,
+            filterState: filterState,
+            searchText: searchState.searchText,
+            searchFields: searchState.searchFields
+        )
+
+        // 初始化进度
+        progressHandler(0, totalCount)
+
+        // 使用流式导出
+        return try await LogParser.logEventToTempFileStreaming(
+            fileName: fileName,
+            batchSize: 1000,
+            progressHandler: { written, _ in
+                // 更新进度(传入准确的总数)
+                progressHandler(written, totalCount)
+            },
+            eventFetcher: { [weak self] offset, limit in
+                guard let self = self else { return [] }
+
+                // 分批查询日志
+                return try await self.dataLoader.loadEvents(
+                    sessionId: self.filterState.selectedSessionId,
+                    filterState: self.filterState,
+                    searchText: self.searchState.searchText,
+                    searchFields: self.searchState.searchFields,
+                    offset: offset,
+                    limit: limit
+                )
+            }
+        )
+    }
+
+    /// 【已废弃】导出所有符合条件的日志事件
+    ///
+    /// 此方法会将所有日志加载到内存,导致高内存占用。
+    /// 请使用 `exportAllEventsStreaming` 替代。
+    @available(*, deprecated, message: "使用 exportAllEventsStreaming 避免内存峰值")
     func exportAllEvents() async -> [LogEvent] {
         do {
             return try await dataLoader.loadAllEvents(
                 sessionId: filterState.selectedSessionId,
                 filterState: filterState,
-                searchText: searchState.searchText
+                searchText: searchState.searchText,
+                searchFields: searchState.searchFields
             )
         } catch {
             print("❌ Failed to export all events: \(error)")

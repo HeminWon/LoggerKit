@@ -14,7 +14,7 @@ struct LogFilterSheet: View {
 
     /// 是否处于预览模式：有搜索文本且有匹配结果
     private var isInPreviewMode: Bool {
-        !sceneState.searchState.searchText.isEmpty && !sceneState.searchResults.isEmpty
+        !sceneState.searchState.searchText.isEmpty && !sceneState.searchState.cachedResults.isEmpty
     }
 
     var body: some View {
