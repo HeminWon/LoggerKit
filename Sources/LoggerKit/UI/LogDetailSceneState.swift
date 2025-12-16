@@ -606,17 +606,21 @@ public class LogDetailSceneState: ObservableObject {
         await loadLogsFromDatabase(resetPagination: true)
     }
 
-    /// 加载全量数据用于搜索预览
+    /// 加载数据用于搜索预览
+    /// 优化说明: 将 limit 从 10000 降低到 3000
+    /// - 搜索预览只需要少量匹配项（message 限制为 5 个）
+    /// - 3000 条数据足以覆盖大部分搜索场景
+    /// - 显著减少内存占用和查询时间
     private func loadAllEventsForSearchPreview() async {
         do {
             let events = try await dataLoader.loadAllEventsForSearchPreview(
                 sessionIds: filterState.selectedSessionIds,
-                limit: 10000
+                limit: 3000
             )
             self.allEventsForSearchPreview = events
-            print("📊 已加载全量数据用于搜索预览: count=\(events.count)")
+            print("📊 已加载数据用于搜索预览: count=\(events.count)")
         } catch {
-            print("❌ Failed to load all events for search preview: \(error)")
+            print("❌ Failed to load events for search preview: \(error)")
         }
     }
 

@@ -36,6 +36,65 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         self.coreDataStack = coreDataStack
     }
 
+    // MARK: - 私有辅助方法
+
+    /// 构建查询谓词（复用逻辑，消除 fetchEvents 和 countEvents 的重复代码）
+    private func buildPredicates(
+        levels: Set<LogEvent.Level>,
+        functions: Set<String>,
+        fileNames: Set<String>,
+        contexts: Set<String>,
+        threads: Set<String>,
+        sessionIds: Set<String>,
+        messageKeywords: Set<String>
+    ) -> [NSPredicate] {
+        var predicates: [NSPredicate] = []
+
+        // 日志等级筛选
+        if !levels.isEmpty {
+            let levelValues = levels.map { Int16($0.rawValue) }
+            predicates.append(NSPredicate(format: "level IN %@", levelValues))
+        }
+
+        // 函数名筛选
+        if !functions.isEmpty {
+            predicates.append(NSPredicate(format: "%K IN %@", "function", Array(functions)))
+        }
+
+        // 文件名筛选
+        if !fileNames.isEmpty {
+            predicates.append(NSPredicate(format: "fileName IN %@", Array(fileNames)))
+        }
+
+        // Context 筛选
+        if !contexts.isEmpty {
+            predicates.append(NSPredicate(format: "context IN %@", Array(contexts)))
+        }
+
+        // 线程筛选
+        if !threads.isEmpty {
+            predicates.append(NSPredicate(format: "thread IN %@", Array(threads)))
+        }
+
+        // 会话筛选
+        if !sessionIds.isEmpty {
+            predicates.append(NSPredicate(format: "sessionId IN %@", Array(sessionIds)))
+        }
+
+        // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)
+        if !messageKeywords.isEmpty {
+            var messagePredicates: [NSPredicate] = []
+            for keyword in messageKeywords {
+                messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
+            }
+            // 组合为 OR 关系
+            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+            predicates.append(combinedPredicate)
+        }
+
+        return predicates
+    }
+
     // MARK: - 查询方法
 
     /// 按日期查询日志事件
@@ -100,50 +159,16 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         let targetContext = context ?? coreDataStack.viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
-        // 构建谓词
-        var predicates: [NSPredicate] = []
-
-        // 日志等级筛选
-        if !levels.isEmpty {
-            let levelValues = levels.map { Int16($0.rawValue) }
-            predicates.append(NSPredicate(format: "level IN %@", levelValues))
-        }
-
-        // 函数名筛选
-        if !functions.isEmpty {
-            predicates.append(NSPredicate(format: "%K IN %@", "function", Array(functions)))
-        }
-
-        // 文件名筛选
-        if !fileNames.isEmpty {
-            predicates.append(NSPredicate(format: "fileName IN %@", Array(fileNames)))
-        }
-
-        // Context 筛选
-        if !contexts.isEmpty {
-            predicates.append(NSPredicate(format: "context IN %@", Array(contexts)))
-        }
-
-        // 线程筛选
-        if !threads.isEmpty {
-            predicates.append(NSPredicate(format: "thread IN %@", Array(threads)))
-        }
-
-        // 会话筛选
-        if !sessionIds.isEmpty {
-            predicates.append(NSPredicate(format: "sessionId IN %@", Array(sessionIds)))
-        }
-
-        // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)
-        if !messageKeywords.isEmpty {
-            var messagePredicates: [NSPredicate] = []
-            for keyword in messageKeywords {
-                messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
-            }
-            // 组合为 OR 关系
-            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
-            predicates.append(combinedPredicate)
-        }
+        // 使用共用方法构建谓词
+        let predicates = buildPredicates(
+            levels: levels,
+            functions: functions,
+            fileNames: fileNames,
+            contexts: contexts,
+            threads: threads,
+            sessionIds: sessionIds,
+            messageKeywords: messageKeywords
+        )
 
         // 组合谓词
         if !predicates.isEmpty {
@@ -166,16 +191,16 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         return entities.map { $0.toLogEvent() }
     }
 
-    /// 查询所有日志事件用于搜索预览 (不应用任何过滤条件,仅用于全局搜索)
+    /// 查询日志事件用于搜索预览 (不应用过滤条件,仅用于全局搜索)
     /// - Parameters:
     ///   - context: 可选的NSManagedObjectContext
     ///   - sessionIds: 可选的会话ID集合筛选
-    ///   - limit: 查询数量限制,默认10000条
+    ///   - limit: 查询数量限制,默认3000条（优化后的默认值，平衡性能和覆盖范围）
     /// - Returns: 日志事件数组
     public func fetchAllEventsForSearchPreview(
         in context: NSManagedObjectContext? = nil,
         sessionIds: Set<String> = [],
-        limit: Int = 10000
+        limit: Int = 3000
     ) throws -> [LogEvent] {
         let targetContext = context ?? coreDataStack.viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
@@ -281,50 +306,16 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         let targetContext = context ?? coreDataStack.viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
-        // 构建谓词(复用 fetchEvents 的逻辑)
-        var predicates: [NSPredicate] = []
-
-        // 日志等级筛选
-        if !levels.isEmpty {
-            let levelValues = levels.map { Int16($0.rawValue) }
-            predicates.append(NSPredicate(format: "level IN %@", levelValues))
-        }
-
-        // 函数名筛选
-        if !functions.isEmpty {
-            predicates.append(NSPredicate(format: "%K IN %@", "function", Array(functions)))
-        }
-
-        // 文件名筛选
-        if !fileNames.isEmpty {
-            predicates.append(NSPredicate(format: "fileName IN %@", Array(fileNames)))
-        }
-
-        // Context 筛选
-        if !contexts.isEmpty {
-            predicates.append(NSPredicate(format: "context IN %@", Array(contexts)))
-        }
-
-        // 线程筛选
-        if !threads.isEmpty {
-            predicates.append(NSPredicate(format: "thread IN %@", Array(threads)))
-        }
-
-        // 会话筛选
-        if !sessionIds.isEmpty {
-            predicates.append(NSPredicate(format: "sessionId IN %@", Array(sessionIds)))
-        }
-
-        // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)
-        if !messageKeywords.isEmpty {
-            var messagePredicates: [NSPredicate] = []
-            for keyword in messageKeywords {
-                messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
-            }
-            // 组合为 OR 关系
-            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
-            predicates.append(combinedPredicate)
-        }
+        // 使用共用方法构建谓词
+        let predicates = buildPredicates(
+            levels: levels,
+            functions: functions,
+            fileNames: fileNames,
+            contexts: contexts,
+            threads: threads,
+            sessionIds: sessionIds,
+            messageKeywords: messageKeywords
+        )
 
         // 组合谓词
         if !predicates.isEmpty {
