@@ -21,6 +21,7 @@ final class FilterOptionsCache {
         case fileNameCounts
         case contextCounts
         case threadCounts
+        case messageCounts
     }
 
     // MARK: - Storage
@@ -107,6 +108,16 @@ final class FilterOptionsCache {
     /// 设置线程计数
     func setThreadCounts(_ value: [String: Int]) {
         write(.threadCounts, value: value)
+    }
+
+    /// 获取消息计数
+    func messageCounts() -> [String: Int]? {
+        read(.messageCounts)
+    }
+
+    /// 设置消息计数
+    func setMessageCounts(_ value: [String: Int]) {
+        write(.messageCounts, value: value)
     }
 
     /// 清除所有缓存 (使用同步 barrier)

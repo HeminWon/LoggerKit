@@ -75,12 +75,14 @@ public class SearchState: ObservableObject {
     ///   - fileNameCounts: 文件名计数字典
     ///   - contextCounts: 上下文计数字典
     ///   - threadCounts: 线程计数字典
+    ///   - messageCounts: 消息计数字典
     public func computeResultsAsync(
         from events: [LogEvent],
         functionCounts: [String: Int],
         fileNameCounts: [String: Int],
         contextCounts: [String: Int],
-        threadCounts: [String: Int]
+        threadCounts: [String: Int],
+        messageCounts: [String: Int]
     ) {
         // 取消之前的搜索任务
         searchTask?.cancel()
@@ -108,7 +110,8 @@ public class SearchState: ObservableObject {
                     functionCounts: functionCounts,
                     fileNameCounts: fileNameCounts,
                     contextCounts: contextCounts,
-                    threadCounts: threadCounts
+                    threadCounts: threadCounts,
+                    messageCounts: messageCounts
                 )
             }.value
 
@@ -134,7 +137,8 @@ public class SearchState: ObservableObject {
         functionCounts: [String: Int],
         fileNameCounts: [String: Int],
         contextCounts: [String: Int],
-        threadCounts: [String: Int]
+        threadCounts: [String: Int],
+        messageCounts: [String: Int]
     ) -> CategorizedSearchResults {
         let lowercasedSearch = searchText.lowercased()
         var results = CategorizedSearchResults()
@@ -153,8 +157,9 @@ public class SearchState: ObservableObject {
                 if event.message.lowercased().contains(lowercasedSearch) {
                     if !messageSet.contains(event.message) {
                         messageSet.insert(event.message)
+                        let count = messageCounts[event.message] ?? 0
                         results.message.append(
-                            SearchResultItem(field: .message, value: event.message, matchCount: 1)
+                            SearchResultItem(field: .message, value: event.message, matchCount: count)
                         )
                     }
                 }

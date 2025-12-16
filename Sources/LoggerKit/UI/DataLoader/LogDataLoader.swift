@@ -28,8 +28,6 @@ public class LogDataLoader: LogDataLoaderProtocol {
     public func loadEvents(
         sessionId: String?,
         filterState: FilterState,
-        searchText: String,
-        searchFields: Set<SearchField>,
         offset: Int,
         limit: Int
     ) async throws -> [LogEvent] {
@@ -55,8 +53,6 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         contexts: contexts,
                         threads: threads,
                         sessionId: sessionId,
-                        searchText: searchText,
-                        searchFields: searchFields,
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: limit,
@@ -89,9 +85,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func countEvents(
         sessionId: String?,
-        filterState: FilterState,
-        searchText: String,
-        searchFields: Set<SearchField>
+        filterState: FilterState
     ) async throws -> Int {
         // 在主线程捕获需要的值
         let dbManager = self.databaseManager
@@ -115,8 +109,6 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         contexts: contexts,
                         threads: threads,
                         sessionId: sessionId,
-                        searchText: searchText,
-                        searchFields: searchFields,
                         messageKeywords: messageKeywords
                     )
 
@@ -130,9 +122,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func loadAllEvents(
         sessionId: String?,
-        filterState: FilterState,
-        searchText: String,
-        searchFields: Set<SearchField>
+        filterState: FilterState
     ) async throws -> [LogEvent] {
         // 在主线程捕获需要的值
         let dbManager = self.databaseManager
@@ -156,12 +146,35 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         contexts: contexts,
                         threads: threads,
                         sessionId: sessionId,
-                        searchText: searchText,
-                        searchFields: searchFields,
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: 100000,  // 使用大数值代替无限制
                         offset: 0
+                    )
+
+                    continuation.resume(returning: events)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func loadAllEventsForSearchPreview(
+        sessionId: String?,
+        limit: Int
+    ) async throws -> [LogEvent] {
+        let dbManager = self.databaseManager
+
+        // 使用 performBackgroundTask 确保线程安全
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    // 在后台 context 中执行全量查询
+                    let events = try dbManager.fetchAllEventsForSearchPreview(
+                        in: context,
+                        sessionId: sessionId,
+                        limit: limit
                     )
 
                     continuation.resume(returning: events)

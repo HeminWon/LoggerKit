@@ -91,8 +91,6 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         contexts: Set<String> = [],
         threads: Set<String> = [],
         sessionId: String? = nil,
-        searchText: String = "",
-        searchFields: Set<SearchField> = [.message, .fileName, .function],
         messageKeywords: Set<String> = [],
         sortDescriptors: [NSSortDescriptor] = [],
         limit: Int = 1000,
@@ -136,49 +134,15 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
         }
 
-        // 搜索文本和消息关键词筛选 (OR逻辑: searchText 或 messageKeywords 任一匹配即可)
-        if !searchText.isEmpty || !messageKeywords.isEmpty {
+        // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)
+        if !messageKeywords.isEmpty {
             var messagePredicates: [NSPredicate] = []
-
-            // 搜索文本 (根据 searchFields 动态构建查询条件)
-            if !searchText.isEmpty {
-                var fieldPredicates: [NSPredicate] = []
-
-                // 根据用户选择的搜索范围构建谓词
-                if searchFields.contains(.message) {
-                    fieldPredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", searchText))
-                }
-                if searchFields.contains(.fileName) {
-                    fieldPredicates.append(NSPredicate(format: "fileName CONTAINS[cd] %@", searchText))
-                }
-                if searchFields.contains(.function) {
-                    fieldPredicates.append(NSPredicate(format: "%K CONTAINS[cd] %@", "function", searchText))
-                }
-                if searchFields.contains(.context) {
-                    fieldPredicates.append(NSPredicate(format: "context CONTAINS[cd] %@", searchText))
-                }
-                if searchFields.contains(.thread) {
-                    fieldPredicates.append(NSPredicate(format: "thread CONTAINS[cd] %@", searchText))
-                }
-
-                // 将所有字段的搜索条件用 OR 组合
-                if !fieldPredicates.isEmpty {
-                    messagePredicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: fieldPredicates))
-                }
+            for keyword in messageKeywords {
+                messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
             }
-
-            // 消息关键词筛选 (每个关键词独立匹配)
-            if !messageKeywords.isEmpty {
-                for keyword in messageKeywords {
-                    messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
-                }
-            }
-
             // 组合为 OR 关系
-            if !messagePredicates.isEmpty {
-                let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
-                predicates.append(combinedPredicate)
-            }
+            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+            predicates.append(combinedPredicate)
         }
 
         // 组合谓词
@@ -196,6 +160,36 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         // 分页
         fetchRequest.fetchLimit = limit
         fetchRequest.fetchOffset = offset
+
+        // 执行查询
+        let entities = try targetContext.fetch(fetchRequest)
+        return entities.map { $0.toLogEvent() }
+    }
+
+    /// 查询所有日志事件用于搜索预览 (不应用任何过滤条件,仅用于全局搜索)
+    /// - Parameters:
+    ///   - context: 可选的NSManagedObjectContext
+    ///   - sessionId: 可选的会话ID筛选
+    ///   - limit: 查询数量限制,默认10000条
+    /// - Returns: 日志事件数组
+    public func fetchAllEventsForSearchPreview(
+        in context: NSManagedObjectContext? = nil,
+        sessionId: String? = nil,
+        limit: Int = 10000
+    ) throws -> [LogEvent] {
+        let targetContext = context ?? coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        // 只应用会话筛选(如果有)
+        if let sessionId = sessionId {
+            fetchRequest.predicate = NSPredicate(format: "sessionId == %@", sessionId)
+        }
+
+        // 按时间倒序
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+
+        // 限制数量避免内存问题
+        fetchRequest.fetchLimit = limit
 
         // 执行查询
         let entities = try targetContext.fetch(fetchRequest)
@@ -282,8 +276,6 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         contexts: Set<String> = [],
         threads: Set<String> = [],
         sessionId: String? = nil,
-        searchText: String = "",
-        searchFields: Set<SearchField> = [.message, .fileName, .function],
         messageKeywords: Set<String> = []
     ) throws -> Int {
         let targetContext = context ?? coreDataStack.viewContext
@@ -323,49 +315,15 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             predicates.append(NSPredicate(format: "sessionId == %@", sessionId))
         }
 
-        // 搜索文本和消息关键词筛选 (OR逻辑: searchText 或 messageKeywords 任一匹配即可)
-        if !searchText.isEmpty || !messageKeywords.isEmpty {
+        // 消息关键词筛选 (OR逻辑: 任一关键词匹配即可)
+        if !messageKeywords.isEmpty {
             var messagePredicates: [NSPredicate] = []
-
-            // 搜索文本 (根据 searchFields 动态构建查询条件)
-            if !searchText.isEmpty {
-                var fieldPredicates: [NSPredicate] = []
-
-                // 根据用户选择的搜索范围构建谓词
-                if searchFields.contains(.message) {
-                    fieldPredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", searchText))
-                }
-                if searchFields.contains(.fileName) {
-                    fieldPredicates.append(NSPredicate(format: "fileName CONTAINS[cd] %@", searchText))
-                }
-                if searchFields.contains(.function) {
-                    fieldPredicates.append(NSPredicate(format: "%K CONTAINS[cd] %@", "function", searchText))
-                }
-                if searchFields.contains(.context) {
-                    fieldPredicates.append(NSPredicate(format: "context CONTAINS[cd] %@", searchText))
-                }
-                if searchFields.contains(.thread) {
-                    fieldPredicates.append(NSPredicate(format: "thread CONTAINS[cd] %@", searchText))
-                }
-
-                // 将所有字段的搜索条件用 OR 组合
-                if !fieldPredicates.isEmpty {
-                    messagePredicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: fieldPredicates))
-                }
+            for keyword in messageKeywords {
+                messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
             }
-
-            // 消息关键词筛选 (每个关键词独立匹配)
-            if !messageKeywords.isEmpty {
-                for keyword in messageKeywords {
-                    messagePredicates.append(NSPredicate(format: "message CONTAINS[cd] %@", keyword))
-                }
-            }
-
             // 组合为 OR 关系
-            if !messagePredicates.isEmpty {
-                let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
-                predicates.append(combinedPredicate)
-            }
+            let combinedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: messagePredicates)
+            predicates.append(combinedPredicate)
         }
 
         // 组合谓词

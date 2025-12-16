@@ -97,6 +97,12 @@ public class LogDetailSceneState: ObservableObject {
             invalidateCache()
         }
     }
+    /// 全量数据,用于搜索预览 (不受任何过滤条件影响)
+    @Published var allEventsForSearchPreview: [LogEvent] = [] {
+        didSet {
+            invalidateAllEventsCache()
+        }
+    }
     /// 显示用的 ViewModel 数组,封装了 event、index 和预计算的颜色
     @Published var displayEvents: [LogRowViewModel] = []
     /// 符合当前筛选条件的日志总数(不受分页限制)
@@ -123,10 +129,16 @@ public class LogDetailSceneState: ObservableObject {
 
     // MARK: - 缓存管理器
     private let cache = FilterOptionsCache()
+    private let allEventsCache = FilterOptionsCache()
 
     /// 清除所有缓存
     private func invalidateCache() {
         cache.invalidateAll()
+    }
+
+    /// 清除全量数据缓存
+    private func invalidateAllEventsCache() {
+        allEventsCache.invalidateAll()
     }
 
     // MARK: - 可选项列表（从日志数据中提取，带缓存）
@@ -212,6 +224,79 @@ public class LogDetailSceneState: ObservableObject {
             counts[event.thread, default: 0] += 1
         }
         cache.setThreadCounts(counts)
+        return counts
+    }
+
+    private var messageCounts: [String: Int] {
+        if let cached = cache.messageCounts() {
+            return cached
+        }
+        var counts: [String: Int] = [:]
+        for event in events {
+            counts[event.message, default: 0] += 1
+        }
+        cache.setMessageCounts(counts)
+        return counts
+    }
+
+    // MARK: - 全量数据计数 (用于搜索预览)
+    private var allFunctionCounts: [String: Int] {
+        if let cached = allEventsCache.functionCounts() {
+            return cached
+        }
+        var counts: [String: Int] = [:]
+        for event in allEventsForSearchPreview {
+            counts[event.function, default: 0] += 1
+        }
+        allEventsCache.setFunctionCounts(counts)
+        return counts
+    }
+
+    private var allFileNameCounts: [String: Int] {
+        if let cached = allEventsCache.fileNameCounts() {
+            return cached
+        }
+        var counts: [String: Int] = [:]
+        for event in allEventsForSearchPreview {
+            counts[event.fileName, default: 0] += 1
+        }
+        allEventsCache.setFileNameCounts(counts)
+        return counts
+    }
+
+    private var allContextCounts: [String: Int] {
+        if let cached = allEventsCache.contextCounts() {
+            return cached
+        }
+        var counts: [String: Int] = [:]
+        for event in allEventsForSearchPreview {
+            counts[event.context, default: 0] += 1
+        }
+        allEventsCache.setContextCounts(counts)
+        return counts
+    }
+
+    private var allThreadCounts: [String: Int] {
+        if let cached = allEventsCache.threadCounts() {
+            return cached
+        }
+        var counts: [String: Int] = [:]
+        for event in allEventsForSearchPreview {
+            counts[event.thread, default: 0] += 1
+        }
+        allEventsCache.setThreadCounts(counts)
+        return counts
+    }
+
+    private var allMessageCounts: [String: Int] {
+        if let cached = allEventsCache.messageCounts() {
+            return cached
+        }
+        var counts: [String: Int] = [:]
+        for event in allEventsForSearchPreview {
+            counts[event.message, default: 0] += 1
+        }
+        allEventsCache.setMessageCounts(counts)
         return counts
     }
 
@@ -470,10 +555,6 @@ public class LogDetailSceneState: ObservableObject {
         // 检查任务是否已被取消
         if Task.isCancelled { return }
 
-        // 🔑 在函数开始时就捕获搜索参数的快照，避免在异步过程中值发生变化
-        let searchTextSnapshot = searchState.searchText
-        let searchFieldsSnapshot = searchState.searchFields
-
         // 生成新的查询序列号
         querySequenceNumber += 1
         let currentSequence = querySequenceNumber
@@ -481,7 +562,7 @@ public class LogDetailSceneState: ObservableObject {
         // 如果是重置分页(新查询),更新生效序列号
         if resetPagination {
             activeQuerySequence = currentSequence
-            print("📊 开始查询: seq=\(currentSequence), searchText='\(searchTextSnapshot)'")
+            print("📊 开始查询: seq=\(currentSequence)")
         }
 
         // 根据是否重置分页来设置不同的loading状态
@@ -495,12 +576,10 @@ public class LogDetailSceneState: ObservableObject {
         let offset = page * pageSize
 
         do {
-            // 使用 DataLoader 加载数据（使用快照值）
+            // 使用 DataLoader 加载数据
             let events = try await dataLoader.loadEvents(
                 sessionId: filterState.selectedSessionId,
                 filterState: filterState,
-                searchText: searchTextSnapshot,
-                searchFields: searchFieldsSnapshot,
                 offset: offset,
                 limit: pageSize
             )
@@ -511,7 +590,7 @@ public class LogDetailSceneState: ObservableObject {
                 return
             }
 
-            print("✅ 查询完成: seq=\(currentSequence), events.count=\(events.count), searchText='\(searchTextSnapshot)'")
+            print("✅ 查询完成: seq=\(currentSequence), events.count=\(events.count)")
 
             // 再次检查任务是否被取消
             if Task.isCancelled { return }
@@ -529,12 +608,11 @@ public class LogDetailSceneState: ObservableObject {
                 currentPage = 1
                 hasMoreData = true
 
-                // 查询总数 (传入当前序列号和搜索快照)
-                totalCount = await fetchTotalCount(
-                    sequence: currentSequence,
-                    searchText: searchTextSnapshot,
-                    searchFields: searchFieldsSnapshot
-                )
+                // 查询总数
+                totalCount = await fetchTotalCount(sequence: currentSequence)
+
+                // 加载全量数据用于搜索预览
+                await loadAllEventsForSearchPreview()
             } else {
                 // 追加分页:追加到 events 数组
                 self.events.append(contentsOf: events)
@@ -601,15 +679,30 @@ public class LogDetailSceneState: ObservableObject {
         await loadLogsFromDatabase(resetPagination: true)
     }
 
-    /// 执行异步搜索 - 在后台线程计算搜索结果
+    /// 加载全量数据用于搜索预览
+    private func loadAllEventsForSearchPreview() async {
+        do {
+            let events = try await dataLoader.loadAllEventsForSearchPreview(
+                sessionId: filterState.selectedSessionId,
+                limit: 10000
+            )
+            self.allEventsForSearchPreview = events
+            print("📊 已加载全量数据用于搜索预览: count=\(events.count)")
+        } catch {
+            print("❌ Failed to load all events for search preview: \(error)")
+        }
+    }
+
+    /// 执行异步搜索 - 在后台线程计算搜索结果 (基于全量数据)
     private func performAsyncSearch() {
-        print("🔎 执行搜索预览计算: events.count=\(events.count), searchText='\(searchState.searchText)', searchFields=\(searchState.searchFields)")
+        print("🔎 执行搜索预览计算: allEvents.count=\(allEventsForSearchPreview.count), searchText='\(searchState.searchText)', searchFields=\(searchState.searchFields)")
         searchState.computeResultsAsync(
-            from: events,
-            functionCounts: functionCounts,
-            fileNameCounts: fileNameCounts,
-            contextCounts: contextCounts,
-            threadCounts: threadCounts
+            from: allEventsForSearchPreview,
+            functionCounts: allFunctionCounts,
+            fileNameCounts: allFileNameCounts,
+            contextCounts: allContextCounts,
+            threadCounts: allThreadCounts,
+            messageCounts: allMessageCounts
         )
     }
 
@@ -650,19 +743,13 @@ public class LogDetailSceneState: ObservableObject {
     /// 查询符合当前筛选条件的日志总数
     /// - Parameters:
     ///   - sequence: 查询序列号,用于验证结果有效性
-    ///   - searchText: 搜索文本快照
-    ///   - searchFields: 搜索范围快照
     private func fetchTotalCount(
-        sequence: UInt64,
-        searchText: String,
-        searchFields: Set<SearchField>
+        sequence: UInt64
     ) async -> Int {
         do {
             let count = try await dataLoader.countEvents(
                 sessionId: filterState.selectedSessionId,
-                filterState: filterState,
-                searchText: searchText,
-                searchFields: searchFields
+                filterState: filterState
             )
 
             // 验证序列号 - 只接受最新查询的总数
@@ -694,9 +781,7 @@ public class LogDetailSceneState: ObservableObject {
         // 首先查询总数
         let totalCount = try await dataLoader.countEvents(
             sessionId: filterState.selectedSessionId,
-            filterState: filterState,
-            searchText: searchState.searchText,
-            searchFields: searchState.searchFields
+            filterState: filterState
         )
 
         // 初始化进度
@@ -717,8 +802,6 @@ public class LogDetailSceneState: ObservableObject {
                 return try await self.dataLoader.loadEvents(
                     sessionId: self.filterState.selectedSessionId,
                     filterState: self.filterState,
-                    searchText: self.searchState.searchText,
-                    searchFields: self.searchState.searchFields,
                     offset: offset,
                     limit: limit
                 )
@@ -735,9 +818,7 @@ public class LogDetailSceneState: ObservableObject {
         do {
             return try await dataLoader.loadAllEvents(
                 sessionId: filterState.selectedSessionId,
-                filterState: filterState,
-                searchText: searchState.searchText,
-                searchFields: searchState.searchFields
+                filterState: filterState
             )
         } catch {
             print("❌ Failed to export all events: \(error)")
