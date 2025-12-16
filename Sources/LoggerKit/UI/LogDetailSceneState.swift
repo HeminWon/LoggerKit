@@ -387,7 +387,7 @@ public class LogDetailSceneState: ObservableObject {
 
     /// 生成导出文件名
     /// - Parameter firstLogTimestamp: 第一条日志的时间戳
-    /// - Returns: 格式为 `{bundleId}_{identifier}_{YYYY-MM-DD}_{HHmmss}.log` 的文件名
+    /// - Returns: 格式为 `{bundleId}_{identifier}_{YYYY-MM-DD}_{HHmmss}.log` 或 `{bundleId}_{YYYY-MM-DD}_{HHmmss}.log` (当 identifier 为空时)
     func generateExportFileName(firstLogTimestamp: TimeInterval) -> String {
         let date = Date(timeIntervalSince1970: firstLogTimestamp)
 
@@ -403,8 +403,14 @@ public class LogDetailSceneState: ObservableObject {
         timeFormatter.locale = Locale(identifier: "en_US_POSIX")
         let timeString = timeFormatter.string(from: date)
 
-        // 组装文件名: {bundleId}_{identifier}_{date}_{time}.log
-        return "\(prefix)_\(identifier)_\(dateString)_\(timeString).log"
+        // 组装文件名: 如果 identifier 为空,则格式为 {bundleId}_{date}_{time}.log
+        // 否则为 {bundleId}_{identifier}_{date}_{time}.log
+        var components = [prefix]
+        if !identifier.isEmpty {
+            components.append(identifier)
+        }
+        components.append(contentsOf: [dateString, timeString])
+        return components.joined(separator: "_") + ".log"
     }
 
     /// 显示标题
@@ -424,13 +430,8 @@ public class LogDetailSceneState: ObservableObject {
             self.prefix = bundleId
         }
 
-        if let identifier = identifier {
-            self.identifier = identifier
-        } else {
-            let logIdentifier: String = UserDefaults.standard.string(forKey: Constants.UserDefaultsKeys.logIdentifier) ?? String(UUID().uuidString.prefix(8))
-            self.identifier = logIdentifier
-            UserDefaults.standard.set(logIdentifier, forKey: Constants.UserDefaultsKeys.logIdentifier)
-        }
+        // 直接使用传入的 identifier,如果为 nil 则设置为空字符串
+        self.identifier = identifier ?? ""
 
         // 初始化 FilterState
         self.filterState = filterState ?? FilterState()
