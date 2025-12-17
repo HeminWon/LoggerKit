@@ -61,4 +61,26 @@ public protocol LogDatabaseManagerProtocol {
 
     /// 获取所有会话信息
     func fetchAllSessions() throws -> [SessionInfo]
+
+    // MARK: - 删除接口
+
+    /// 删除所有日志
+    func deleteAllLogs() throws
+
+    /// 删除指定日期的日志
+    func deleteLogs(forDate date: String) throws
+
+    /// 删除指定时间之前的日志
+    func deleteLogs(before date: Date) throws
+
+    /// 删除指定会话的所有日志
+    func deleteLogs(forSession sessionId: String) throws
+
+    /// 删除多个会话的日志
+    func deleteLogs(forSessions sessionIds: Set<String>) throws
+
+    // MARK: - 辅助接口
+
+    /// 获取数据库文件大小
+    func databaseSize() -> Int64
 }

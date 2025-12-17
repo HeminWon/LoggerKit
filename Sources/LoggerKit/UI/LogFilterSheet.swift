@@ -291,39 +291,123 @@ struct SessionChip: View {
     let session: SessionInfo
     let isSelected: Bool
     let action: () -> Void
+    let onDelete: ((String) -> Void)? // 可选的删除回调
+    let fullWidth: Bool // 是否全宽显示（纵向列表模式）
+
+    @State private var showDeleteConfirmation = false
+
+    // 提供默认初始化器，让 onDelete 和 fullWidth 可选
+    init(
+        session: SessionInfo,
+        isSelected: Bool,
+        action: @escaping () -> Void,
+        onDelete: ((String) -> Void)? = nil,
+        fullWidth: Bool = false
+    ) {
+        self.session = session
+        self.isSelected = isSelected
+        self.action = action
+        self.onDelete = onDelete
+        self.fullWidth = fullWidth
+    }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(session.id)
-                        .font(.caption)
-                        .fontWeight(.medium)
+            if fullWidth {
+                // 全宽列表项样式（用于纵向列表）
+                HStack(spacing: 12) {
+                    // 左侧：会话信息
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.id)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        HStack(spacing: 8) {
+                            Text(formattedDate)
+                                .font(.caption)
+                                .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+
+                            Text("•")
+                                .font(.caption)
+                                .foregroundColor(isSelected ? .white.opacity(0.6) : .secondary)
+
+                            Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                                .font(.caption)
+                                .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // 右侧：选中图标
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
+                            .font(.title3)
+                            .foregroundColor(.white)
                     }
                 }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.1))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
+                )
+            } else {
+                // 紧凑卡片样式（用于横向滚动）
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text(session.id)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                        }
+                    }
 
-                Text(formattedDate)
-                    .font(.caption2)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    Text(formattedDate)
+                        .font(.caption2)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
 
-                Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
-                    .font(.caption2)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                        .font(.caption2)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.2))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
+                )
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(isSelected ? Color.accentColor : Color.gray.opacity(0.2))
-            .foregroundColor(isSelected ? .white : .primary)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
+        // 仅当提供 onDelete 回调时显示 Context Menu
+        .contextMenu {
+            if onDelete != nil {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("删除此会话", systemImage: "trash")
+                }
+            }
+        }
+        // 删除确认对话框（仅在删除模式下显示）
+        .alert("确认删除会话 \(session.id)", isPresented: $showDeleteConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                onDelete?(session.id)
+            }
+        } message: {
+            Text("将删除此会话的 \(session.logCount) 条日志，且不可恢复。")
+        }
     }
 
     private var formattedDate: String {

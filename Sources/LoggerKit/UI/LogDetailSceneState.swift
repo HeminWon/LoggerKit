@@ -763,4 +763,45 @@ public class LogDetailSceneState: ObservableObject {
     func toggleLevel(_ level: LogEvent.Level) {
         filterState.toggleLevel(level)
     }
+
+    // MARK: - 删除操作
+
+    /// 删除所有日志
+    public func deleteAllLogs() async throws {
+        guard let dbManager = LoggerEngine.shared.getDatabaseManager() else {
+            throw LogDatabaseError.databaseNotAvailable
+        }
+
+        try await Task.detached {
+            try dbManager.deleteAllLogs()
+        }.value
+
+        // 刷新日志列表
+        await loadLogFile()
+    }
+
+    /// 删除指定会话的日志
+    /// - Parameter sessionIds: 会话 ID 集合
+    public func deleteSessions(_ sessionIds: Set<String>) async throws {
+        guard !sessionIds.isEmpty else {
+            throw LogDatabaseError.invalidParameter("会话 ID 集合不能为空")
+        }
+
+        guard let dbManager = LoggerEngine.shared.getDatabaseManager() else {
+            throw LogDatabaseError.databaseNotAvailable
+        }
+
+        try await Task.detached {
+            try dbManager.deleteLogs(forSessions: sessionIds)
+        }.value
+
+        // 刷新日志列表
+        await loadLogFile()
+    }
+
+    /// 删除单个会话的日志
+    /// - Parameter sessionId: 会话 ID
+    public func deleteSession(_ sessionId: String) async throws {
+        try await deleteSessions([sessionId])
+    }
 }

@@ -487,6 +487,76 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         }
     }
 
+    /// 删除指定会话的所有日志
+    public func deleteLogs(forSession sessionId: String) throws {
+        let context = coreDataStack.newBackgroundContext()
+        var thrownError: Error?
+
+        context.performAndWait {
+            let fetchRequest = LogEventEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "sessionId == %@", sessionId)
+
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
+            deleteRequest.resultType = .resultTypeObjectIDs
+
+            do {
+                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+                let objectIDs = result.result as! [NSManagedObjectID]
+
+                // 合并更改到主上下文
+                NSManagedObjectContext.mergeChanges(
+                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                    into: [coreDataStack.viewContext]
+                )
+
+                print("✅ Deleted \(objectIDs.count) logs for session \(sessionId)")
+            } catch {
+                print("❌ Failed to delete logs for session \(sessionId): \(error)")
+                thrownError = error
+            }
+        }
+
+        if let error = thrownError {
+            throw error
+        }
+    }
+
+    /// 删除多个会话的日志
+    public func deleteLogs(forSessions sessionIds: Set<String>) throws {
+        guard !sessionIds.isEmpty else { return }
+
+        let context = coreDataStack.newBackgroundContext()
+        var thrownError: Error?
+
+        context.performAndWait {
+            let fetchRequest = LogEventEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "sessionId IN %@", Array(sessionIds))
+
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
+            deleteRequest.resultType = .resultTypeObjectIDs
+
+            do {
+                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+                let objectIDs = result.result as! [NSManagedObjectID]
+
+                // 合并更改到主上下文
+                NSManagedObjectContext.mergeChanges(
+                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                    into: [coreDataStack.viewContext]
+                )
+
+                print("✅ Deleted \(objectIDs.count) logs for \(sessionIds.count) sessions")
+            } catch {
+                print("❌ Failed to delete logs for sessions: \(error)")
+                thrownError = error
+            }
+        }
+
+        if let error = thrownError {
+            throw error
+        }
+    }
+
     /// 数据库大小
     public func databaseSize() -> Int64 {
         guard let storeURL = coreDataStack.persistentContainer.persistentStoreCoordinator.persistentStores.first?.url else {

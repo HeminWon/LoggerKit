@@ -18,6 +18,7 @@ public struct LogDetailScene: View {
 
     @State var isSharePresented: Bool = false
     @State var isFilterPresented: Bool = false
+    @State var isDeleteManagementPresented: Bool = false
     @State var exportURL: URL?
     @State var isExporting: Bool = false
     @State var exportProgress: Double = 0.0
@@ -163,6 +164,15 @@ public struct LogDetailScene: View {
                 LogFilterSheet(sceneState: sceneState)
             }
         }
+        .sheet(isPresented: $isDeleteManagementPresented) {
+            if #available(iOS 16.0, macOS 13.0, *) {
+                LogDeleteManagementSheet(sceneState: sceneState)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            } else {
+                LogDeleteManagementSheet(sceneState: sceneState)
+            }
+        }
         #if canImport(UIKit)
         .sheet(isPresented: $isSharePresented) {
             if let url = exportURL {
@@ -184,7 +194,7 @@ public struct LogDetailScene: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                // 筛选按钮
+                // 筛选按钮（高频操作，独立显示）
                 Button {
                     isFilterPresented = true
                 } label: {
@@ -195,8 +205,47 @@ public struct LogDetailScene: View {
                     }
                 }
 
-                // 分享按钮
-                shareButton
+                // 更多菜单（中低频操作）
+                Menu {
+                    // 导出日志
+                    Button {
+                        Task {
+                            isExporting = true
+                            exportProgress = 0.0
+                            exportedCount = 0
+                            totalExportCount = 0
+
+                            do {
+                                exportURL = try await sceneState.exportAllEventsStreaming(
+                                    progressHandler: { written, total in
+                                        exportedCount = written
+                                        totalExportCount = total
+                                        exportProgress = total > 0 ? Double(written) / Double(total) : 0.0
+                                    }
+                                )
+                                isExporting = false
+                                isSharePresented = true
+                            } catch {
+                                exportError = error
+                                showExportError = true
+                                isExporting = false
+                            }
+                        }
+                    } label: {
+                        Label("导出日志", systemImage: "square.and.arrow.up")
+                    }
+
+                    Divider()
+
+                    // 删除管理（危险操作）
+                    Button(role: .destructive) {
+                        isDeleteManagementPresented = true
+                    } label: {
+                        Label("删除管理", systemImage: "trash.circle")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
         }
         #else
