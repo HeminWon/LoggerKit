@@ -34,13 +34,13 @@ struct LogDeleteManagementSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle("日志删除管理")
+            .navigationTitle(String(localized: "delete_management_title", bundle: .module))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button(String(localized: "done_button", bundle: .module)) {
                         dismiss()
                     }
                 }
@@ -50,26 +50,26 @@ struct LogDeleteManagementSheet: View {
             await loadSessions()
         }
         // 删除所有日志确认对话框
-        .alert("确认删除所有日志", isPresented: $showDeleteAllConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert(String(localized: "delete_all_confirmation_title", bundle: .module), isPresented: $showDeleteAllConfirmation) {
+            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
+            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
                 deleteAllLogs()
             }
         } message: {
-            Text("此操作将删除所有日志记录，且不可恢复。")
+            Text(String(localized: "delete_all_confirmation_message", bundle: .module))
         }
         // 删除选中 Session 确认对话框
-        .alert("确认删除选中的会话", isPresented: $showDeleteSessionsConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert(String(localized: "delete_sessions_confirmation_title", bundle: .module), isPresented: $showDeleteSessionsConfirmation) {
+            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
+            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
                 deleteSelectedSessions()
             }
         } message: {
-            Text("将删除 \(selectedSessionIds.count) 个会话的所有日志，且不可恢复。")
+            Text(String(format: String(localized: "delete_sessions_confirmation_message", bundle: .module), selectedSessionIds.count))
         }
         // 错误提示
-        .alert("删除失败", isPresented: $showError) {
-            Button("确定", role: .cancel) { }
+        .alert(String(localized: "delete_failed_title", bundle: .module), isPresented: $showError) {
+            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
         } message: {
             if let error = deleteError {
                 Text(error.localizedDescription)
@@ -82,9 +82,9 @@ struct LogDeleteManagementSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("删除所有日志")
+                    Text(String(localized: "delete_all_logs_title", bundle: .module))
                         .font(.headline)
-                    Text("清空数据库中的所有日志记录")
+                    Text(String(localized: "delete_all_logs_description", bundle: .module))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -96,7 +96,7 @@ struct LogDeleteManagementSheet: View {
             } label: {
                 HStack {
                     Image(systemName: "trash.fill")
-                    Text("删除所有日志")
+                    Text(String(localized: "delete_all_logs_button", bundle: .module))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -116,14 +116,14 @@ struct LogDeleteManagementSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("按会话删除")
+                    Text(String(localized: "delete_by_session_title", bundle: .module))
                         .font(.headline)
                     if !selectedSessionIds.isEmpty {
-                        Text("已选中 \(selectedSessionIds.count) 个会话")
+                        Text(String(format: String(localized: "selected_sessions_count", bundle: .module), selectedSessionIds.count))
                             .font(.caption)
                             .foregroundColor(.blue)
                     } else {
-                        Text("选择要删除的会话")
+                        Text(String(localized: "delete_by_session_description", bundle: .module))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -133,13 +133,13 @@ struct LogDeleteManagementSheet: View {
                 // 全选/清空按钮
                 if !sessions.isEmpty {
                     if selectedSessionIds.isEmpty {
-                        Button("全选") {
+                        Button(String(localized: "select_all", bundle: .module)) {
                             selectedSessionIds = Set(sessions.map { $0.id })
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
                     } else {
-                        Button("清空") {
+                        Button(String(localized: "empty", bundle: .module)) {
                             selectedSessionIds.removeAll()
                         }
                         .font(.caption)
@@ -154,7 +154,7 @@ struct LogDeleteManagementSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding()
             } else if sessions.isEmpty {
-                Text("暂无会话记录")
+                Text(String(localized: "no_session_records", bundle: .module))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
@@ -170,7 +170,7 @@ struct LogDeleteManagementSheet: View {
                 } label: {
                     HStack {
                         Image(systemName: "trash.fill")
-                        Text("删除选中的会话 (\(selectedSessionIds.count))")
+                        Text(String(format: String(localized: "delete_selected_sessions_button", bundle: .module), selectedSessionIds.count))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)

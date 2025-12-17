@@ -395,18 +395,18 @@ struct SessionChip: View {
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
-                    Label("删除此会话", systemImage: "trash")
+                    Label(String(localized: "delete_session_context_menu", bundle: .module), systemImage: "trash")
                 }
             }
         }
         // 删除确认对话框（仅在删除模式下显示）
-        .alert("确认删除会话 \(session.id)", isPresented: $showDeleteConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
+        .alert(String(format: String(localized: "delete_session_confirmation_title", bundle: .module), session.id), isPresented: $showDeleteConfirmation) {
+            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
+            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
                 onDelete?(session.id)
             }
         } message: {
-            Text("将删除此会话的 \(session.logCount) 条日志，且不可恢复。")
+            Text(String(format: String(localized: "delete_session_confirmation_message", bundle: .module), session.logCount))
         }
     }
 

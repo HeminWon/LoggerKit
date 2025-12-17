@@ -51,3 +51,36 @@
 
 // MARK: - Log List Scene
 "clear_all" = "Clear All";
+
+// MARK: - Log Detail Scene - Toolbar
+"export_logs" = "Export Logs";
+"delete_management" = "Delete Management";
+"loaded_total_count" = "Loaded %d / Total %d";
+
+// MARK: - Export
+"export_failed" = "Export Failed";
+"confirm_button" = "OK";
+"exporting_progress" = "Exporting";
+
+// MARK: - Delete Management Sheet
+"delete_management_title" = "Log Delete Management";
+"delete_all_logs_title" = "Delete All Logs";
+"delete_all_logs_description" = "Clear all log records from the database";
+"delete_all_logs_button" = "Delete All Logs";
+"delete_all_confirmation_title" = "Confirm Delete All Logs";
+"delete_all_confirmation_message" = "This action will delete all log records and cannot be undone.";
+"delete_by_session_title" = "Delete by Session";
+"delete_by_session_description" = "Select sessions to delete";
+"selected_sessions_count" = "%d session(s) selected";
+"select_all" = "Select All";
+"empty" = "Clear";
+"no_session_records" = "No session records";
+"delete_selected_sessions_button" = "Delete Selected Sessions (%d)";
+"delete_sessions_confirmation_title" = "Confirm Delete Selected Sessions";
+"delete_sessions_confirmation_message" = "This will delete all logs from %d session(s) and cannot be undone.";
+"delete_session_context_menu" = "Delete This Session";
+"delete_session_confirmation_title" = "Confirm Delete Session %@";
+"delete_session_confirmation_message" = "This will delete %d log(s) from this session and cannot be undone.";
+"delete_failed_title" = "Delete Failed";
+"cancel_button" = "Cancel";
+"delete_button" = "Delete";

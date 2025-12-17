@@ -56,6 +56,16 @@ public struct LogDetailScene: View {
         String(localized: "share_log", bundle: .module)
     }
 
+    /// 是否没有日志（根据 totalCount 和 loadingState 判断）
+    private var hasNoLogs: Bool {
+        // 加载中不禁用，避免闪烁
+        if case .loading = sceneState.loadingState {
+            return false
+        }
+        // 总数为 0 且不在加载状态时才禁用
+        return sceneState.totalCount == 0 && sceneState.loadingState == .loaded
+    }
+
     public var body: some View {
         VStack {
             if case .loading = sceneState.loadingState {
@@ -78,7 +88,7 @@ public struct LogDetailScene: View {
                 // 1️⃣ 筛选结果统计
                 HStack {
                     if sceneState.totalCount > 0 {
-                        Text("已加载 \(sceneState.displayEvents.count) / 总计 \(sceneState.totalCount) 条")
+                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), sceneState.displayEvents.count, sceneState.totalCount))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
@@ -92,6 +102,40 @@ public struct LogDetailScene: View {
                             .foregroundColor(.blue)
                     }
                     Spacer()
+
+                    // 导出进度显示
+                    if isExporting {
+                        HStack(spacing: 4) {
+                            // 圆环进度
+                            if totalExportCount > 0 {
+                                ZStack {
+                                    Circle()
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 2)
+                                        .frame(width: 16, height: 16)
+                                    Circle()
+                                        .trim(from: 0, to: exportProgress)
+                                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                        .frame(width: 16, height: 16)
+                                        .rotationEffect(.degrees(-90))
+                                        .animation(.linear(duration: 0.1), value: exportProgress)
+                                }
+                            } else {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .frame(width: 16, height: 16)
+                            }
+
+                            // 进度文字
+                            Text(String(localized: "exporting_progress", bundle: .module))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            if totalExportCount > 0 {
+                                Text("\(exportedCount)/\(totalExportCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -204,6 +248,7 @@ public struct LogDetailScene: View {
                         Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle")
                     }
                 }
+                .disabled(hasNoLogs)
 
                 // 更多菜单（中低频操作）
                 Menu {
@@ -232,7 +277,7 @@ public struct LogDetailScene: View {
                             }
                         }
                     } label: {
-                        Label("导出日志", systemImage: "square.and.arrow.up")
+                        Label(String(localized: "export_logs", bundle: .module), systemImage: "square.and.arrow.up")
                     }
 
                     Divider()
@@ -241,11 +286,12 @@ public struct LogDetailScene: View {
                     Button(role: .destructive) {
                         isDeleteManagementPresented = true
                     } label: {
-                        Label("删除管理", systemImage: "trash.circle")
+                        Label(String(localized: "delete_management", bundle: .module), systemImage: "trash.circle")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .disabled(hasNoLogs)
             }
         }
         #else
@@ -322,9 +368,9 @@ public struct LogDetailScene: View {
             }
             .frame(width: 32, height: 32) // 固定尺寸,避免布局变化
         }
-        .disabled(isExporting)
-        .alert("导出失败", isPresented: $showExportError) {
-            Button("确定", role: .cancel) { }
+        .disabled(isExporting || hasNoLogs)
+        .alert(String(localized: "export_failed", bundle: .module), isPresented: $showExportError) {
+            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
         } message: {
             if let error = exportError {
                 Text(error.localizedDescription)
