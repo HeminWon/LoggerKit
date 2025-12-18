@@ -16,17 +16,6 @@ import AppKit
 public struct LogDetailScene: View {
     @ObservedObject var sceneState: LogDetailSceneState
 
-    @State var isSharePresented: Bool = false
-    @State var isFilterPresented: Bool = false
-    @State var isDeleteManagementPresented: Bool = false
-    @State var exportURL: URL?
-    @State var isExporting: Bool = false
-    @State var exportProgress: Double = 0.0
-    @State var exportedCount: Int = 0
-    @State var totalExportCount: Int = 0
-    @State var exportError: Error?
-    @State var showExportError: Bool = false
-
     public init(sceneState: LogDetailSceneState? = nil) {
         self.sceneState = sceneState ?? LogDetailSceneState()
     }
@@ -104,20 +93,20 @@ public struct LogDetailScene: View {
                     Spacer()
 
                     // 导出进度显示
-                    if isExporting {
+                    if sceneState.isExporting {
                         HStack(spacing: 4) {
                             // 圆环进度
-                            if totalExportCount > 0 {
+                            if sceneState.totalExportCount > 0 {
                                 ZStack {
                                     Circle()
                                         .stroke(Color.gray.opacity(0.2), lineWidth: 2)
                                         .frame(width: 16, height: 16)
                                     Circle()
-                                        .trim(from: 0, to: exportProgress)
+                                        .trim(from: 0, to: sceneState.exportProgress)
                                         .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                                         .frame(width: 16, height: 16)
                                         .rotationEffect(.degrees(-90))
-                                        .animation(.linear(duration: 0.1), value: exportProgress)
+                                        .animation(.linear(duration: 0.1), value: sceneState.exportProgress)
                                 }
                             } else {
                                 ProgressView()
@@ -129,8 +118,8 @@ public struct LogDetailScene: View {
                             Text(String(localized: "exporting_progress", bundle: .module))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            if totalExportCount > 0 {
-                                Text("\(exportedCount)/\(totalExportCount)")
+                            if sceneState.totalExportCount > 0 {
+                                Text("\(sceneState.exportedCount)/\(sceneState.totalExportCount)")
                                     .font(.caption2)
                                     .foregroundColor(.blue)
                             }
@@ -199,7 +188,7 @@ public struct LogDetailScene: View {
         .task {
             await sceneState.loadLogFile()
         }
-        .sheet(isPresented: $isFilterPresented) {
+        .sheet(isPresented: sceneState.isFilterPresentedBinding) {
             if #available(iOS 16.0, macOS 13.0, *) {
                 LogFilterSheet(sceneState: sceneState)
                     .presentationDetents([.medium, .large])
@@ -208,7 +197,7 @@ public struct LogDetailScene: View {
                 LogFilterSheet(sceneState: sceneState)
             }
         }
-        .sheet(isPresented: $isDeleteManagementPresented) {
+        .sheet(isPresented: sceneState.isDeleteManagementPresentedBinding) {
             if #available(iOS 16.0, macOS 13.0, *) {
                 LogDeleteManagementSheet(sceneState: sceneState)
                     .presentationDetents([.medium, .large])
@@ -218,10 +207,10 @@ public struct LogDetailScene: View {
             }
         }
         #if canImport(UIKit)
-        .sheet(isPresented: $isSharePresented) {
-            if let url = exportURL {
+        .sheet(isPresented: sceneState.isSharePresentedBinding) {
+            if let url = sceneState.exportedFileURL {
                 let shareSheet = ShareSheet(activityItems: [url]) {
-                    isSharePresented = false
+                    Task { await sceneState.store.send(.setSharePresented(false)) }
                 }
                 if #available(iOS 16.0, *) {
                     shareSheet
@@ -240,7 +229,7 @@ public struct LogDetailScene: View {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 // 筛选按钮（高频操作，独立显示）
                 Button {
-                    isFilterPresented = true
+                    Task { await sceneState.store.send(.setFilterPresented(true)) }
                 } label: {
                     if sceneState.activeFilterCount > 0 {
                         Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle.fill")
@@ -255,25 +244,17 @@ public struct LogDetailScene: View {
                     // 导出日志
                     Button {
                         Task {
-                            isExporting = true
-                            exportProgress = 0.0
-                            exportedCount = 0
-                            totalExportCount = 0
-
                             do {
-                                exportURL = try await sceneState.exportAllEventsStreaming(
+                                _ = try await sceneState.exportAllEventsStreaming(
                                     progressHandler: { written, total in
-                                        exportedCount = written
-                                        totalExportCount = total
-                                        exportProgress = total > 0 ? Double(written) / Double(total) : 0.0
+                                        Task { @MainActor in
+                                            await sceneState.store.send(.exportProgressUpdated(exported: written, total: total))
+                                        }
                                     }
                                 )
-                                isExporting = false
-                                isSharePresented = true
+                                // Export completion is handled by the reducer (sets isSharePresented = true)
                             } catch {
-                                exportError = error
-                                showExportError = true
-                                isExporting = false
+                                // Export failure is handled by the reducer (sets showExportError = true)
                             }
                         }
                     } label: {
@@ -284,7 +265,7 @@ public struct LogDetailScene: View {
 
                     // 删除管理（危险操作）
                     Button(role: .destructive) {
-                        isDeleteManagementPresented = true
+                        Task { await sceneState.store.send(.setDeleteManagementPresented(true)) }
                     } label: {
                         Label(String(localized: "delete_management", bundle: .module), systemImage: "trash.circle")
                     }
@@ -307,35 +288,27 @@ public struct LogDetailScene: View {
     private var shareButton: some View {
         Button {
             Task {
-                isExporting = true
-                exportProgress = 0.0
-                exportedCount = 0
-                totalExportCount = 0
-
                 do {
                     // 使用流式导出（文件名会在内部根据第一条日志时间自动生成）
-                    exportURL = try await sceneState.exportAllEventsStreaming(
+                    _ = try await sceneState.exportAllEventsStreaming(
                         progressHandler: { written, total in
-                            exportedCount = written
-                            totalExportCount = total
-                            exportProgress = total > 0 ? Double(written) / Double(total) : 0.0
+                            Task { @MainActor in
+                                await sceneState.store.send(.exportProgressUpdated(exported: written, total: total))
+                            }
                         }
                     )
-                    isExporting = false
-                    isSharePresented = true
+                    // Export completion is handled by the reducer (sets isSharePresented = true)
                 } catch {
-                    exportError = error
-                    showExportError = true
-                    isExporting = false
-                    print("❌ 导出失败: \(error)")
+                    // Export failure is handled by the reducer (sets showExportError = true)
+                    print("❌ 导出失败: \(sceneState.error?.localizedDescription ?? "unknown error")")
                 }
             }
         } label: {
             // 使用固定尺寸的 ZStack 确保布局不会因图标切换而变化
             ZStack {
-                if isExporting {
+                if sceneState.isExporting {
                     // 圆环进度条
-                    if totalExportCount > 0 {
+                    if sceneState.totalExportCount > 0 {
                         ZStack {
                             // 背景圆环
                             Circle()
@@ -344,14 +317,14 @@ public struct LogDetailScene: View {
 
                             // 进度圆环
                             Circle()
-                                .trim(from: 0, to: exportProgress)
+                                .trim(from: 0, to: sceneState.exportProgress)
                                 .stroke(Color.blue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                                 .frame(width: 24, height: 24)
                                 .rotationEffect(.degrees(-90))
-                                .animation(.linear(duration: 0.1), value: exportProgress)
+                                .animation(.linear(duration: 0.1), value: sceneState.exportProgress)
 
                             // 百分比文字
-                            Text("\(Int(exportProgress * 100))")
+                            Text("\(Int(sceneState.exportProgress * 100))")
                                 .font(.system(size: 8, weight: .medium))
                                 .foregroundColor(.blue)
                         }
@@ -368,11 +341,11 @@ public struct LogDetailScene: View {
             }
             .frame(width: 32, height: 32) // 固定尺寸,避免布局变化
         }
-        .disabled(isExporting || hasNoLogs)
-        .alert(String(localized: "export_failed", bundle: .module), isPresented: $showExportError) {
+        .disabled(sceneState.isExporting || hasNoLogs)
+        .alert(String(localized: "export_failed", bundle: .module), isPresented: sceneState.showExportErrorBinding) {
             Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
         } message: {
-            if let error = exportError {
+            if let error = sceneState.error {
                 Text(error.localizedDescription)
             }
         }
@@ -391,13 +364,13 @@ public struct LogDetailScene: View {
 
 // MARK: - LogRowViewModel
 /// LogRowView 的专用数据模型,封装了显示所需的 event、index 和预计算的颜色
-struct LogRowViewModel: Identifiable {
-    let id: UUID              // 使用 event.id 作为唯一标识
-    let event: LogEvent       // 原始日志数据
-    let index: Int            // 显示序号
-    let cachedColor: Color    // 预计算的 session 颜色
+public struct LogRowViewModel: Identifiable {
+    public let id: UUID              // 使用 event.id 作为唯一标识
+    public let event: LogEvent       // 原始日志数据
+    public let index: Int            // 显示序号
+    public let cachedColor: Color    // 预计算的 session 颜色
 
-    init(event: LogEvent, index: Int) {
+    public init(event: LogEvent, index: Int) {
         self.id = event.id
         self.event = event
         self.index = index
@@ -476,18 +449,3 @@ struct LogRowView: View {
 
 #Preview {
 }
-
-#if canImport(UIKit)
-extension LogDetailScene {
-    /// 创建一个包含 LogDetailScene 的 UIViewController,方便在 UIKit 项目中使用
-    /// - Parameter sceneState: 可选的场景状态,不传则使用默认状态（加载所有日志）
-    /// - Returns: 包含 LogDetailScene 的 UIViewController,外部可以自行决定如何展示 (present/push)
-    public static func makeViewController(sceneState: LogDetailSceneState? = nil) -> UIViewController {
-        let state = sceneState ?? LogDetailSceneState()
-        let scene = LogDetailScene(sceneState: state)
-        let hostingController = UIHostingController(rootView: scene)
-        hostingController.title = "Logs"
-        return hostingController
-    }
-}
-#endif

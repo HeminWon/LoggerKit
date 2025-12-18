@@ -60,4 +60,18 @@ public protocol LogDataLoaderProtocol {
 
     /// 取消当前加载任务
     func cancelCurrentTask()
+
+    // MARK: - 筛选选项查询方法
+
+    /// 获取所有可用的函数名
+    func getAvailableFunctions() async throws -> [String]
+
+    /// 获取所有可用的文件名
+    func getAvailableFileNames() async throws -> [String]
+
+    /// 获取所有可用的上下文
+    func getAvailableContexts() async throws -> [String]
+
+    /// 获取所有可用的线程名
+    func getAvailableThreads() async throws -> [String]
 }

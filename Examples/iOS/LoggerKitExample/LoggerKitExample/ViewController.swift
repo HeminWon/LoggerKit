@@ -167,7 +167,7 @@ class ViewController: UIViewController {
         showToast("开始生成200条测试日志...")
 
         DispatchQueue.global(qos: .background).async { [weak self] in
-            for i in 1...200 {
+            for i in 1...5000 {
                 // 变化的函数名
                 let functions = [
                     "viewDidLoad()", "buttonTapped()", "dataFetched()", "userLogin()",
@@ -236,7 +236,7 @@ class ViewController: UIViewController {
 
     @objc private func showLogList() {
         // 使用 UIKit 静态方法创建 ViewController
-        let logVC = LogDetailScene.makeViewController()
+        let logVC = LoggerKit.makeViewController()
         navigationController?.pushViewController(logVC, animated: true)
     }
 

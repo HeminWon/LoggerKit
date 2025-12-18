@@ -39,6 +39,11 @@ public class LogDataLoader: LogDataLoaderProtocol {
         let contexts = filterState.selectedContexts
         let threads = filterState.selectedThreads
         let messageKeywords = filterState.selectedMessageKeywords
+        let selectedSessionIds = filterState.selectedSessionIds
+
+        // 合并 sessionIds: 优先使用用户选择的 selectedSessionIds,否则使用环境的 sessionIds
+        // 如果用户选择了特定会话,只查询这些会话;否则使用环境限定的会话范围
+        let finalSessionIds: Set<String> = selectedSessionIds.isEmpty ? sessionIds : selectedSessionIds
 
         // 使用 performBackgroundTask 确保线程安全
         return try await withCheckedThrowingContinuation { continuation in
@@ -52,7 +57,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         fileNames: fileNames,
                         contexts: contexts,
                         threads: threads,
-                        sessionIds: sessionIds,
+                        sessionIds: finalSessionIds,  // ✅ 使用合并后的 sessionIds
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: limit,
@@ -95,6 +100,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
         let contexts = filterState.selectedContexts
         let threads = filterState.selectedThreads
         let messageKeywords = filterState.selectedMessageKeywords
+        let selectedSessionIds = filterState.selectedSessionIds
+
+        // 合并 sessionIds: 优先使用用户选择的 selectedSessionIds,否则使用环境的 sessionIds
+        let finalSessionIds: Set<String> = selectedSessionIds.isEmpty ? sessionIds : selectedSessionIds
 
         // 使用 performBackgroundTask 确保线程安全
         return try await withCheckedThrowingContinuation { continuation in
@@ -108,7 +117,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         fileNames: fileNames,
                         contexts: contexts,
                         threads: threads,
-                        sessionIds: sessionIds,
+                        sessionIds: finalSessionIds,  // ✅ 使用合并后的 sessionIds
                         messageKeywords: messageKeywords
                     )
 
@@ -132,6 +141,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
         let contexts = filterState.selectedContexts
         let threads = filterState.selectedThreads
         let messageKeywords = filterState.selectedMessageKeywords
+        let selectedSessionIds = filterState.selectedSessionIds
+
+        // 合并 sessionIds: 优先使用用户选择的 selectedSessionIds,否则使用环境的 sessionIds
+        let finalSessionIds: Set<String> = selectedSessionIds.isEmpty ? sessionIds : selectedSessionIds
 
         // 使用 performBackgroundTask 确保线程安全
         return try await withCheckedThrowingContinuation { continuation in
@@ -145,7 +158,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
                         fileNames: fileNames,
                         contexts: contexts,
                         threads: threads,
-                        sessionIds: sessionIds,
+                        sessionIds: finalSessionIds,  // ✅ 使用合并后的 sessionIds
                         messageKeywords: messageKeywords,
                         sortDescriptors: [],
                         limit: 100000,  // 使用大数值代替无限制
@@ -188,5 +201,67 @@ public class LogDataLoader: LogDataLoaderProtocol {
     public func cancelCurrentTask() {
         currentTask?.cancel()
         currentTask = nil
+    }
+
+    // MARK: - 筛选选项查询方法
+
+    public func getAvailableFunctions() async throws -> [String] {
+        let dbManager = self.databaseManager
+
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    let functions = try dbManager.fetchAvailableFunctions()
+                    continuation.resume(returning: functions)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func getAvailableFileNames() async throws -> [String] {
+        let dbManager = self.databaseManager
+
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    let fileNames = try dbManager.fetchAvailableFileNames()
+                    continuation.resume(returning: fileNames)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func getAvailableContexts() async throws -> [String] {
+        let dbManager = self.databaseManager
+
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    let contexts = try dbManager.fetchAvailableContexts()
+                    continuation.resume(returning: contexts)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func getAvailableThreads() async throws -> [String] {
+        let dbManager = self.databaseManager
+
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    let threads = try dbManager.fetchAvailableThreads()
+                    continuation.resume(returning: threads)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 }

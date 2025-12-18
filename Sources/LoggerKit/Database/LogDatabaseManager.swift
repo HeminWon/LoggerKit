@@ -275,12 +275,13 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         functionRequest.sortDescriptors = [NSSortDescriptor(key: "count", ascending: false)]
         functionRequest.fetchLimit = 100
 
-        // 过滤掉function为空的情况
-        functionRequest.predicate = NSPredicate(format: "function != nil AND function != ''")
+        // 过滤掉function为空的情况 - 只在数据库层过滤nil，空字符串在应用层过滤
+//        functionRequest.predicate = NSPredicate(format: "function != nil")
 
         let functionResults = try context.fetch(functionRequest) as! [NSDictionary]
         let topFunctions = functionResults.compactMap { dict -> (String, Int)? in
             guard let function = dict["function"] as? String,
+                  !function.isEmpty,  // 在应用层过滤空字符串
                   let count = dict["count"] as? Int else { return nil }
             return (function, count)
         }
@@ -391,6 +392,28 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             }
             return SessionInfo(id: sessionId, startTime: sessionStartTime, logCount: logCount)
         }
+    }
+
+    // MARK: - 筛选选项查询方法
+
+    /// 获取所有可用的函数名
+    public func fetchAvailableFunctions() throws -> [String] {
+        return try fetchUniqueValues(for: "function")
+    }
+
+    /// 获取所有可用的文件名
+    public func fetchAvailableFileNames() throws -> [String] {
+        return try fetchUniqueValues(for: "fileName")
+    }
+
+    /// 获取所有可用的上下文
+    public func fetchAvailableContexts() throws -> [String] {
+        return try fetchUniqueValues(for: "context")
+    }
+
+    /// 获取所有可用的线程名
+    public func fetchAvailableThreads() throws -> [String] {
+        return try fetchUniqueValues(for: "thread")
     }
 
     /// 查询指定日期的日志数量

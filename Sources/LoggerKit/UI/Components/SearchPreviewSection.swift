@@ -20,9 +20,10 @@ struct SearchPreviewSection: View {
             // 搜索范围配置
             searchFieldsSelector
 
-            // 搜索结果预览 - 使用搜索文本作为 id 强制刷新
+            // 搜索结果预览
             if !sceneState.searchState.searchText.isEmpty {
                 searchResultsPreview
+                    // 使用 searchText 和 totalCount 的组合作为 id，确保搜索时视图能正确刷新
                     .id("\(sceneState.searchState.searchText)-\(sceneState.searchState.cachedResults.totalCount)")
             }
         }
@@ -71,7 +72,7 @@ struct SearchPreviewSection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(SearchField.allCases) { field in
-                        Button(action: { sceneState.searchState.toggleSearchField(field) }) {
+                        Button(action: { sceneState.toggleSearchField(field) }) {
                             HStack(spacing: 4) {
                                 Image(systemName: field.icon)
                                 Text(field.localizedName)

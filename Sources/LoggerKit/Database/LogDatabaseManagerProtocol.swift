@@ -62,6 +62,20 @@ public protocol LogDatabaseManagerProtocol {
     /// 获取所有会话信息
     func fetchAllSessions() throws -> [SessionInfo]
 
+    // MARK: - 筛选选项查询接口
+
+    /// 获取所有可用的函数名
+    func fetchAvailableFunctions() throws -> [String]
+
+    /// 获取所有可用的文件名
+    func fetchAvailableFileNames() throws -> [String]
+
+    /// 获取所有可用的上下文
+    func fetchAvailableContexts() throws -> [String]
+
+    /// 获取所有可用的线程名
+    func fetchAvailableThreads() throws -> [String]
+
     // MARK: - 删除接口
 
     /// 删除所有日志
