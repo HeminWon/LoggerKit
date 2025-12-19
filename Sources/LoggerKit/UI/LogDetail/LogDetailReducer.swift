@@ -106,41 +106,6 @@ public struct LogDetailReducer: Reducer {
 
     private func reduceCoreActions(_ state: inout LogDetailState, _ action: LogDetailAction) -> Effect<LogDetailAction> {
         switch action {
-        case .loadLogFile:
-            // ⚠️ 向后兼容: 委托给 LogList Feature
-            // 同步 filterState 到 LogList
-            state.list.filterState = state.filterFeature
-
-            return .multiple([
-                // Delegate to LogList
-                .task { .list(.loadLogFile) },
-                // Load statistics
-                .task { [environment] in
-                    do {
-                        let stats = try await environment.dataLoader.loadStatistics()
-                        return .statisticsLoaded(stats)
-                    } catch {
-                        // Statistics failure doesn't fail the whole load
-                        return .statisticsLoaded(LogStatistics(totalCount: 0, levelCounts: [:], topFunctions: []))
-                    }
-                },
-                // Load all events for search preview
-                .task { [environment] in
-                    do {
-                        let allEvents = try await environment.dataLoader.loadAllEventsForSearchPreview(
-                            sessionIds: environment.sessionIds,
-                            limit: 10000
-                        )
-                        print("🟢 [LogDetailReducer] allEventsLoaded: \(allEvents.count) events")
-                        return .allEventsLoaded(allEvents)
-                    } catch {
-                        // Search preview failure doesn't fail the whole load
-                        print("🔴 [LogDetailReducer] loadAllEventsForSearchPreview failed: \(error)")
-                        return .allEventsLoaded([])
-                    }
-                }
-            ])
-
         case .allEventsLoaded(let events):
             state.allEventsForSearchPreview = events
             print("🔵 [LogDetailReducer] Forwarding \(events.count) events to SearchFeature")
@@ -281,7 +246,7 @@ public struct LogDetailReducer: Reducer {
 
         case .deletionCompleted:
             // Reload after deletion
-            return reduceCoreActions(&state, .loadLogFile)
+            return .task { .list(.loadLogFile) }
 
         case .deletionFailed(let error):
             state.error = error

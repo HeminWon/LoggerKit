@@ -23,17 +23,13 @@ import Foundation
 /// Example:
 /// ```swift
 /// // User taps "Load Logs"
-/// await store.send(.loadLogFile)
+/// await store.send(.list(.loadLogFile))
 ///
-/// // System loads data and returns
-/// await store.send(.logsLoaded(events))
+/// // System loads data and returns (handled by LogList Feature)
+/// // .list(.loadSucceeded(events, totalCount, sequenceNumber))
 /// ```
 public enum LogDetailAction: Equatable {
     // MARK: - User Interactions (Legacy Actions - 待迁移到新 Feature)
-
-    /// Load log file (initial load)
-    /// ⚠️ TODO: 迁移到 .list(.loadLogFile)
-    case loadLogFile
 
     /// Export logs (legacy, for backward compatibility)
     /// ⚠️ TODO: 迁移到 .export(.export)
@@ -122,8 +118,6 @@ public enum LogDetailAction: Equatable {
 
     public static func == (lhs: LogDetailAction, rhs: LogDetailAction) -> Bool {
         switch (lhs, rhs) {
-        case (.loadLogFile, .loadLogFile):
-            return true
         case (.deleteAllLogs, .deleteAllLogs):
             return true
         case (.exportStarted, .exportStarted):

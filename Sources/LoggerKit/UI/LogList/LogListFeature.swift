@@ -85,7 +85,7 @@ extension LogList {
 
         /// Display view models (computed on demand)
         public var displayEvents: [LogRowViewModel] {
-            events.enumerated().map { LogRowViewModel(event: $1, index: $0) }
+            events.enumerated().map { LogRowViewModel(event: $1, index: $0 + 1) }
         }
 
         // MARK: - Initializer
@@ -308,7 +308,7 @@ extension LogList {
                 state.updateEvents(events)
                 state.totalCount = totalCount
                 state.currentPage = 0
-                state.hasMore = events.count >= state.pageSize
+                state.hasMore = events.count < totalCount
             }
 
             // Update loading state
@@ -333,7 +333,11 @@ extension LogList {
             // Append events
             state.events.append(contentsOf: events)
             state.currentPage += 1
-            state.hasMore = events.count >= state.pageSize
+            state.hasMore = state.events.count < state.totalCount
+
+            // Update loading state
+            state.loadingState = .loaded
+            state.error = nil
 
             return .none
         }

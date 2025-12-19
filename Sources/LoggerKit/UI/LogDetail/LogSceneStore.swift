@@ -22,7 +22,7 @@ import Foundation
 /// )
 ///
 /// // Load logs
-/// await store.send(.loadLogFile)
+/// await store.send(.list(.loadLogFile))
 ///
 /// // Apply filter
 /// await store.send(.filter(.applyFilters))
