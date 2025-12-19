@@ -64,7 +64,12 @@ public struct ExportState: Equatable, Sendable {
 /// state.events = loadedEvents
 /// ```
 public struct LogDetailState: Equatable {
-    // MARK: - Data
+    // MARK: - List Feature (NEW TCA-based list functionality)
+
+    /// List feature (new TCA-based list functionality)
+    public var list: LogList.State = LogList.State()
+
+    // MARK: - Data (将在清理阶段移除，使用 list.events 代替)
 
     /// Filtered and paginated events to display
     public var events: [LogEvent] = []
@@ -78,7 +83,7 @@ public struct LogDetailState: Equatable {
     /// Total count of events matching current filters (not limited by pagination)
     public var totalCount: Int = 0
 
-    // MARK: - Loading State
+    // MARK: - Loading State (将在清理阶段移除，使用 list.loadingState 代替)
 
     /// Current loading state
     public var loadingState: LoadingState = .idle
@@ -204,7 +209,8 @@ public struct LogDetailState: Equatable {
 
     public static func == (lhs: LogDetailState, rhs: LogDetailState) -> Bool {
         // Compare all fields (including cachedSearchResults - critical for search UI updates!)
-        return lhs.events.count == rhs.events.count &&
+        return lhs.list == rhs.list &&  // ✅ 新增：LogList Feature 比较
+            lhs.events.count == rhs.events.count &&
             lhs.allEventsForSearchPreview.count == rhs.allEventsForSearchPreview.count &&
             lhs.displayEvents.count == rhs.displayEvents.count &&
             lhs.totalCount == rhs.totalCount &&

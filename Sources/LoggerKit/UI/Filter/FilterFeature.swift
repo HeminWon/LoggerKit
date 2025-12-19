@@ -25,8 +25,8 @@ extension FilterFeature {
     public struct State: Equatable, Sendable {
         // MARK: - Selected Filters
 
-        /// Selected log levels
-        public var selectedLevels: Set<LogEvent.Level> = []
+        /// Selected log levels (默认选中所有级别)
+        public var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error]
 
         /// Selected functions
         public var selectedFunctions: Set<String> = []

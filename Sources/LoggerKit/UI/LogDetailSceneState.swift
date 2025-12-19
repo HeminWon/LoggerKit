@@ -173,8 +173,9 @@ public class LogDetailSceneState: ObservableObject {
 
     private func setupStoreBindings() {
         // Sync store state to published properties
+        // ✅ 使用 LogList Feature 的状态
         store.$state
-            .map { $0.events }
+            .map { $0.list.events }
             .assign(to: &$events)
 
         store.$state
@@ -182,15 +183,16 @@ public class LogDetailSceneState: ObservableObject {
             .assign(to: &$allEventsForSearchPreview)
 
         store.$state
-            .map { $0.totalCount }
+            .map { $0.list.totalCount }
             .assign(to: &$totalCount)
 
         store.$state
-            .map { $0.loadingState }
+            .map { $0.list.loadingState }
             .assign(to: &$loadingState)
 
         store.$state
-            .map { $0.error }
+            .map { $0.list.error?.localizedDescription }
+            .map { $0.map { NSError(domain: "LogList", code: -1, userInfo: [NSLocalizedDescriptionKey: $0]) as Error } }
             .assign(to: &$error)
 
         store.$state
@@ -236,8 +238,9 @@ public class LogDetailSceneState: ObservableObject {
             .assign(to: &$showExportError)
 
         // Update display events when events change
+        // ✅ 使用 LogList Feature 的 events
         store.$state
-            .map { $0.events }
+            .map { $0.list.events }
             .map { events in
                 events.enumerated().map { index, event in
                     LogRowViewModel(event: event, index: index + 1)
@@ -314,17 +317,17 @@ public class LogDetailSceneState: ObservableObject {
 
     /// Load log file
     public func loadLogFile() async {
-        await store.send(.loadLogFile)
+        await store.send(.list(.loadLogFile))  // ✅ 使用 LogList Action
     }
 
     /// Load more logs (pagination)
     public func loadMore() async {
-        await store.send(.loadMore)
+        await store.send(.list(.loadMore))  // ✅ 使用 LogList Action
     }
 
     /// Refresh logs
     public func refresh() async {
-        await store.send(.refresh)
+        await store.send(.list(.refresh))  // ✅ 使用 LogList Action
     }
 
     /// Refresh search results

@@ -43,6 +43,9 @@ public enum LogDetailAction: Equatable {
     /// Export logs (legacy, for backward compatibility)
     case exportLogs(format: ExportFormat, progress: @Sendable (Double) -> Void)
 
+    /// List feature actions (new TCA-based list)
+    case list(LogList.Action)
+
     /// Export feature actions (new TCA-based export)
     case export(ExportFeature.Action)
 

@@ -10,20 +10,21 @@ import Foundation
 
 // MARK: - LogDetailReducer
 
-/// Main reducer for the log detail scene
+/// Main reducer for the log detail scene (协调器模式)
 ///
-/// This reducer combines all sub-reducers and handles:
-/// - Initial log loading
-/// - Refresh
-/// - Export
-/// - Delete
-/// - Error handling
+/// This reducer acts as a coordinator and delegates to sub-features:
+/// - LogList Feature: List data loading, pagination, query sequencing
+/// - Export Feature: Log export functionality
+/// - Filter Feature: Filter management
+/// - Search Feature: Search functionality
+/// - Delete Feature: Log deletion
 ///
-/// Sub-reducers handle:
-/// - FilterReducer: Filter changes
-/// - PaginationReducer: Pagination and load more
-/// - SearchReducer: Search functionality
+/// Legacy sub-reducers (will be removed in future):
+/// - FilterReducer: Old filter logic (use FilterFeature instead)
 /// - CacheReducer: Cache management
+///
+/// DEPRECATED sub-reducers (已移除):
+/// - PaginationReducer: ❌ Merged into LogList Feature
 public struct LogDetailReducer: Reducer {
     public typealias State = LogDetailState
     public typealias Action = LogDetailAction
@@ -31,8 +32,9 @@ public struct LogDetailReducer: Reducer {
     private let environment: LogDetailEnvironment
 
     // Sub-reducers
-    private let filterReducer: FilterReducer
-    private let paginationReducer: PaginationReducer
+    private let listReducer: LogList.Reducer  // ✅ 新增: LogList Reducer
+    private let filterReducer: FilterReducer  // ⚠️ 保留:旧的 FilterReducer（可能有遗留逻辑）
+    // ❌ 已移除: private let paginationReducer: PaginationReducer  // 逻辑已合并到 LogList
     private let cacheReducer: CacheReducer
     private let exportReducer: ExportFeature.ExportReducer
     private let filterFeatureReducer: FilterFeature.Reducer
@@ -41,8 +43,16 @@ public struct LogDetailReducer: Reducer {
 
     public init(environment: LogDetailEnvironment) {
         self.environment = environment
+
+        // Initialize LogList.Reducer with LogList.Environment
+        let listEnvironment = LogList.Environment.live(
+            dataLoader: environment.dataLoader,
+            sessionIds: environment.sessionIds
+        )
+        self.listReducer = LogList.Reducer(environment: listEnvironment)
+
         self.filterReducer = FilterReducer(environment: environment)
-        self.paginationReducer = PaginationReducer(environment: environment)
+        // ❌ 已移除: self.paginationReducer = PaginationReducer(environment: environment)
         self.cacheReducer = CacheReducer()
 
         // Initialize ExportReducer with ExportFeature.Environment
@@ -72,7 +82,7 @@ public struct LogDetailReducer: Reducer {
         // First, let sub-reducers handle their actions
         let subEffects = [
             filterReducer.reduce(&state, action),
-            paginationReducer.reduce(&state, action),
+            // ❌ 已移除: paginationReducer.reduce(&state, action),  // 逻辑已合并到 LogList
             cacheReducer.reduce(&state, action)
         ]
 
@@ -100,58 +110,13 @@ public struct LogDetailReducer: Reducer {
     private func reduceCoreActions(_ state: inout LogDetailState, _ action: LogDetailAction) -> Effect<LogDetailAction> {
         switch action {
         case .loadLogFile:
-            // Initial load
-            state.loadingState = .loading(progress: nil)
-            state.events = []
-            state.error = nil
-            state.resetPagination()
-
-            let sequenceNumber = state.querySequenceNumber + 1
-
-            // Capture values
-            let sessionIds = environment.sessionIds
-            let pageSize = state.pageSize
-            let levels = state.selectedLevels
-            let functions = state.selectedFunctions
-            let fileNames = state.selectedFileNames
-            let contexts = state.selectedContexts
-            let threads = state.selectedThreads
-            let messageKeywords = state.selectedMessageKeywords
-            let sessionIdFilters = state.selectedSessionIds
+            // ⚠️ 向后兼容: 委托给 LogList Feature
+            // 同步 filterState 到 LogList
+            state.list.filterState = state.filterFeature
 
             return .multiple([
-                // Load events
-                .cancellable(id: "loadLogs") { [environment] in
-                    do {
-                        let filterState = await MainActor.run {
-                            let fs = FilterState()
-                            fs.selectedLevels = levels
-                            fs.selectedFunctions = functions
-                            fs.selectedFileNames = fileNames
-                            fs.selectedContexts = contexts
-                            fs.selectedThreads = threads
-                            fs.selectedMessageKeywords = messageKeywords
-                            fs.selectedSessionIds = sessionIdFilters
-                            return fs
-                        }
-
-                        let events = try await environment.dataLoader.loadEvents(
-                            sessionIds: sessionIds,
-                            filterState: filterState,
-                            offset: 0,
-                            limit: pageSize
-                        )
-
-                        let totalCount = try await environment.dataLoader.countEvents(
-                            sessionIds: sessionIds,
-                            filterState: filterState
-                        )
-
-                        return .logsLoaded(events: events, totalCount: totalCount, sequenceNumber: sequenceNumber)
-                    } catch {
-                        return .loadingFailed(error)
-                    }
-                },
+                // Delegate to LogList
+                .task { .list(.loadLogFile) },
                 // Load statistics
                 .task { [environment] in
                     do {
@@ -178,12 +143,17 @@ public struct LogDetailReducer: Reducer {
             ])
 
         case .refresh:
-            // Same as initial load
-            return reduceCoreActions(&state, .loadLogFile)
+            // ⚠️ 向后兼容: 委托给 LogList Feature
+            return .task { .list(.refresh) }
 
         case .logsLoaded:
-            // Handled by PaginationReducer
+            // ⚠️ 向后兼容: 现在由 LogList Feature 处理（通过 PaginationReducer 已合并到 LogList）
+            // 这个 case 不应该再被触发，因为新的流程使用 .list(.loadSucceeded)
             return .none
+
+        case .loadMore:
+            // ⚠️ 向后兼容: 委托给 LogList Feature
+            return .task { .list(.loadMore) }
 
         case .allEventsLoaded(let events):
             state.allEventsForSearchPreview = events
@@ -346,6 +316,11 @@ public struct LogDetailReducer: Reducer {
             state.showExportError = value
             return .none
 
+        case .list(let listAction):
+            // Delegate to LogList.Reducer
+            let listEffect = listReducer.reduce(&state.list, listAction)
+            return listEffect.map { .list($0) }
+
         case .export(let exportAction):
             // Delegate to ExportFeature.Reducer
             let exportEffect = exportReducer.reduce(&state.exportFeature, exportAction)
@@ -362,10 +337,13 @@ public struct LogDetailReducer: Reducer {
                 state.isFilterPresented = false
                 state.resetPagination()
 
+                // Sync filterState to LogList.State
+                state.list.filterState = state.filterFeature
+
                 // Return combined effects: filter effect + reload data
                 return .multiple([
                     filterEffect.map { .filter($0) },
-                    .task { .loadLogFile }
+                    .task { .list(.refresh) }  // ✅ 使用 LogList.refresh
                 ])
             }
 
@@ -390,7 +368,7 @@ public struct LogDetailReducer: Reducer {
                 // Return combined effects: delete effect + reload data
                 return .multiple([
                     deleteEffect.map { .delete($0) },
-                    .task { .loadLogFile }
+                    .task { .list(.refresh) }  // ✅ 使用 LogList.refresh
                 ])
             }
 
