@@ -69,10 +69,14 @@ public struct LogDetailState: Equatable {
     /// List feature (new TCA-based list functionality)
     public var list: LogList.State = LogList.State()
 
-    // MARK: - Data (将在清理阶段移除，使用 list.events 代替)
+    // MARK: - Data (计算属性，代理到 list)
 
     /// Filtered and paginated events to display
-    public var events: [LogEvent] = []
+    /// 代理到 list.events，保持单一数据源
+    public var events: [LogEvent] {
+        get { list.events }
+        set { list.events = newValue }
+    }
 
     /// All events for search preview (unfiltered)
     public var allEventsForSearchPreview: [LogEvent] = []
@@ -81,12 +85,20 @@ public struct LogDetailState: Equatable {
     public var displayEvents: [LogRowViewModel] = []
 
     /// Total count of events matching current filters (not limited by pagination)
-    public var totalCount: Int = 0
+    /// 代理到 list.totalCount，保持单一数据源
+    public var totalCount: Int {
+        get { list.totalCount }
+        set { list.totalCount = newValue }
+    }
 
-    // MARK: - Loading State (将在清理阶段移除，使用 list.loadingState 代替)
+    // MARK: - Loading State (计算属性，代理到 list.loadingState)
 
     /// Current loading state
-    public var loadingState: LoadingState = .idle
+    /// 代理到 list.loadingState，保持单一数据源
+    public var loadingState: LoadingState {
+        get { list.loadingState }
+        set { list.loadingState = newValue }
+    }
 
     /// Error (if any)
     public var error: Error?
@@ -128,39 +140,79 @@ public struct LogDetailState: Equatable {
     /// Whether export error alert is shown
     public var showExportError: Bool = false
 
-    // MARK: - Pagination
+    // MARK: - Pagination (计算属性，代理到 list)
 
     /// Current page number
-    public var currentPage: Int = 0
+    /// 代理到 list.currentPage，保持单一数据源
+    public var currentPage: Int {
+        get { list.currentPage }
+        set { list.currentPage = newValue }
+    }
 
     /// Page size
-    public var pageSize: Int = 500
+    /// 代理到 list.pageSize，保持单一数据源
+    public var pageSize: Int {
+        get { list.pageSize }
+        set { list.pageSize = newValue }
+    }
 
     /// Whether more data is available
-    public var hasMoreData: Bool = true
+    /// 代理到 list.hasMore，保持单一数据源
+    public var hasMoreData: Bool {
+        get { list.hasMore }
+        set { list.hasMore = newValue }
+    }
 
-    // MARK: - Filter State
+    // MARK: - Filter State (计算属性，代理到 filterFeature)
 
     /// Selected log levels
-    public var selectedLevels: Set<LogEvent.Level> = [.verbose, .debug, .info, .warning, .error]
+    /// 代理到 filterFeature.selectedLevels，保持单一数据源
+    public var selectedLevels: Set<LogEvent.Level> {
+        get { filterFeature.selectedLevels }
+        set { filterFeature.selectedLevels = newValue }
+    }
 
     /// Selected functions
-    public var selectedFunctions: Set<String> = []
+    /// 代理到 filterFeature.selectedFunctions，保持单一数据源
+    public var selectedFunctions: Set<String> {
+        get { filterFeature.selectedFunctions }
+        set { filterFeature.selectedFunctions = newValue }
+    }
 
     /// Selected file names
-    public var selectedFileNames: Set<String> = []
+    /// 代理到 filterFeature.selectedFileNames，保持单一数据源
+    public var selectedFileNames: Set<String> {
+        get { filterFeature.selectedFileNames }
+        set { filterFeature.selectedFileNames = newValue }
+    }
 
     /// Selected contexts
-    public var selectedContexts: Set<String> = []
+    /// 代理到 filterFeature.selectedContexts，保持单一数据源
+    public var selectedContexts: Set<String> {
+        get { filterFeature.selectedContexts }
+        set { filterFeature.selectedContexts = newValue }
+    }
 
     /// Selected threads
-    public var selectedThreads: Set<String> = []
+    /// 代理到 filterFeature.selectedThreads，保持单一数据源
+    public var selectedThreads: Set<String> {
+        get { filterFeature.selectedThreads }
+        set { filterFeature.selectedThreads = newValue }
+    }
 
     /// Selected message keywords
-    public var selectedMessageKeywords: Set<String> = []
+    /// 代理到 filterFeature.selectedMessageKeywords，保持单一数据源
+    public var selectedMessageKeywords: Set<String> {
+        get { filterFeature.selectedMessageKeywords }
+        set { filterFeature.selectedMessageKeywords = newValue }
+    }
 
     /// Selected session IDs
-    public var selectedSessionIds: Set<String> = []
+    /// 代理到 filterFeature.selectedSessionIds，保持单一数据源
+    public var selectedSessionIds: Set<String> {
+        get { filterFeature.selectedSessionIds }
+        set { filterFeature.selectedSessionIds = newValue }
+    }
 
     // MARK: - Statistics
 
@@ -208,33 +260,22 @@ public struct LogDetailState: Equatable {
     // MARK: - Equatable
 
     public static func == (lhs: LogDetailState, rhs: LogDetailState) -> Bool {
-        // Compare all fields (including cachedSearchResults - critical for search UI updates!)
-        return lhs.list == rhs.list &&  // ✅ 新增：LogList Feature 比较
-            lhs.events.count == rhs.events.count &&
+        // ✅ 优化：只比较子 Feature，不再比较重复的计算属性
+        // 重复字段（events, totalCount, loadingState, currentPage, pageSize, hasMoreData,
+        // selectedLevels, selectedFunctions 等）已通过子 Feature 的比较自动覆盖
+        return lhs.list == rhs.list &&  // 包含: events, totalCount, loadingState, currentPage, pageSize, hasMoreData
             lhs.allEventsForSearchPreview.count == rhs.allEventsForSearchPreview.count &&
             lhs.displayEvents.count == rhs.displayEvents.count &&
-            lhs.totalCount == rhs.totalCount &&
-            lhs.loadingState == rhs.loadingState &&
             lhs.error?.localizedDescription == rhs.error?.localizedDescription &&
-            lhs.exportFeature == rhs.exportFeature &&  // ✅ 新增：ExportFeature 比较
-            lhs.exportState == rhs.exportState &&  // ✅ 保留：向后兼容
-            lhs.filterFeature == rhs.filterFeature &&  // ✅ 新增：FilterFeature 比较
-            lhs.searchFeature == rhs.searchFeature &&  // ✅ 新增：SearchFeature 比较
-            lhs.deleteFeature == rhs.deleteFeature &&  // ✅ 新增：DeleteFeature 比较
+            lhs.exportFeature == rhs.exportFeature &&
+            lhs.exportState == rhs.exportState &&
+            lhs.filterFeature == rhs.filterFeature &&  // 包含: selectedLevels, selectedFunctions, selectedFileNames, 等所有筛选字段
+            lhs.searchFeature == rhs.searchFeature &&
+            lhs.deleteFeature == rhs.deleteFeature &&
             lhs.isSharePresented == rhs.isSharePresented &&
             lhs.isFilterPresented == rhs.isFilterPresented &&
             lhs.isDeleteManagementPresented == rhs.isDeleteManagementPresented &&
             lhs.showExportError == rhs.showExportError &&
-            lhs.currentPage == rhs.currentPage &&
-            lhs.pageSize == rhs.pageSize &&
-            lhs.hasMoreData == rhs.hasMoreData &&
-            lhs.selectedLevels == rhs.selectedLevels &&
-            lhs.selectedFunctions == rhs.selectedFunctions &&
-            lhs.selectedFileNames == rhs.selectedFileNames &&
-            lhs.selectedContexts == rhs.selectedContexts &&
-            lhs.selectedThreads == rhs.selectedThreads &&
-            lhs.selectedMessageKeywords == rhs.selectedMessageKeywords &&
-            lhs.selectedSessionIds == rhs.selectedSessionIds &&
             lhs.querySequenceNumber == rhs.querySequenceNumber &&
             lhs.activeQuerySequence == rhs.activeQuerySequence
     }
@@ -273,20 +314,22 @@ public struct LogDetailState: Equatable {
     }
 
     /// Reset pagination
+    /// 代理到 list，保持单一数据源
     public mutating func resetPagination() {
-        currentPage = 0
-        hasMoreData = true
+        list.currentPage = 0
+        list.hasMore = true
     }
 
     /// Reset filters
+    /// 代理到 filterFeature，保持单一数据源
     public mutating func resetFilters() {
-        selectedLevels = [.verbose, .debug, .info, .warning, .error]
-        selectedFunctions = []
-        selectedFileNames = []
-        selectedContexts = []
-        selectedThreads = []
-        selectedMessageKeywords = []
-        selectedSessionIds = []
+        filterFeature.selectedLevels = [.verbose, .debug, .info, .warning, .error]
+        filterFeature.selectedFunctions = []
+        filterFeature.selectedFileNames = []
+        filterFeature.selectedContexts = []
+        filterFeature.selectedThreads = []
+        filterFeature.selectedMessageKeywords = []
+        filterFeature.selectedSessionIds = []
     }
 
     /// Reset search
