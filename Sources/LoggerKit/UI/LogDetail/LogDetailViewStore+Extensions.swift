@@ -267,14 +267,7 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
 
     /// 刷新日志
     public func refresh() {
-        send(.refresh)
-    }
-
-    /// 应用过滤器
-    ///
-    /// - Parameter options: 过滤选项
-    public func applyFilter(_ options: FilterOptions) {
-        send(.applyFilter(options))
+        send(.list(.refresh))
     }
 
     /// 重置过滤器
@@ -449,11 +442,6 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
     /// ```
     public func loadLogFileAsync() async {
         await sendAsync(.list(.loadLogFile))
-    }
-
-    /// 应用过滤器 (异步)
-    public func applyFilterAsync(_ options: FilterOptions) async {
-        await sendAsync(.applyFilter(options))
     }
 
     /// 导出日志 (异步)

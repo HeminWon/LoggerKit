@@ -141,19 +141,6 @@ public struct LogDetailReducer: Reducer {
                 }
             ])
 
-        case .refresh:
-            // ⚠️ 向后兼容: 委托给 LogList Feature
-            return .task { .list(.refresh) }
-
-        case .logsLoaded:
-            // ⚠️ 向后兼容: 现在由 LogList Feature 处理（通过 PaginationReducer 已合并到 LogList）
-            // 这个 case 不应该再被触发，因为新的流程使用 .list(.loadSucceeded)
-            return .none
-
-        case .loadMore:
-            // ⚠️ 向后兼容: 委托给 LogList Feature
-            return .task { .list(.loadMore) }
-
         case .allEventsLoaded(let events):
             state.allEventsForSearchPreview = events
             print("🔵 [LogDetailReducer] Forwarding \(events.count) events to SearchFeature")

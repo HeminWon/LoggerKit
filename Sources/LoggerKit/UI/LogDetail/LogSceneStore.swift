@@ -25,8 +25,7 @@ import Foundation
 /// await store.send(.loadLogFile)
 ///
 /// // Apply filter
-/// let options = FilterOptions(...)
-/// await store.send(.applyFilter(options))
+/// await store.send(.filter(.applyFilters))
 /// ```
 public typealias LogSceneStore = Store<LogDetailState, LogDetailAction>
 

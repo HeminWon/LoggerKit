@@ -32,7 +32,7 @@ public struct CacheReducer: Reducer {
             state.allEventsForSearchPreview = []
             return .none
 
-        case .logsLoaded:
+        case .list(.loadSucceeded):
             // When new logs are loaded, invalidate caches
             state.invalidateAllCaches()
             return .none
