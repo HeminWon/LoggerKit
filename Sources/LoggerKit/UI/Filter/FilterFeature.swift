@@ -221,10 +221,14 @@ extension FilterFeature {
             case (.addMessageKeyword(let l), .addMessageKeyword(let r)),
                  (.removeMessageKeyword(let l), .removeMessageKeyword(let r)):
                 return l == r
+            case (.addSessionId(let l), .addSessionId(let r)),
+                 (.removeSessionId(let l), .removeSessionId(let r)):
+                return l == r
             case (.resetFilters, .resetFilters),
                  (.applyFilters, .applyFilters),
                  (.filtersApplied, .filtersApplied),
-                 (.loadAvailableOptions, .loadAvailableOptions):
+                 (.loadAvailableOptions, .loadAvailableOptions),
+                 (.clearSessionIds, .clearSessionIds):
                 return true
             case (.availableOptionsLoaded(let lf, let ln, let lc, let lt),
                   .availableOptionsLoaded(let rf, let rn, let rc, let rt)):
@@ -262,63 +266,63 @@ extension FilterFeature {
                 } else {
                     state.selectedLevels.insert(level)
                 }
-                return .none
+                return .send(.filtersApplied)
 
             case .addFunction(let function):
                 state.selectedFunctions.insert(function)
-                return .none
+                return .send(.filtersApplied)
 
             case .removeFunction(let function):
                 state.selectedFunctions.remove(function)
-                return .none
+                return .send(.filtersApplied)
 
             case .addFileName(let fileName):
                 state.selectedFileNames.insert(fileName)
-                return .none
+                return .send(.filtersApplied)
 
             case .removeFileName(let fileName):
                 state.selectedFileNames.remove(fileName)
-                return .none
+                return .send(.filtersApplied)
 
             case .addContext(let context):
                 state.selectedContexts.insert(context)
-                return .none
+                return .send(.filtersApplied)
 
             case .removeContext(let context):
                 state.selectedContexts.remove(context)
-                return .none
+                return .send(.filtersApplied)
 
             case .addThread(let thread):
                 state.selectedThreads.insert(thread)
-                return .none
+                return .send(.filtersApplied)
 
             case .removeThread(let thread):
                 state.selectedThreads.remove(thread)
-                return .none
+                return .send(.filtersApplied)
 
             case .addMessageKeyword(let keyword):
                 state.selectedMessageKeywords.insert(keyword)
-                return .none
+                return .send(.filtersApplied)
 
             case .removeMessageKeyword(let keyword):
                 state.selectedMessageKeywords.remove(keyword)
-                return .none
+                return .send(.filtersApplied)
 
             case .addSessionId(let sessionId):
                 state.selectedSessionIds.insert(sessionId)
-                return .none
+                return .send(.filtersApplied)
 
             case .removeSessionId(let sessionId):
                 state.selectedSessionIds.remove(sessionId)
-                return .none
+                return .send(.filtersApplied)
 
             case .clearSessionIds:
                 state.selectedSessionIds.removeAll()
-                return .none
+                return .send(.filtersApplied)
 
             case .resetFilters:
                 state.reset()
-                return .none
+                return .send(.filtersApplied)
 
             case .applyFilters:
                 // 通知父 Reducer 筛选已应用

@@ -330,21 +330,35 @@ public struct LogDetailReducer: Reducer {
             // Delegate to FilterFeature.Reducer
             let filterEffect = filterFeatureReducer.reduce(&state.filterFeature, filterAction)
 
+            // 始终同步 filterState 到 LogList.State（确保数据一致性）
+            state.list.filterState = state.filterFeature
+
+            // Check if this is the availableOptionsLoaded event
+            if case .availableOptionsLoaded(let functions, let fileNames, let contexts, let threads) = filterAction {
+                // 将加载的选项缓存到父层状态
+                state.cachedAvailableFunctions = functions
+                state.cachedAvailableFileNames = fileNames
+                state.cachedAvailableContexts = contexts
+                state.cachedAvailableThreads = threads
+                print("🟢 [FilterFeature] Available options cached: \(functions.count) functions, \(fileNames.count) files")
+            }
+
             // Check if this is the filtersApplied event
             if case .filtersApplied = filterAction {
                 // Filters have been applied, trigger list refresh
                 print("🟢 [FilterFeature] Filters applied, triggering list refresh")
-                state.isFilterPresented = false
                 state.resetPagination()
-
-                // Sync filterState to LogList.State
-                state.list.filterState = state.filterFeature
 
                 // Return combined effects: filter effect + reload data
                 return .multiple([
                     filterEffect.map { .filter($0) },
                     .task { .list(.refresh) }  // ✅ 使用 LogList.refresh
                 ])
+            }
+
+            // 对于显式的 applyFilters 操作，关闭筛选面板
+            if case .applyFilters = filterAction {
+                state.isFilterPresented = false
             }
 
             return filterEffect.map { .filter($0) }

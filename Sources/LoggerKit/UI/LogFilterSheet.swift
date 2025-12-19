@@ -156,6 +156,10 @@ struct LogFilterSheet: View {
                     }
                 }
             }
+            .task {
+                // 打开筛选页面时加载全量选项
+                viewStore.send(.filter(.loadAvailableOptions))
+            }
         }
     }
 

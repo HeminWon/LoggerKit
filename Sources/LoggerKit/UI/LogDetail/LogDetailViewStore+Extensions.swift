@@ -100,7 +100,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
         if !state.allEventsForSearchPreview.isEmpty {
             return Array(Set(state.allEventsForSearchPreview.map { $0.context })).filter { !$0.isEmpty }.sorted()
         }
-        return Array(Set(state.list.events.map { $0.context })).filter { !$0.isEmpty }.sorted()
+        // 不使用已过滤的 list.events，避免筛选后选项消失
+        return []
     }
 
     /// 可用的文件名列表
@@ -111,7 +112,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
         if !state.allEventsForSearchPreview.isEmpty {
             return Array(Set(state.allEventsForSearchPreview.map { $0.fileName })).sorted()
         }
-        return Array(Set(state.list.events.map { $0.fileName })).sorted()
+        // 不使用已过滤的 list.events，避免筛选后选项消失
+        return []
     }
 
     /// 可用的函数列表
@@ -125,7 +127,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
         if !state.allEventsForSearchPreview.isEmpty {
             return Array(Set(state.allEventsForSearchPreview.map { $0.function })).sorted()
         }
-        return Array(Set(state.list.events.map { $0.function })).sorted()
+        // 不使用已过滤的 list.events，避免筛选后选项消失
+        return []
     }
 
     /// 可用的线程列表
@@ -136,7 +139,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
         if !state.allEventsForSearchPreview.isEmpty {
             return Array(Set(state.allEventsForSearchPreview.map { $0.thread })).filter { !$0.isEmpty }.sorted()
         }
-        return Array(Set(state.list.events.map { $0.thread })).filter { !$0.isEmpty }.sorted()
+        // 不使用已过滤的 list.events，避免筛选后选项消失
+        return []
     }
 
     // MARK: - 预定义 Bindings (常用场景)

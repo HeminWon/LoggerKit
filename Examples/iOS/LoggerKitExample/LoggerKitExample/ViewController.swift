@@ -68,6 +68,7 @@ class ViewController: UIViewController {
 
         addSeparator()
 
+        addButton(title: "进入第二个页面 (测试会话)", action: #selector(pushToSecondPage), backgroundColor: .systemPurple)
         addButton(title: "生成200条测试日志", action: #selector(generate200Logs), backgroundColor: .systemOrange)
         addButton(title: "查看日志列表 (Push)", action: #selector(showLogList), backgroundColor: .systemGreen)
     }
@@ -232,6 +233,11 @@ class ViewController: UIViewController {
                 self?.showToast("✅ 已生成200条测试日志")
             }
         }
+    }
+
+    @objc private func pushToSecondPage() {
+        let secondVC = SecondViewController()
+        navigationController?.pushViewController(secondVC, animated: true)
     }
 
     @objc private func showLogList() {

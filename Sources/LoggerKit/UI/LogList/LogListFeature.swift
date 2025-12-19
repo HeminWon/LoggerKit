@@ -356,6 +356,7 @@ extension LogList {
                         fs.selectedContexts = filterState.selectedContexts
                         fs.selectedThreads = filterState.selectedThreads
                         fs.selectedMessageKeywords = filterState.selectedMessageKeywords
+                        fs.selectedSessionIds = filterState.selectedSessionIds
                         return fs
                     }
 
