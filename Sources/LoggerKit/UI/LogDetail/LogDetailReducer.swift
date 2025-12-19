@@ -19,11 +19,11 @@ import Foundation
 /// - Search Feature: Search functionality
 /// - Delete Feature: Log deletion
 ///
-/// Legacy sub-reducers (will be removed in future):
-/// - FilterReducer: Old filter logic (use FilterFeature instead)
+/// Legacy sub-reducers:
 /// - CacheReducer: Cache management
 ///
 /// DEPRECATED sub-reducers (已移除):
+/// - FilterReducer: ❌ Removed, use FilterFeature instead
 /// - PaginationReducer: ❌ Merged into LogList Feature
 public struct LogDetailReducer: Reducer {
     public typealias State = LogDetailState
@@ -32,9 +32,8 @@ public struct LogDetailReducer: Reducer {
     private let environment: LogDetailEnvironment
 
     // Sub-reducers
-    private let listReducer: LogList.Reducer  // ✅ 新增: LogList Reducer
-    private let filterReducer: FilterReducer  // ⚠️ 保留:旧的 FilterReducer（可能有遗留逻辑）
-    // ❌ 已移除: private let paginationReducer: PaginationReducer  // 逻辑已合并到 LogList
+    private let listReducer: LogList.Reducer  // ✅ LogList Reducer
+    // ❌ 已移除: private let filterReducer: FilterReducer  // 使用 FilterFeature 代替
     private let cacheReducer: CacheReducer
     private let exportReducer: ExportFeature.ExportReducer
     private let filterFeatureReducer: FilterFeature.Reducer
@@ -51,8 +50,7 @@ public struct LogDetailReducer: Reducer {
         )
         self.listReducer = LogList.Reducer(environment: listEnvironment)
 
-        self.filterReducer = FilterReducer(environment: environment)
-        // ❌ 已移除: self.paginationReducer = PaginationReducer(environment: environment)
+        // ❌ 已移除: self.filterReducer = FilterReducer(environment: environment)  // 使用 FilterFeature 代替
         self.cacheReducer = CacheReducer()
 
         // Initialize ExportReducer with ExportFeature.Environment
@@ -81,8 +79,7 @@ public struct LogDetailReducer: Reducer {
     public func reduce(_ state: inout LogDetailState, _ action: LogDetailAction) -> Effect<LogDetailAction> {
         // First, let sub-reducers handle their actions
         let subEffects = [
-            filterReducer.reduce(&state, action),
-            // ❌ 已移除: paginationReducer.reduce(&state, action),  // 逻辑已合并到 LogList
+            // ❌ 已移除: filterReducer.reduce(&state, action),  // 使用 FilterFeature 代替
             cacheReducer.reduce(&state, action)
         ]
 
