@@ -29,18 +29,22 @@ import Foundation
 /// await store.send(.logsLoaded(events))
 /// ```
 public enum LogDetailAction: Equatable {
-    // MARK: - User Interactions
+    // MARK: - User Interactions (Legacy Actions - 待迁移到新 Feature)
 
     /// Load log file (initial load)
+    /// ⚠️ TODO: 迁移到 .list(.loadLogFile)
     case loadLogFile
 
     /// Load more logs (pagination)
+    /// ⚠️ TODO: 迁移到 .list(.loadMore)
     case loadMore
 
     /// Refresh logs
+    /// ⚠️ TODO: 迁移到 .list(.refresh)
     case refresh
 
     /// Export logs (legacy, for backward compatibility)
+    /// ⚠️ TODO: 迁移到 .export(.export)
     case exportLogs(format: ExportFormat, progress: @Sendable (Double) -> Void)
 
     /// List feature actions (new TCA-based list)
@@ -61,9 +65,10 @@ public enum LogDetailAction: Equatable {
     /// Delete all logs
     case deleteAllLogs
 
-    // MARK: - System Responses
+    // MARK: - System Responses (Legacy Actions - 待迁移到新 Feature)
 
     /// Logs loaded successfully
+    /// ⚠️ TODO: 迁移到 .list(.loadSucceeded)
     case logsLoaded(events: [LogEvent], totalCount: Int, sequenceNumber: UInt64)
 
     // MARK: - Export Progress Actions
@@ -95,53 +100,68 @@ public enum LogDetailAction: Equatable {
     /// Statistics loaded
     case statisticsLoaded(LogStatistics)
 
-    // MARK: - Filter Actions
+    // MARK: - Filter Actions (Legacy - 待迁移到 .filter(FilterFeature.Action))
 
     /// Apply filter
+    /// ⚠️ TODO: 迁移到 .filter(.applyFilters)
     case applyFilter(FilterOptionsLegacy)
 
     /// Reset filter
+    /// ⚠️ TODO: 迁移到 .filter(.resetFilters)
     case resetFilter
 
     /// Toggle log level
+    /// ⚠️ TODO: 迁移到 .filter(.toggleLevel)
     case toggleLevel(LogEvent.Level)
 
     /// Add function filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleFunction)
     case addFunctionFilter(String)
 
     /// Remove function filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleFunction)
     case removeFunctionFilter(String)
 
     /// Add file name filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleFileName)
     case addFileNameFilter(String)
 
     /// Remove file name filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleFileName)
     case removeFileNameFilter(String)
 
     /// Add context filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleContext)
     case addContextFilter(String)
 
     /// Remove context filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleContext)
     case removeContextFilter(String)
 
     /// Add thread filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleThread)
     case addThreadFilter(String)
 
     /// Remove thread filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleThread)
     case removeThreadFilter(String)
 
     /// Add message keyword filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleMessageKeyword)
     case addMessageKeywordFilter(String)
 
     /// Remove message keyword filter
+    /// ⚠️ TODO: 迁移到 .filter(.toggleMessageKeyword)
     case removeMessageKeywordFilter(String)
 
-    // MARK: - Pagination Actions
+    // MARK: - Pagination Actions (Legacy - 已合并到 LogList Feature)
 
     /// Next page
+    /// ⚠️ TODO: 迁移到 .list(.loadMore)
     case nextPage
 
     /// Reset pagination
+    /// ⚠️ TODO: 使用 state.list.resetPagination() 或 .list(.reset)
     case resetPagination
 
     // MARK: - Cache Actions
