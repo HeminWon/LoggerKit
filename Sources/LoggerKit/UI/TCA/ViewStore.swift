@@ -63,11 +63,11 @@ public final class ViewStore<State: Equatable, Action>: ObservableObject {
     ///
     /// 通常不需要直接访问 Store，但在某些场景下可能需要：
     /// - 传递给其他需要 Store 的组件
-    /// - 创建 SceneState (向后兼容)
+    /// - 创建子 Store (scoped store)
     ///
     /// Example:
     /// ```swift
-    /// let sceneState = LogDetailSceneState(store: viewStore.underlyingStore)
+    /// let childStore = viewStore.underlyingStore.scope(...)
     /// ```
     public var underlyingStore: Store<State, Action> {
         store

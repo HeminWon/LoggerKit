@@ -20,12 +20,7 @@ struct LogDeleteManagementSheet: View {
     @State private var deleteError: LogDatabaseError?
     @State private var showError = false
 
-    // 向后兼容:支持 SceneState 初始化
-    init(sceneState: LogDetailSceneState) {
-        self.viewStore = ViewStore(store: sceneState.store)
-    }
-
-    // 推荐:使用 ViewStore 初始化
+    // 使用 ViewStore 初始化
     init(viewStore: LogDetailViewStore) {
         self.viewStore = viewStore
     }

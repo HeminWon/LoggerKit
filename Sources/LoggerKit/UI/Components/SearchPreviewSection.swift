@@ -12,13 +12,7 @@ struct SearchPreviewSection: View {
     @ObservedObject var viewStore: LogDetailViewStore
     var onFilterAdded: (() -> Void)?
 
-    // 向后兼容:支持 SceneState 初始化
-    init(sceneState: LogDetailSceneState, onFilterAdded: (() -> Void)? = nil) {
-        self.viewStore = ViewStore(store: sceneState.store)
-        self.onFilterAdded = onFilterAdded
-    }
-
-    // 推荐:使用 ViewStore 初始化
+    // 使用 ViewStore 初始化
     init(viewStore: LogDetailViewStore, onFilterAdded: (() -> Void)? = nil) {
         self.viewStore = viewStore
         self.onFilterAdded = onFilterAdded

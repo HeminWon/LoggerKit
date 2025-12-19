@@ -12,12 +12,7 @@ struct LogFilterSheet: View {
     @ObservedObject var viewStore: LogDetailViewStore
     @Environment(\.dismiss) private var dismiss
 
-    // 向后兼容:支持 SceneState 初始化
-    init(sceneState: LogDetailSceneState) {
-        self.viewStore = ViewStore(store: sceneState.store)
-    }
-
-    // 推荐:使用 ViewStore 初始化
+    // 使用 ViewStore 初始化
     init(viewStore: LogDetailViewStore) {
         self.viewStore = viewStore
     }
@@ -266,12 +261,7 @@ struct SessionFilterSection: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
 
-    // 向后兼容:支持 SceneState 初始化
-    init(sceneState: LogDetailSceneState) {
-        self.viewStore = ViewStore(store: sceneState.store)
-    }
-
-    // 推荐:使用 ViewStore 初始化
+    // 使用 ViewStore 初始化
     init(viewStore: LogDetailViewStore) {
         self.viewStore = viewStore
     }
@@ -569,8 +559,5 @@ struct FilterSectionWrapper: View {
 }
 
 #Preview {
-    LogFilterSheet(sceneState: LogDetailSceneState(
-        prefix: "test",
-        identifier: "123"
-    ))
+    LogFilterSheet(viewStore: LoggerKit.makeViewStore())
 }

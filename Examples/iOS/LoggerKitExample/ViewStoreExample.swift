@@ -72,7 +72,7 @@ struct FullViewStoreExample: View {
             FilterSheet(viewStore: viewStore)
         }
         .sheet(isPresented: viewStore.sharePresentedBinding) {
-            if let url = viewStore.state.exportState.exportedFileURL {
+            if let url = viewStore.exportedFileURL {
                 ShareSheet(url: url)
             }
         }

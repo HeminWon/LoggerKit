@@ -143,11 +143,11 @@ public enum LoggerKit {
     public static func makeView(
         store: LogSceneStore
     ) -> some View {
-        let sceneState = LogDetailSceneState(store: store)
-        return LogDetailScene(sceneState: sceneState)
+        let viewStore = store.viewStore()
+        return LogDetailScene(viewStore: viewStore)
     }
 
-    /// 便捷方法：直接创建日志查看 View（使用 SceneState，保持向后兼容）
+    /// 便捷方法：直接创建日志查看 View
     ///
     /// 使用示例：
     /// ```swift
@@ -162,8 +162,8 @@ public enum LoggerKit {
     public static func makeView(
         configuration: Configuration = .default
     ) -> some View {
-        let store = makeStore(configuration: configuration)
-        return makeView(store: store)
+        let viewStore = makeViewStore(configuration: configuration)
+        return LogDetailScene(viewStore: viewStore)
     }
 
     /// 用 ViewStore 构造日志查看 View（推荐）
@@ -251,7 +251,8 @@ public enum LoggerKit {
     public static func makeViewController(
         store: LogSceneStore
     ) -> UIViewController {
-        let view = makeView(store: store)
+        let viewStore = store.viewStore()
+        let view = LogDetailScene(viewStore: viewStore)
         let hostingController = UIHostingController(rootView: view)
         hostingController.title = NSLocalizedString("log_viewer_title",
                                                     bundle: .module,

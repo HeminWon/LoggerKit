@@ -16,16 +16,9 @@ import AppKit
 public struct LogDetailScene: View {
     @ObservedObject var viewStore: LogDetailViewStore
 
-    /// 推荐的初始化方法 - 使用 ViewStore
+    /// 使用 ViewStore 初始化
     public init(viewStore: LogDetailViewStore) {
         self.viewStore = viewStore
-    }
-
-    /// 向后兼容的初始化方法 - 使用 SceneState
-    @available(*, deprecated, message: "使用 init(viewStore:) 替代")
-    public init(sceneState: LogDetailSceneState? = nil) {
-        let state = sceneState ?? LogDetailSceneState()
-        self.viewStore = ViewStore(store: state.store)
     }
 
     // MARK: - Localized Strings
@@ -247,18 +240,7 @@ public struct LogDetailScene: View {
                 Menu {
                     // 导出日志
                     Button {
-                        Task {
-                            do {
-                                _ = try await viewStore.exportAllEventsStreaming(
-                                    progressHandler: { written, total in
-                                        viewStore.send(.exportProgressUpdated(exported: written, total: total))
-                                    }
-                                )
-                                // Export completion is handled by the reducer (sets isSharePresented = true)
-                            } catch {
-                                // Export failure is handled by the reducer (sets showExportError = true)
-                            }
-                        }
+                        viewStore.startExport(format: .log)
                     } label: {
                         Label(String(localized: "export_logs", bundle: .module), systemImage: "square.and.arrow.up")
                     }
@@ -289,20 +271,7 @@ public struct LogDetailScene: View {
     // MARK: - Subviews
     private var shareButton: some View {
         Button {
-            Task {
-                do {
-                    // 使用流式导出（文件名会在内部根据第一条日志时间自动生成）
-                    _ = try await viewStore.exportAllEventsStreaming(
-                        progressHandler: { written, total in
-                            viewStore.send(.exportProgressUpdated(exported: written, total: total))
-                        }
-                    )
-                    // Export completion is handled by the reducer (sets isSharePresented = true)
-                } catch {
-                    // Export failure is handled by the reducer (sets showExportError = true)
-                    print("❌ 导出失败: \(viewStore.error?.localizedDescription ?? "unknown error")")
-                }
-            }
+            viewStore.startExport(format: .log)
         } label: {
             // 使用固定尺寸的 ZStack 确保布局不会因图标切换而变化
             ZStack {
