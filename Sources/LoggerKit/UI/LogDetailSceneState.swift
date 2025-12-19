@@ -13,10 +13,24 @@ import Combine
 
 /// Facade for the log detail scene - delegates to internal TCA Store
 ///
+/// ⚠️ **已废弃**: 请使用 ViewStore 替代
+///
+/// 迁移指南:
+/// ```swift
+/// // 旧方式
+/// let sceneState = LogDetailSceneState()
+/// LogDetailScene(sceneState: sceneState)
+///
+/// // 新方式
+/// let viewStore = LoggerKit.makeViewStore()
+/// LogDetailScene(viewStore: viewStore)
+/// ```
+///
 /// This class maintains backward compatibility while using TCA architecture internally.
 /// All state changes are now driven by Actions through the Store.
 ///
 /// Migration from 808 lines to ~150 lines Facade pattern.
+@available(*, deprecated, message: "使用 ViewStore 替代。详见 LogDetailViewStore+Extensions.swift")
 @MainActor
 public class LogDetailSceneState: ObservableObject {
 

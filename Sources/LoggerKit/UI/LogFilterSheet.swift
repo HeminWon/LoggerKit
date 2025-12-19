@@ -9,12 +9,22 @@ import SwiftUI
 
 /// 半屏筛选面板
 struct LogFilterSheet: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
     @Environment(\.dismiss) private var dismiss
+
+    // 向后兼容:支持 SceneState 初始化
+    init(sceneState: LogDetailSceneState) {
+        self.viewStore = ViewStore(store: sceneState.store)
+    }
+
+    // 推荐:使用 ViewStore 初始化
+    init(viewStore: LogDetailViewStore) {
+        self.viewStore = viewStore
+    }
 
     /// 是否处于预览模式：有搜索文本且有匹配结果
     private var isInPreviewMode: Bool {
-        !sceneState.searchState.searchText.isEmpty && !sceneState.searchState.cachedResults.isEmpty
+        !viewStore.searchText.isEmpty && !viewStore.searchResults.isEmpty
     }
 
     var body: some View {
@@ -22,9 +32,9 @@ struct LogFilterSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // 搜索区域（含实时预览）
-                    SearchPreviewSection(sceneState: sceneState) {
+                    SearchPreviewSection(viewStore: viewStore) {
                         // 添加筛选后清空搜索框，退出预览模式
-                        sceneState.searchState.searchText = ""
+                        viewStore.send(.search(.updateSearchText("")))
                     }
 
                     // 预览模式下不显示其他筛选条件
@@ -32,7 +42,7 @@ struct LogFilterSheet: View {
                         Divider()
 
                         // 消息关键词筛选
-                        if !sceneState.filterState.selectedMessageKeywords.isEmpty {
+                        if !viewStore.state.filterFeature.selectedMessageKeywords.isEmpty {
                             messageKeywordsSection
                             Divider()
                         }
@@ -42,46 +52,78 @@ struct LogFilterSheet: View {
 
                         Divider()
 
-                        // 模块筛选（折叠式）
-                        if !sceneState.availableContexts.isEmpty {
-                            CollapsibleFilterSection(
+                        // 模块筛选（折叠式） - 临时使用 State,未来版本将重构
+                        if !viewStore.availableContexts.isEmpty {
+                            FilterSectionWrapper(
                                 title: String(localized: "search_field_context", bundle: .module),
-                                options: sceneState.availableContexts,
-                                selectedOptions: $sceneState.filterState.selectedContexts
+                                options: viewStore.availableContexts,
+                                selected: viewStore.selectedContexts,
+                                onAdd: { viewStore.send(.filter(.addContext($0))) },
+                                onRemove: { viewStore.send(.filter(.removeContext($0))) },
+                                onSelectAll: {
+                                    viewStore.availableContexts.forEach { viewStore.send(.filter(.addContext($0))) }
+                                },
+                                onClear: {
+                                    viewStore.selectedContexts.forEach { viewStore.send(.filter(.removeContext($0))) }
+                                }
                             )
                             Divider()
                         }
 
                         // 文件筛选（折叠式）
-                        if !sceneState.availableFileNames.isEmpty {
-                            CollapsibleFilterSection(
+                        if !viewStore.availableFileNames.isEmpty {
+                            FilterSectionWrapper(
                                 title: String(localized: "search_field_file", bundle: .module),
-                                options: sceneState.availableFileNames,
-                                selectedOptions: $sceneState.filterState.selectedFileNames
+                                options: viewStore.availableFileNames,
+                                selected: viewStore.selectedFileNames,
+                                onAdd: { viewStore.send(.filter(.addFileName($0))) },
+                                onRemove: { viewStore.send(.filter(.removeFileName($0))) },
+                                onSelectAll: {
+                                    viewStore.availableFileNames.forEach { viewStore.send(.filter(.addFileName($0))) }
+                                },
+                                onClear: {
+                                    viewStore.selectedFileNames.forEach { viewStore.send(.filter(.removeFileName($0))) }
+                                }
                             )
                             Divider()
                         }
 
                         // 函数筛选（折叠式）
-                        if !sceneState.availableFunctions.isEmpty {
-                            CollapsibleFilterSection(
+                        if !viewStore.availableFunctions.isEmpty {
+                            FilterSectionWrapper(
                                 title: String(localized: "search_field_function", bundle: .module),
-                                options: sceneState.availableFunctions,
-                                selectedOptions: $sceneState.filterState.selectedFunctions
+                                options: viewStore.availableFunctions,
+                                selected: viewStore.selectedFunctions,
+                                onAdd: { viewStore.send(.filter(.addFunction($0))) },
+                                onRemove: { viewStore.send(.filter(.removeFunction($0))) },
+                                onSelectAll: {
+                                    viewStore.availableFunctions.forEach { viewStore.send(.filter(.addFunction($0))) }
+                                },
+                                onClear: {
+                                    viewStore.selectedFunctions.forEach { viewStore.send(.filter(.removeFunction($0))) }
+                                }
                             )
                             Divider()
                         }
 
                         // 会话筛选
-                        SessionFilterSection(sceneState: sceneState)
+                        SessionFilterSection(viewStore: viewStore)
                         Divider()
 
                         // 线程筛选（折叠式）
-                        if !sceneState.availableThreads.isEmpty {
-                            CollapsibleFilterSection(
+                        if !viewStore.availableThreads.isEmpty {
+                            FilterSectionWrapper(
                                 title: String(localized: "search_field_thread", bundle: .module),
-                                options: sceneState.availableThreads,
-                                selectedOptions: $sceneState.filterState.selectedThreads
+                                options: viewStore.availableThreads,
+                                selected: viewStore.selectedThreads,
+                                onAdd: { viewStore.send(.filter(.addThread($0))) },
+                                onRemove: { viewStore.send(.filter(.removeThread($0))) },
+                                onSelectAll: {
+                                    viewStore.availableThreads.forEach { viewStore.send(.filter(.addThread($0))) }
+                                },
+                                onClear: {
+                                    viewStore.selectedThreads.forEach { viewStore.send(.filter(.removeThread($0))) }
+                                }
                             )
                         }
                     }
@@ -97,14 +139,14 @@ struct LogFilterSheet: View {
                     VStack(spacing: 2) {
                         Text(String(localized: "filter_title", bundle: .module))
                             .font(.headline)
-                        Text(String(format: String(localized: "match_count", bundle: .module), sceneState.displayEvents.count))
+                        Text(String(format: String(localized: "match_count", bundle: .module), viewStore.displayEvents.count))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "reset_button", bundle: .module)) {
-                        sceneState.resetFilters()
+                        viewStore.resetFilters()
                     }
                     .foregroundColor(.red)
                 }
@@ -124,12 +166,15 @@ struct LogFilterSheet: View {
                 Text(String(localized: "message_keywords", bundle: .module))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("(\(sceneState.filterState.selectedMessageKeywords.count))")
+                Text("(\(viewStore.state.filterFeature.selectedMessageKeywords.count))")
                     .font(.caption)
                     .foregroundColor(.blue)
                 Spacer()
                 Button(String(localized: "clear_button", bundle: .module)) {
-                    sceneState.filterState.selectedMessageKeywords.removeAll()
+                    // 逐个移除所有关键词
+                    viewStore.selectedMessageKeywords.forEach { keyword in
+                        viewStore.send(.filter(.removeMessageKeyword(keyword)))
+                    }
                 }
                 .font(.caption)
                 .foregroundColor(.red)
@@ -137,13 +182,13 @@ struct LogFilterSheet: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(Array(sceneState.filterState.selectedMessageKeywords).sorted(), id: \.self) { keyword in
+                    ForEach(Array(viewStore.state.filterFeature.selectedMessageKeywords).sorted(), id: \.self) { keyword in
                         HStack(spacing: 4) {
                             Text(keyword)
                                 .font(.caption)
                                 .lineLimit(1)
                             Button(action: {
-                                sceneState.filterState.selectedMessageKeywords.remove(keyword)
+                                viewStore.send(.filter(.removeMessageKeyword(keyword)))
                             }) {
                                 Image(systemName: "xmark")
                                     .font(.caption2)
@@ -172,11 +217,21 @@ struct LogFilterSheet: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                Button(sceneState.filterState.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
-                    if sceneState.filterState.selectedLevels.count == 5 {
-                        sceneState.filterState.selectedLevels.removeAll()
+                Button(viewStore.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
+                    if viewStore.selectedLevels.count == 5 {
+                        // 清除所有:逐个toggle
+                        [LogEvent.Level.verbose, .debug, .info, .warning, .error].forEach { level in
+                            if viewStore.selectedLevels.contains(level) {
+                                viewStore.send(.filter(.toggleLevel(level)))
+                            }
+                        }
                     } else {
-                        sceneState.filterState.selectedLevels = [.verbose, .debug, .info, .warning, .error]
+                        // 全选:逐个toggle
+                        [LogEvent.Level.verbose, .debug, .info, .warning, .error].forEach { level in
+                            if !viewStore.selectedLevels.contains(level) {
+                                viewStore.send(.filter(.toggleLevel(level)))
+                            }
+                        }
                     }
                 }
                 .font(.caption)
@@ -188,10 +243,10 @@ struct LogFilterSheet: View {
                     ForEach([LogEvent.Level.verbose, .debug, .info, .warning, .error], id: \.self) { level in
                         FilterChip(
                             title: level.severity,
-                            isSelected: sceneState.filterState.selectedLevels.contains(level),
+                            isSelected: viewStore.state.filterFeature.selectedLevels.contains(level),
                             color: level.color
                         ) {
-                            sceneState.toggleLevel(level)
+                            viewStore.toggleLevel(level)
                         }
                     }
                 }
@@ -202,10 +257,20 @@ struct LogFilterSheet: View {
 
 // MARK: - 会话筛选 Section
 struct SessionFilterSection: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
     @State private var sessions: [SessionInfo] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    // 向后兼容:支持 SceneState 初始化
+    init(sceneState: LogDetailSceneState) {
+        self.viewStore = ViewStore(store: sceneState.store)
+    }
+
+    // 推荐:使用 ViewStore 初始化
+    init(viewStore: LogDetailViewStore) {
+        self.viewStore = viewStore
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -213,13 +278,14 @@ struct SessionFilterSection: View {
                 Text(String(localized: "session_filter_title", bundle: .module))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("(\(sceneState.filterState.selectedSessionIds.count))")
+                Text("(\(viewStore.selectedSessionIds.count))")
                     .font(.caption)
                     .foregroundColor(.blue)
                 Spacer()
-                if !sceneState.filterState.selectedSessionIds.isEmpty {
+                // 有选中时显示清除按钮
+                if !viewStore.selectedSessionIds.isEmpty {
                     Button(String(localized: "clear_button", bundle: .module)) {
-                        sceneState.filterState.selectedSessionIds.removeAll()
+                        viewStore.send(.filter(.clearSessionIds))
                     }
                     .font(.caption)
                     .foregroundColor(.red)
@@ -244,12 +310,13 @@ struct SessionFilterSection: View {
                         ForEach(sessions) { session in
                             SessionChip(
                                 session: session,
-                                isSelected: sceneState.filterState.selectedSessionIds.contains(session.id)
+                                isSelected: viewStore.selectedSessionIds.contains(session.id)
                             ) {
-                                if sceneState.filterState.selectedSessionIds.contains(session.id) {
-                                    sceneState.filterState.selectedSessionIds.remove(session.id)
+                                // 切换会话筛选
+                                if viewStore.selectedSessionIds.contains(session.id) {
+                                    viewStore.send(.filter(.removeSessionId(session.id)))
                                 } else {
-                                    sceneState.filterState.selectedSessionIds.insert(session.id)
+                                    viewStore.send(.filter(.addSessionId(session.id)))
                                 }
                             }
                         }
@@ -415,6 +482,85 @@ struct SessionChip: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM-dd HH:mm:ss"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - FilterSectionWrapper (临时包装器,简化 ViewStore 使用)
+struct FilterSectionWrapper: View {
+    let title: String
+    let options: [String]
+    let selected: Set<String>
+    let onAdd: (String) -> Void
+    let onRemove: (String) -> Void
+    let onSelectAll: () -> Void
+    let onClear: () -> Void
+
+    /// 排序后的选项列表：选中的在前，未选中的在后
+    private var sortedOptions: [String] {
+        let selectedArray = options.filter { selected.contains($0) }.sorted()
+        let unselected = options.filter { !selected.contains($0) }.sorted()
+        return selectedArray + unselected
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 标题栏
+            HStack {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                if !selected.isEmpty {
+                    Text("(\(selected.count))")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+
+                Spacer()
+
+                if selected.isEmpty {
+                    // 没有选中时显示全选按钮
+                    Button(String(localized: "select_all_button", bundle: .module)) {
+                        onSelectAll()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                } else {
+                    // 有选中时显示清除按钮
+                    Button(String(localized: "clear_button", bundle: .module)) {
+                        onClear()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.red)
+                }
+            }
+
+            // 选项列表（水平滚动，使用 LazyHStack 优化性能）
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 8) {
+                    ForEach(sortedOptions, id: \.self) { option in
+                        FilterChip(
+                            title: truncateText(option, maxLength: 20),
+                            isSelected: selected.contains(option)
+                        ) {
+                            if selected.contains(option) {
+                                onRemove(option)
+                            } else {
+                                onAdd(option)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 1) // 防止 LazyHStack 裁剪阴影
+            }
+        }
+    }
+
+    private func truncateText(_ text: String, maxLength: Int) -> String {
+        if text.count > maxLength {
+            return String(text.prefix(maxLength)) + "..."
+        }
+        return text
     }
 }
 

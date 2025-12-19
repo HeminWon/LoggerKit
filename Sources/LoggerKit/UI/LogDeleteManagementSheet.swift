@@ -9,7 +9,7 @@ import SwiftUI
 
 /// 日志删除管理面板
 struct LogDeleteManagementSheet: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var sessions: [SessionInfo] = []
@@ -19,6 +19,16 @@ struct LogDeleteManagementSheet: View {
     @State private var showDeleteSessionsConfirmation = false
     @State private var deleteError: LogDatabaseError?
     @State private var showError = false
+
+    // 向后兼容:支持 SceneState 初始化
+    init(sceneState: LogDetailSceneState) {
+        self.viewStore = ViewStore(store: sceneState.store)
+    }
+
+    // 推荐:使用 ViewStore 初始化
+    init(viewStore: LogDetailViewStore) {
+        self.viewStore = viewStore
+    }
 
     var body: some View {
         NavigationView {
@@ -238,7 +248,7 @@ struct LogDeleteManagementSheet: View {
     private func deleteAllLogs() {
         Task {
             do {
-                try await sceneState.deleteAllLogs()
+                try await viewStore.deleteAllLogsAsync()
                 dismiss()
             } catch {
                 deleteError = error as? LogDatabaseError ?? .deleteFailed(underlying: error)
@@ -250,7 +260,7 @@ struct LogDeleteManagementSheet: View {
     private func deleteSelectedSessions() {
         Task {
             do {
-                try await sceneState.deleteSessions(selectedSessionIds)
+                try await viewStore.deleteSessions(selectedSessionIds)
 
                 // 清空选中状态
                 selectedSessionIds.removeAll()
@@ -266,7 +276,7 @@ struct LogDeleteManagementSheet: View {
 
     private func deleteSingleSession(_ sessionId: String) async {
         do {
-            try await sceneState.deleteSession(sessionId)
+            try await viewStore.deleteSession(sessionId)
 
             // 从选中列表移除
             selectedSessionIds.remove(sessionId)

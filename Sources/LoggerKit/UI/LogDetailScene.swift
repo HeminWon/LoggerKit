@@ -14,10 +14,18 @@ import AppKit
 #endif
 
 public struct LogDetailScene: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
 
+    /// 推荐的初始化方法 - 使用 ViewStore
+    public init(viewStore: LogDetailViewStore) {
+        self.viewStore = viewStore
+    }
+
+    /// 向后兼容的初始化方法 - 使用 SceneState
+    @available(*, deprecated, message: "使用 init(viewStore:) 替代")
     public init(sceneState: LogDetailSceneState? = nil) {
-        self.sceneState = sceneState ?? LogDetailSceneState()
+        let state = sceneState ?? LogDetailSceneState()
+        self.viewStore = ViewStore(store: state.store)
     }
 
     // MARK: - Localized Strings
@@ -48,20 +56,20 @@ public struct LogDetailScene: View {
     /// 是否没有日志（根据 totalCount 和 loadingState 判断）
     private var hasNoLogs: Bool {
         // 加载中不禁用，避免闪烁
-        if case .loading = sceneState.loadingState {
+        if viewStore.isLoading {
             return false
         }
         // 总数为 0 且不在加载状态时才禁用
-        return sceneState.totalCount == 0 && sceneState.loadingState == .loaded
+        return viewStore.totalCount == 0 && viewStore.loadingState == .loaded
     }
 
     public var body: some View {
         VStack {
-            if case .loading = sceneState.loadingState {
+            if viewStore.isLoading {
                 Spacer()
                 ProgressView(loadingText)
                 Spacer()
-            } else if let error = sceneState.error {
+            } else if let error = viewStore.error {
                 Spacer()
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
@@ -76,37 +84,37 @@ public struct LogDetailScene: View {
             } else {
                 // 1️⃣ 筛选结果统计
                 HStack {
-                    if sceneState.totalCount > 0 {
-                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), sceneState.displayEvents.count, sceneState.totalCount))
+                    if viewStore.totalCount > 0 {
+                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), viewStore.displayEvents.count, viewStore.totalCount))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
-                        Text(String(format: totalCountFormat, sceneState.displayEvents.count))
+                        Text(String(format: totalCountFormat, viewStore.displayEvents.count))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    if sceneState.activeFilterCount > 0 {
-                        Text(String(format: filterCountFormat, sceneState.activeFilterCount))
+                    if viewStore.activeFilterCount > 0 {
+                        Text(String(format: filterCountFormat, viewStore.activeFilterCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                     Spacer()
 
                     // 导出进度显示
-                    if sceneState.isExporting {
+                    if viewStore.isExporting {
                         HStack(spacing: 4) {
                             // 圆环进度
-                            if sceneState.totalExportCount > 0 {
+                            if viewStore.totalExportCount > 0 {
                                 ZStack {
                                     Circle()
                                         .stroke(Color.gray.opacity(0.2), lineWidth: 2)
                                         .frame(width: 16, height: 16)
                                     Circle()
-                                        .trim(from: 0, to: sceneState.exportProgress)
+                                        .trim(from: 0, to: viewStore.exportProgress)
                                         .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                                         .frame(width: 16, height: 16)
                                         .rotationEffect(.degrees(-90))
-                                        .animation(.linear(duration: 0.1), value: sceneState.exportProgress)
+                                        .animation(.linear(duration: 0.1), value: viewStore.exportProgress)
                                 }
                             } else {
                                 ProgressView()
@@ -118,8 +126,8 @@ public struct LogDetailScene: View {
                             Text(String(localized: "exporting_progress", bundle: .module))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            if sceneState.totalExportCount > 0 {
-                                Text("\(sceneState.exportedCount)/\(sceneState.totalExportCount)")
+                            if viewStore.totalExportCount > 0 {
+                                Text("\(viewStore.exportedCount)/\(viewStore.totalExportCount)")
                                     .font(.caption2)
                                     .foregroundColor(.blue)
                             }
@@ -133,17 +141,15 @@ public struct LogDetailScene: View {
 
                 // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
                 List {
-                    ForEach(sceneState.displayEvents) { viewModel in
+                    ForEach(viewStore.displayEvents) { viewModel in
                         if #available(iOS 15.0, macOS 13.0, *) {
                             LogRowView(viewModel: viewModel)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .listRowSeparator(.hidden)
                                 .onAppear {
                                     // 滚动到底部时加载更多
-                                    if viewModel.id == sceneState.displayEvents.last?.id {
-                                        Task {
-                                            await sceneState.loadMore()
-                                        }
+                                    if viewModel.id == viewStore.displayEvents.last?.id {
+                                        viewStore.loadMore()
                                     }
                                 }
                         } else {
@@ -151,17 +157,15 @@ public struct LogDetailScene: View {
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .onAppear {
                                     // 滚动到底部时加载更多
-                                    if viewModel.id == sceneState.displayEvents.last?.id {
-                                        Task {
-                                            await sceneState.loadMore()
-                                        }
+                                    if viewModel.id == viewStore.displayEvents.last?.id {
+                                        viewStore.loadMore()
                                     }
                                 }
                         }
                     }
 
                     // 分页加载指示器
-                    if sceneState.loadingState == .loadingMore {
+                    if viewStore.loadingState == .loadingMore {
                         if #available(iOS 15.0, macOS 13.0, *) {
                             HStack {
                                 Spacer()
@@ -186,31 +190,31 @@ public struct LogDetailScene: View {
             }
         }
         .task {
-            await sceneState.loadLogFile()
+            await viewStore.loadLogFileAsync()
         }
-        .sheet(isPresented: sceneState.isFilterPresentedBinding) {
+        .sheet(isPresented: viewStore.filterPresentedBinding) {
             if #available(iOS 16.0, macOS 13.0, *) {
-                LogFilterSheet(sceneState: sceneState)
+                LogFilterSheet(viewStore: viewStore)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             } else {
-                LogFilterSheet(sceneState: sceneState)
+                LogFilterSheet(viewStore: viewStore)
             }
         }
-        .sheet(isPresented: sceneState.isDeleteManagementPresentedBinding) {
+        .sheet(isPresented: viewStore.deleteManagementPresentedBinding) {
             if #available(iOS 16.0, macOS 13.0, *) {
-                LogDeleteManagementSheet(sceneState: sceneState)
+                LogDeleteManagementSheet(viewStore: viewStore)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             } else {
-                LogDeleteManagementSheet(sceneState: sceneState)
+                LogDeleteManagementSheet(viewStore: viewStore)
             }
         }
         #if canImport(UIKit)
-        .sheet(isPresented: sceneState.isSharePresentedBinding) {
-            if let url = sceneState.exportedFileURL {
+        .sheet(isPresented: viewStore.sharePresentedBinding) {
+            if let url = viewStore.exportedFileURL {
                 let shareSheet = ShareSheet(activityItems: [url]) {
-                    Task { await sceneState.store.send(.setSharePresented(false)) }
+                    viewStore.send(.setSharePresented(false))
                 }
                 if #available(iOS 16.0, *) {
                     shareSheet
@@ -222,16 +226,16 @@ public struct LogDetailScene: View {
             }
         }
         #endif
-        .navigationTitle(sceneState.displayTitle)
+        .navigationTitle(viewStore.displayTitle)
         #if os(iOS) || os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 // 筛选按钮（高频操作，独立显示）
                 Button {
-                    Task { await sceneState.store.send(.setFilterPresented(true)) }
+                    viewStore.send(.setFilterPresented(true))
                 } label: {
-                    if sceneState.activeFilterCount > 0 {
+                    if viewStore.activeFilterCount > 0 {
                         Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle.fill")
                     } else {
                         Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle")
@@ -245,11 +249,9 @@ public struct LogDetailScene: View {
                     Button {
                         Task {
                             do {
-                                _ = try await sceneState.exportAllEventsStreaming(
+                                _ = try await viewStore.exportAllEventsStreaming(
                                     progressHandler: { written, total in
-                                        Task { @MainActor in
-                                            await sceneState.store.send(.exportProgressUpdated(exported: written, total: total))
-                                        }
+                                        viewStore.send(.exportProgressUpdated(exported: written, total: total))
                                     }
                                 )
                                 // Export completion is handled by the reducer (sets isSharePresented = true)
@@ -265,7 +267,7 @@ public struct LogDetailScene: View {
 
                     // 删除管理（危险操作）
                     Button(role: .destructive) {
-                        Task { await sceneState.store.send(.setDeleteManagementPresented(true)) }
+                        viewStore.send(.setDeleteManagementPresented(true))
                     } label: {
                         Label(String(localized: "delete_management", bundle: .module), systemImage: "trash.circle")
                     }
@@ -290,25 +292,23 @@ public struct LogDetailScene: View {
             Task {
                 do {
                     // 使用流式导出（文件名会在内部根据第一条日志时间自动生成）
-                    _ = try await sceneState.exportAllEventsStreaming(
+                    _ = try await viewStore.exportAllEventsStreaming(
                         progressHandler: { written, total in
-                            Task { @MainActor in
-                                await sceneState.store.send(.exportProgressUpdated(exported: written, total: total))
-                            }
+                            viewStore.send(.exportProgressUpdated(exported: written, total: total))
                         }
                     )
                     // Export completion is handled by the reducer (sets isSharePresented = true)
                 } catch {
                     // Export failure is handled by the reducer (sets showExportError = true)
-                    print("❌ 导出失败: \(sceneState.error?.localizedDescription ?? "unknown error")")
+                    print("❌ 导出失败: \(viewStore.error?.localizedDescription ?? "unknown error")")
                 }
             }
         } label: {
             // 使用固定尺寸的 ZStack 确保布局不会因图标切换而变化
             ZStack {
-                if sceneState.isExporting {
+                if viewStore.isExporting {
                     // 圆环进度条
-                    if sceneState.totalExportCount > 0 {
+                    if viewStore.totalExportCount > 0 {
                         ZStack {
                             // 背景圆环
                             Circle()
@@ -317,14 +317,14 @@ public struct LogDetailScene: View {
 
                             // 进度圆环
                             Circle()
-                                .trim(from: 0, to: sceneState.exportProgress)
+                                .trim(from: 0, to: viewStore.exportProgress)
                                 .stroke(Color.blue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                                 .frame(width: 24, height: 24)
                                 .rotationEffect(.degrees(-90))
-                                .animation(.linear(duration: 0.1), value: sceneState.exportProgress)
+                                .animation(.linear(duration: 0.1), value: viewStore.exportProgress)
 
                             // 百分比文字
-                            Text("\(Int(sceneState.exportProgress * 100))")
+                            Text("\(Int(viewStore.exportProgress * 100))")
                                 .font(.system(size: 8, weight: .medium))
                                 .foregroundColor(.blue)
                         }
@@ -341,11 +341,11 @@ public struct LogDetailScene: View {
             }
             .frame(width: 32, height: 32) // 固定尺寸,避免布局变化
         }
-        .disabled(sceneState.isExporting || hasNoLogs)
-        .alert(String(localized: "export_failed", bundle: .module), isPresented: sceneState.showExportErrorBinding) {
+        .disabled(viewStore.isExporting || hasNoLogs)
+        .alert(String(localized: "export_failed", bundle: .module), isPresented: viewStore.exportErrorPresentedBinding) {
             Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
         } message: {
-            if let error = sceneState.error {
+            if let error = viewStore.error {
                 Text(error.localizedDescription)
             }
         }

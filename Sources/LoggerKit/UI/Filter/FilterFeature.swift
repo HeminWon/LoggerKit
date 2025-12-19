@@ -43,6 +43,9 @@ extension FilterFeature {
         /// Selected message keywords
         public var selectedMessageKeywords: Set<String> = []
 
+        /// Selected session IDs
+        public var selectedSessionIds: Set<String> = []
+
         // MARK: - Available Options (用于 UI 展示)
 
         /// Available functions (从 statistics 获取)
@@ -69,7 +72,8 @@ extension FilterFeature {
         public var hasActiveFilters: Bool {
             !selectedLevels.isEmpty || !selectedFunctions.isEmpty ||
             !selectedFileNames.isEmpty || !selectedContexts.isEmpty ||
-            !selectedThreads.isEmpty || !selectedMessageKeywords.isEmpty
+            !selectedThreads.isEmpty || !selectedMessageKeywords.isEmpty ||
+            !selectedSessionIds.isEmpty
         }
 
         /// Count of active filters
@@ -81,6 +85,7 @@ extension FilterFeature {
             if !selectedContexts.isEmpty { count += 1 }
             if !selectedThreads.isEmpty { count += 1 }
             if !selectedMessageKeywords.isEmpty { count += 1 }
+            if !selectedSessionIds.isEmpty { count += 1 }
             return count
         }
 
@@ -98,6 +103,7 @@ extension FilterFeature {
             selectedContexts.removeAll()
             selectedThreads.removeAll()
             selectedMessageKeywords.removeAll()
+            selectedSessionIds.removeAll()
         }
 
         // MARK: - Equatable
@@ -109,6 +115,7 @@ extension FilterFeature {
             lhs.selectedContexts == rhs.selectedContexts &&
             lhs.selectedThreads == rhs.selectedThreads &&
             lhs.selectedMessageKeywords == rhs.selectedMessageKeywords &&
+            lhs.selectedSessionIds == rhs.selectedSessionIds &&
             lhs.availableFunctions == rhs.availableFunctions &&
             lhs.availableFileNames == rhs.availableFileNames &&
             lhs.availableContexts == rhs.availableContexts &&
@@ -158,6 +165,15 @@ extension FilterFeature {
 
         /// Remove message keyword filter
         case removeMessageKeyword(String)
+
+        /// Add session ID filter
+        case addSessionId(String)
+
+        /// Remove session ID filter
+        case removeSessionId(String)
+
+        /// Clear all session IDs
+        case clearSessionIds
 
         /// Reset all filters
         case resetFilters
@@ -286,6 +302,18 @@ extension FilterFeature {
 
             case .removeMessageKeyword(let keyword):
                 state.selectedMessageKeywords.remove(keyword)
+                return .none
+
+            case .addSessionId(let sessionId):
+                state.selectedSessionIds.insert(sessionId)
+                return .none
+
+            case .removeSessionId(let sessionId):
+                state.selectedSessionIds.remove(sessionId)
+                return .none
+
+            case .clearSessionIds:
+                state.selectedSessionIds.removeAll()
                 return .none
 
             case .resetFilters:

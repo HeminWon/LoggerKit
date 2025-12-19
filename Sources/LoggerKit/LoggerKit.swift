@@ -95,6 +95,40 @@ public enum LoggerKit {
         )
     }
 
+    /// 创建日志查看 ViewStore（推荐）
+    ///
+    /// ViewStore 提供了更好的 SwiftUI 集成体验:
+    /// - ✅ 同步的 send 方法 (不需要 Task { await })
+    /// - ✅ 便捷的 Binding 创建
+    /// - ✅ 预定义的常用 bindings
+    ///
+    /// 使用示例：
+    /// ```swift
+    /// let viewStore = LoggerKit.makeViewStore(
+    ///     configuration: .init(sessionIds: ["session-123"])
+    /// )
+    ///
+    /// // 在 SwiftUI View 中:
+    /// struct MyView: View {
+    ///     @ObservedObject var viewStore: LogDetailViewStore
+    ///
+    ///     var body: some View {
+    ///         TextField("Search", text: viewStore.searchTextBinding)
+    ///         Button("Load") { viewStore.loadLogFile() }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter configuration: UI 配置，默认为 `.default`
+    /// - Returns: LogDetail 的 ViewStore 实例
+    @MainActor
+    public static func makeViewStore(
+        configuration: Configuration = .default
+    ) -> LogDetailViewStore {
+        let store = makeStore(configuration: configuration)
+        return store.viewStore()
+    }
+
     /// 用 Store 构造日志查看 View
     ///
     /// 使用示例：
@@ -113,7 +147,7 @@ public enum LoggerKit {
         return LogDetailScene(sceneState: sceneState)
     }
 
-    /// 便捷方法：直接创建日志查看 View
+    /// 便捷方法：直接创建日志查看 View（使用 SceneState，保持向后兼容）
     ///
     /// 使用示例：
     /// ```swift
@@ -130,6 +164,42 @@ public enum LoggerKit {
     ) -> some View {
         let store = makeStore(configuration: configuration)
         return makeView(store: store)
+    }
+
+    /// 用 ViewStore 构造日志查看 View（推荐）
+    ///
+    /// 使用 ViewStore 的新 API,提供更好的性能和更简洁的代码:
+    /// ```swift
+    /// let viewStore = LoggerKit.makeViewStore()
+    /// let view = LoggerKit.makeView(viewStore: viewStore)
+    /// ```
+    ///
+    /// - Parameter viewStore: 日志场景的 ViewStore 实例
+    /// - Returns: 日志详情视图
+    @MainActor
+    public static func makeView(
+        viewStore: LogDetailViewStore
+    ) -> some View {
+        LogDetailScene(viewStore: viewStore)
+    }
+
+    /// 便捷方法：直接创建日志查看 View（使用 ViewStore）
+    ///
+    /// 这是使用 ViewStore 的最简单方式:
+    /// ```swift
+    /// let view = LoggerKit.makeViewWithViewStore(
+    ///     configuration: .init(sessionIds: ["session-123"])
+    /// )
+    /// ```
+    ///
+    /// - Parameter configuration: UI 配置，默认为 `.default`
+    /// - Returns: 日志详情视图
+    @MainActor
+    public static func makeViewWithViewStore(
+        configuration: Configuration = .default
+    ) -> some View {
+        let viewStore = makeViewStore(configuration: configuration)
+        return makeView(viewStore: viewStore)
     }
 
     #if canImport(UIKit)

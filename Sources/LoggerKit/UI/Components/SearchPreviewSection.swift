@@ -9,8 +9,20 @@ import SwiftUI
 
 /// 搜索结果预览面板
 struct SearchPreviewSection: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
     var onFilterAdded: (() -> Void)?
+
+    // 向后兼容:支持 SceneState 初始化
+    init(sceneState: LogDetailSceneState, onFilterAdded: (() -> Void)? = nil) {
+        self.viewStore = ViewStore(store: sceneState.store)
+        self.onFilterAdded = onFilterAdded
+    }
+
+    // 推荐:使用 ViewStore 初始化
+    init(viewStore: LogDetailViewStore, onFilterAdded: (() -> Void)? = nil) {
+        self.viewStore = viewStore
+        self.onFilterAdded = onFilterAdded
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -21,16 +33,16 @@ struct SearchPreviewSection: View {
             searchFieldsSelector
 
             // 搜索结果预览
-            if !sceneState.searchState.searchText.isEmpty {
+            if !viewStore.searchText.isEmpty {
                 searchResultsPreview
                     // 使用 searchText 和 totalCount 的组合作为 id，确保搜索时视图能正确刷新
-                    .id("\(sceneState.searchState.searchText)-\(sceneState.searchState.cachedResults.totalCount)")
+                    .id("\(viewStore.searchText)-\(viewStore.searchResults.totalCount)")
             }
         }
         .onAppear {
             // 确保在组件显示时触发一次搜索更新
             // 解决首次打开筛选页面时，数据可能尚未加载完成的问题
-            sceneState.refreshSearch()
+            viewStore.refreshSearch()
         }
     }
 
@@ -44,13 +56,13 @@ struct SearchPreviewSection: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
-                TextField(String(localized: "search_placeholder", bundle: .module), text: $sceneState.searchState.searchText)
+                TextField(String(localized: "search_placeholder", bundle: .module), text: viewStore.searchTextBinding)
                     .autocorrectionDisabled()
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
                     #endif
-                if !sceneState.searchState.searchText.isEmpty {
-                    Button(action: { sceneState.searchState.searchText = "" }) {
+                if !viewStore.searchText.isEmpty {
+                    Button(action: { viewStore.send(.search(.updateSearchText(""))) }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                     }
@@ -72,7 +84,7 @@ struct SearchPreviewSection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(SearchField.allCases) { field in
-                        Button(action: { sceneState.toggleSearchField(field) }) {
+                        Button(action: { viewStore.toggleSearchField(field) }) {
                             HStack(spacing: 4) {
                                 Image(systemName: field.icon)
                                 Text(field.localizedName)
@@ -81,12 +93,12 @@ struct SearchPreviewSection: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
-                                sceneState.searchState.searchFields.contains(field)
+                                viewStore.state.searchFeature.searchFields.contains(field)
                                     ? Color.blue.opacity(0.2)
                                     : Color.gray.opacity(0.1)
                             )
                             .foregroundColor(
-                                sceneState.searchState.searchFields.contains(field)
+                                viewStore.state.searchFeature.searchFields.contains(field)
                                     ? .blue
                                     : .primary
                             )
@@ -94,7 +106,7 @@ struct SearchPreviewSection: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(
-                                        sceneState.searchState.searchFields.contains(field)
+                                        viewStore.state.searchFeature.searchFields.contains(field)
                                             ? Color.blue
                                             : Color.clear,
                                         lineWidth: 1
@@ -110,8 +122,8 @@ struct SearchPreviewSection: View {
 
     // MARK: - 搜索结果预览
     private var searchResultsPreview: some View {
-        let results = sceneState.searchState.cachedResults
-        let _ = print("🖼️ UI渲染搜索预览: isEmpty=\(results.isEmpty), totalCount=\(results.totalCount), searchText='\(sceneState.searchState.searchText)'")
+        let results = viewStore.searchResults
+        let _ = print("🖼️ UI渲染搜索预览: isEmpty=\(results.isEmpty), totalCount=\(results.totalCount), searchText='\(viewStore.searchText)'")
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -188,8 +200,8 @@ struct SearchPreviewSection: View {
     private func messageResultCategory(
         items: [SearchResultItem]
     ) -> some View {
-        let keyword = sceneState.searchState.searchText
-        let isKeywordSelected = sceneState.filterState.selectedMessageKeywords.contains(keyword)
+        let keyword = viewStore.searchText
+        let isKeywordSelected = viewStore.state.filterFeature.selectedMessageKeywords.contains(keyword)
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -202,9 +214,9 @@ struct SearchPreviewSection: View {
                 // 添加/移除搜索词按钮
                 Button(action: {
                     if isKeywordSelected {
-                        sceneState.filterState.selectedMessageKeywords.remove(keyword)
+                        viewStore.send(.filter(.removeMessageKeyword(keyword)))
                     } else {
-                        sceneState.filterState.selectedMessageKeywords.insert(keyword)
+                        viewStore.send(.filter(.addMessageKeyword(keyword)))
                         onFilterAdded?()
                     }
                 }) {
@@ -252,13 +264,13 @@ struct SearchPreviewSection: View {
 
                     Spacer()
 
-                    let isSelected = sceneState.isInFilter(item)
+                    let isSelected = viewStore.isInFilter(item)
                     Button(action: {
                         if !isSelected {
-                            sceneState.addToFilter(item)
+                            viewStore.addToFilter(item)
                             onFilterAdded?()
                         } else {
-                            sceneState.removeFromFilter(item)
+                            viewStore.removeFromFilter(item)
                         }
                     }) {
                         Image(systemName: isSelected ? "minus.circle" : "plus.circle")
@@ -276,9 +288,9 @@ struct SearchPreviewSection: View {
     private func highlightedText(_ text: String) -> AttributedString {
         var attributedString = AttributedString(text)
 
-        if let range = text.lowercased().range(of: sceneState.searchState.searchText.lowercased()) {
+        if let range = text.lowercased().range(of: viewStore.searchText.lowercased()) {
             let startIndex = text.distance(from: text.startIndex, to: range.lowerBound)
-            let length = sceneState.searchState.searchText.count
+            let length = viewStore.searchText.count
 
             if let attrRange = Range(NSRange(location: startIndex, length: length), in: attributedString) {
                 attributedString[attrRange].backgroundColor = .yellow.opacity(0.3)
