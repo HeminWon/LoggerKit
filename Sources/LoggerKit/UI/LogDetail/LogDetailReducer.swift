@@ -134,9 +134,11 @@ public struct LogDetailReducer: Reducer {
                             sessionIds: environment.sessionIds,
                             limit: 10000
                         )
+                        print("🟢 [LogDetailReducer] allEventsLoaded: \(allEvents.count) events")
                         return .allEventsLoaded(allEvents)
                     } catch {
                         // Search preview failure doesn't fail the whole load
+                        print("🔴 [LogDetailReducer] loadAllEventsForSearchPreview failed: \(error)")
                         return .allEventsLoaded([])
                     }
                 }
@@ -157,6 +159,7 @@ public struct LogDetailReducer: Reducer {
 
         case .allEventsLoaded(let events):
             state.allEventsForSearchPreview = events
+            print("🔵 [LogDetailReducer] Forwarding \(events.count) events to SearchFeature")
             // Sync to SearchFeature
             return .task { .search(.allEventsLoaded(events)) }
 
@@ -319,6 +322,37 @@ public struct LogDetailReducer: Reducer {
         case .list(let listAction):
             // Delegate to LogList.Reducer
             let listEffect = listReducer.reduce(&state.list, listAction)
+
+            // 如果是 loadLogFile,也需要加载搜索预览数据和统计信息
+            if case .loadLogFile = listAction {
+                return .multiple([
+                    listEffect.map { .list($0) },
+                    // Load statistics
+                    .task { [environment] in
+                        do {
+                            let stats = try await environment.dataLoader.loadStatistics()
+                            return .statisticsLoaded(stats)
+                        } catch {
+                            return .statisticsLoaded(LogStatistics(totalCount: 0, levelCounts: [:], topFunctions: []))
+                        }
+                    },
+                    // Load all events for search preview
+                    .task { [environment] in
+                        do {
+                            let allEvents = try await environment.dataLoader.loadAllEventsForSearchPreview(
+                                sessionIds: environment.sessionIds,
+                                limit: 10000
+                            )
+                            print("🟢 [LogDetailReducer] allEventsLoaded: \(allEvents.count) events")
+                            return .allEventsLoaded(allEvents)
+                        } catch {
+                            print("🔴 [LogDetailReducer] loadAllEventsForSearchPreview failed: \(error)")
+                            return .allEventsLoaded([])
+                        }
+                    }
+                ])
+            }
+
             return listEffect.map { .list($0) }
 
         case .export(let exportAction):

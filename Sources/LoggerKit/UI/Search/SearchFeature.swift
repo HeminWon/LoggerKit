@@ -57,9 +57,9 @@ public struct SearchFeature {
             cachedSearchResults.totalCount
         }
 
-        /// Whether search can be executed (has text and fields)
+        /// Whether search can be executed (has text, fields, and data)
         public var canExecuteSearch: Bool {
-            !searchText.isEmpty && !searchFields.isEmpty
+            !searchText.isEmpty && !searchFields.isEmpty && !allEventsForSearchPreview.isEmpty
         }
 
         // MARK: - Initializer
@@ -151,6 +151,7 @@ public struct SearchFeature {
                 }
 
                 // Trigger search if we have preview data
+                print("🔵 [SearchFeature] updateSearchText: '\(text)', dataReady=\(!state.allEventsForSearchPreview.isEmpty), count=\(state.allEventsForSearchPreview.count)")
                 if !state.allEventsForSearchPreview.isEmpty {
                     return .send(.executeSearch)
                 }
@@ -185,8 +186,10 @@ public struct SearchFeature {
 
             case .allEventsLoaded(let events):
                 state.allEventsForSearchPreview = events
+                print("🟢 [SearchFeature] allEventsLoaded: \(events.count) events, currentSearchText='\(state.searchText)'")
                 // Trigger search if we have search text
                 if !state.searchText.isEmpty {
+                    print("🔵 [SearchFeature] Auto-triggering search after data load")
                     return .send(.executeSearch)
                 }
                 return .none

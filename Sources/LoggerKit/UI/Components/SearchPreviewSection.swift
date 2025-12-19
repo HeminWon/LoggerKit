@@ -32,8 +32,18 @@ struct SearchPreviewSection: View {
             // 搜索范围配置
             searchFieldsSelector
 
-            // 搜索结果预览
-            if !viewStore.searchText.isEmpty {
+            // 数据加载状态提示
+            if viewStore.state.searchFeature.allEventsForSearchPreview.isEmpty {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("正在加载搜索数据...")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.vertical, 8)
+            } else if !viewStore.searchText.isEmpty {
+                // 搜索结果预览
                 searchResultsPreview
                     // 使用 searchText 和 totalCount 的组合作为 id，确保搜索时视图能正确刷新
                     .id("\(viewStore.searchText)-\(viewStore.searchResults.totalCount)")

@@ -218,6 +218,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
         // 执行查询
         let entities = try targetContext.fetch(fetchRequest)
+        print("🔵 [LogDatabaseManager] fetchAllEventsForSearchPreview: sessionIds=\(sessionIds.isEmpty ? "all" : String(describing: sessionIds)), limit=\(limit), fetched=\(entities.count)")
         return entities.map { $0.toLogEvent() }
     }
 
