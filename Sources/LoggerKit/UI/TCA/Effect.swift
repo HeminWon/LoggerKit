@@ -58,6 +58,10 @@ public enum Effect<Action> {
     /// Cancel a running effect by its ID
     case cancel(id: AnyHashable)
 
+    /// Execute an async stream that can emit multiple actions
+    /// Useful for long-running operations that need to send progress updates
+    case stream(id: AnyHashable?, () -> AsyncStream<Action>)
+
     // MARK: - Execution
 
     /// Execute this effect in the context of a store
@@ -80,6 +84,16 @@ public enum Effect<Action> {
         case .cancel(let id):
             // Cancel the task via the executor
             await executor.cancel(id: id)
+            return nil
+
+        case .stream(_, let streamBuilder):
+            // Stream case returns the first action from the stream
+            // All subsequent actions should be handled by a separate mechanism
+            // This is a limitation of the current execute signature
+            let stream = streamBuilder()
+            for await action in stream {
+                return action
+            }
             return nil
 
         case .multiple(let effects):
@@ -118,6 +132,18 @@ public enum Effect<Action> {
             return .cancellable(id: id) {
                 guard let action = try await asyncTask() else { return nil }
                 return transform(action)
+            }
+        case .stream(let id, let streamBuilder):
+            return .stream(id: id) {
+                let stream = streamBuilder()
+                return AsyncStream { continuation in
+                    Task {
+                        for await action in stream {
+                            continuation.yield(transform(action))
+                        }
+                        continuation.finish()
+                    }
+                }
             }
         case .cancel(let id):
             return .cancel(id: id)

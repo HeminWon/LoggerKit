@@ -307,6 +307,23 @@ public struct LogDetailReducer: Reducer {
         case .export(let exportAction):
             // Delegate to ExportFeature.Reducer
             let exportEffect = exportReducer.reduce(&state.exportFeature, exportAction)
+
+            // Sync UI state from ExportFeature to LogDetailState
+            switch exportAction {
+            case .exportSucceeded:
+                // 导出成功，显示分享面板
+                state.isSharePresented = true
+                print("🟢 [LogDetailReducer] Setting isSharePresented = true after exportSucceeded")
+
+            case .exportFailed:
+                // 导出失败，显示错误提示
+                state.showExportError = true
+                print("🔴 [LogDetailReducer] Setting showExportError = true after exportFailed")
+
+            default:
+                break
+            }
+
             return exportEffect.map { .export($0) }
 
         case .filter(let filterAction):

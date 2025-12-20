@@ -53,6 +53,19 @@ extension ExportFeature {
         /// Export error (if any)
         public var error: Error?
 
+        // MARK: - UI Presentation State
+
+        /// 分享面板是否显示
+        public var isShareSheetPresented: Bool = false
+
+        /// 错误提示是否显示
+        public var isErrorAlertPresented: Bool = false
+
+        // MARK: - Progress Throttling State (内部使用)
+
+        /// 上次进度更新时间戳（用于节流）
+        internal var lastProgressUpdateTime: TimeInterval = 0
+
         // MARK: - Computed Properties
 
         /// Whether export is in idle state (not started, completed, or failed)
@@ -70,13 +83,18 @@ extension ExportFeature {
             !isExporting && error != nil
         }
 
+        /// 是否应该自动显示分享面板
+        public var shouldAutoShowShareSheet: Bool {
+            isCompleted && exportedFileURL != nil && !isShareSheetPresented
+        }
+
         // MARK: - Initializer
 
         public init() {}
 
         // MARK: - State Mutations
 
-        /// Reset to initial state
+        /// Reset to initial state (增强版 - 包含 UI 状态重置)
         public mutating func reset() {
             isExporting = false
             progress = 0.0
@@ -84,6 +102,10 @@ extension ExportFeature {
             totalCount = 0
             exportedFileURL = nil
             error = nil
+            // 重置 UI 状态
+            isShareSheetPresented = false
+            isErrorAlertPresented = false
+            lastProgressUpdateTime = 0
         }
 
         /// Update progress
@@ -104,7 +126,11 @@ extension ExportFeature {
             lhs.exportedCount == rhs.exportedCount &&
             lhs.totalCount == rhs.totalCount &&
             lhs.exportedFileURL == rhs.exportedFileURL &&
-            lhs.error?.localizedDescription == rhs.error?.localizedDescription
+            lhs.error?.localizedDescription == rhs.error?.localizedDescription &&
+            // 新增字段比较
+            lhs.isShareSheetPresented == rhs.isShareSheetPresented &&
+            lhs.isErrorAlertPresented == rhs.isErrorAlertPresented
+            // 注意: lastProgressUpdateTime 是内部状态，不包含在相等性比较中
         }
     }
 }
@@ -142,6 +168,17 @@ extension ExportFeature {
         /// Export failed with error
         case exportFailed(Error)
 
+        // MARK: - UI Actions
+
+        /// 设置分享面板显示状态
+        case setShareSheetPresented(Bool)
+
+        /// 设置错误提示显示状态
+        case setErrorAlertPresented(Bool)
+
+        /// 清除错误并重置（便捷操作）
+        case dismissError
+
         // MARK: - Equatable
 
         public static func == (lhs: Action, rhs: Action) -> Bool {
@@ -160,6 +197,13 @@ extension ExportFeature {
                 return l == r
             case (.exportFailed(let l), .exportFailed(let r)):
                 return l.localizedDescription == r.localizedDescription
+            // 新增 UI actions 比较
+            case (.setShareSheetPresented(let l), .setShareSheetPresented(let r)):
+                return l == r
+            case (.setErrorAlertPresented(let l), .setErrorAlertPresented(let r)):
+                return l == r
+            case (.dismissError, .dismissError):
+                return true
             default:
                 return false
             }
@@ -212,11 +256,34 @@ extension ExportFeature {
                 state.isExporting = false
                 state.exportedFileURL = url
                 state.progress = 1.0
+                // 自动显示分享面板
+                state.isShareSheetPresented = true
                 return .none
 
             case .exportFailed(let error):
                 state.isExporting = false
                 state.error = error
+                // 自动显示错误提示
+                state.isErrorAlertPresented = true
+                return .none
+
+            // MARK: - UI Actions
+
+            case .setShareSheetPresented(let presented):
+                state.isShareSheetPresented = presented
+                return .none
+
+            case .setErrorAlertPresented(let presented):
+                state.isErrorAlertPresented = presented
+                // 如果关闭错误提示，清除错误
+                if !presented {
+                    state.error = nil
+                }
+                return .none
+
+            case .dismissError:
+                state.error = nil
+                state.isErrorAlertPresented = false
                 return .none
             }
         }
@@ -233,62 +300,105 @@ extension ExportFeature {
             let sessionIds = state.sessionIds.isEmpty ? environment.allSessionIds : state.sessionIds
             let filterOptions = state.filterOptions
 
-            return .cancellable(id: CancellationID.export) { [environment, filterOptions] in
-                do {
-                    // Convert filterOptions to FilterState on MainActor
-                    let filterState = await MainActor.run {
-                        filterOptions?.toFilterState() ?? FilterState()
-                    }
+            return .stream(id: CancellationID.export) { [environment, filterOptions] in
+                AsyncStream { continuation in
+                    Task {
+                        do {
+                            // Convert filterOptions to FilterState on MainActor
+                            let filterState = await MainActor.run {
+                                filterOptions?.toFilterState() ?? FilterState()
+                            }
 
-                    // Step 1: Count total events
-                    print("🔵 [ExportFeature] Counting total events...")
-                    let totalCount = try await environment.dataLoader.countEvents(
-                        sessionIds: sessionIds,
-                        filterState: filterState
-                    )
-                    print("🟢 [ExportFeature] Total events: \(totalCount)")
+                            // Step 1: Notify preparation started
+                            print("🔵 [ExportFeature] Export preparation started")
+                            continuation.yield(.exportPreparationStarted)
 
-                    guard totalCount > 0 else {
-                        throw ExportFeatureError.emptyData
-                    }
-
-                    // Step 2: Generate file name
-                    let fileName = generateFileName(
-                        sessionIds: sessionIds,
-                        format: format
-                    )
-
-                    // Step 3: Stream export to file
-                    print("🔵 [ExportFeature] Starting streaming export...")
-                    let fileURL = try await LogParser.logEventToTempFileStreaming(
-                        fileName: fileName,
-                        batchSize: 1000,
-                        progressHandler: { written, _ in
-                            print("📊 [ExportFeature] Progress: \(written)/\(totalCount)")
-                        },
-                        eventFetcher: { offset, limit in
-                            print("🔵 [ExportFeature] Fetching batch: offset=\(offset), limit=\(limit)")
-                            return try await environment.dataLoader.loadEvents(
+                            // Step 2: Count total events
+                            print("🔵 [ExportFeature] Counting total events...")
+                            let totalCount = try await environment.dataLoader.countEvents(
                                 sessionIds: sessionIds,
-                                filterState: filterState,
-                                offset: offset,
-                                limit: limit
+                                filterState: filterState
                             )
+                            print("🟢 [ExportFeature] Total events: \(totalCount)")
+
+                            guard totalCount > 0 else {
+                                throw ExportFeatureError.emptyData
+                            }
+
+                            // Step 3: Send total count
+                            continuation.yield(.totalCountCalculated(totalCount))
+
+                            // Step 4: Generate file name
+                            let fileName = generateFileName(
+                                sessionIds: sessionIds,
+                                format: format
+                            )
+
+                            // Step 5: Stream export to file with progress updates
+                            print("🔵 [ExportFeature] Starting streaming export...")
+
+                            // 时间节流的进度更新（避免过度更新 UI）
+                            var lastProgressUpdateTime: TimeInterval = 0
+                            let progressThrottleInterval: TimeInterval = 0.1 // 100ms
+
+                            let fileURL = try await LogParser.logEventToTempFileStreaming(
+                                fileName: fileName,
+                                batchSize: 1000,
+                                progressHandler: { written, _ in
+                                    // 忽略 LogParser 传来的 total（总是 -1），使用我们计算的 totalCount
+                                    let now = Date().timeIntervalSince1970
+
+                                    // 关键点立即更新 + 时间节流
+                                    let shouldUpdate = written == 1 ||                              // 首次
+                                                      written == totalCount ||                     // 末次（使用正确的 totalCount）
+                                                      (now - lastProgressUpdateTime) >= progressThrottleInterval  // 节流间隔
+
+                                    if shouldUpdate {
+                                        lastProgressUpdateTime = now
+                                        print("📊 [ExportFeature] Progress: \(written)/\(totalCount)")
+                                        continuation.yield(.progressUpdated(exported: written, total: totalCount))
+                                    }
+                                },
+                                eventFetcher: { offset, limit in
+                                    print("🔵 [ExportFeature] Fetching batch: offset=\(offset), limit=\(limit)")
+                                    return try await environment.dataLoader.loadEvents(
+                                        sessionIds: sessionIds,
+                                        filterState: filterState,
+                                        offset: offset,
+                                        limit: limit
+                                    )
+                                }
+                            )
+
+                            // Step 6: Export completed successfully
+                            print("🟢 [ExportFeature] Export completed: \(fileURL.path)")
+                            continuation.yield(.exportSucceeded(fileURL))
+                            continuation.finish()
+
+                        } catch is CancellationError {
+                            print("🟡 [ExportFeature] Export cancelled")
+                            // 取消不算错误，直接结束 stream
+                            continuation.finish()
+                        } catch {
+                            print("🔴 [ExportFeature] Export failed: \(error.localizedDescription)")
+                            continuation.yield(.exportFailed(error))
+                            continuation.finish()
                         }
-                    )
-
-                    print("🟢 [ExportFeature] Export completed: \(fileURL.path)")
-                    return .exportSucceeded(fileURL)
-
-                } catch {
-                    print("🔴 [ExportFeature] Export failed: \(error.localizedDescription)")
-                    return .exportFailed(error)
+                    }
                 }
             }
         }
 
         private func handleCancelExport(_ state: inout State) -> Effect<Action> {
-            state.isExporting = false
+            // 清理已导出的临时文件（如果存在）
+            if let fileURL = state.exportedFileURL {
+                cleanupTemporaryFile(at: fileURL)
+            }
+
+            // 完全重置状态（包括 UI 状态）
+            state.reset()
+
+            // 取消 Effect
             return .cancel(id: CancellationID.export)
         }
 
@@ -303,6 +413,18 @@ extension ExportFeature {
             let ext = format == .log ? "log" : "json"
 
             return "logs_\(sessionIdentifier)_\(dateString).\(ext)"
+        }
+
+        /// 清理临时文件
+        private func cleanupTemporaryFile(at url: URL) {
+            do {
+                if FileManager.default.fileExists(atPath: url.path) {
+                    try FileManager.default.removeItem(at: url)
+                    print("🗑️ [ExportFeature] Cleaned up temporary file: \(url.path)")
+                }
+            } catch {
+                print("⚠️ [ExportFeature] Failed to cleanup temporary file: \(error.localizedDescription)")
+            }
         }
 
         // MARK: - Cancellation IDs

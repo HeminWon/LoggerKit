@@ -149,6 +149,18 @@ extension Reducer {
                     guard let action = try await task() else { return nil }
                     return toGlobalAction(action)
                 }
+            case .stream(let id, let streamBuilder):
+                return .stream(id: id) {
+                    let stream = streamBuilder()
+                    return AsyncStream { continuation in
+                        Task {
+                            for await action in stream {
+                                continuation.yield(toGlobalAction(action))
+                            }
+                            continuation.finish()
+                        }
+                    }
+                }
             case .cancel(let id):
                 return .cancel(id: id)
             case .multiple(let effects):
@@ -165,6 +177,18 @@ extension Reducer {
                         return .cancellable(id: id) {
                             guard let action = try await task() else { return nil }
                             return toGlobalAction(action)
+                        }
+                    case .stream(let id, let streamBuilder):
+                        return .stream(id: id) {
+                            let stream = streamBuilder()
+                            return AsyncStream { continuation in
+                                Task {
+                                    for await action in stream {
+                                        continuation.yield(toGlobalAction(action))
+                                    }
+                                    continuation.finish()
+                                }
+                            }
                         }
                     case .cancel(let id):
                         return .cancel(id: id)

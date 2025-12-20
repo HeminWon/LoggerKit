@@ -140,6 +140,42 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
                 }
             }
 
+        case .stream(let id, let streamBuilder):
+            // Cancel any existing task with this ID (if ID is provided)
+            if let id = id {
+                cancel(id: id)
+            }
+
+            // Build the stream
+            let stream = streamBuilder()
+
+            // Start new task to consume the stream
+            let task = Task { [weak self] in
+                guard let self = self else { return }
+
+                // Iterate through all actions in the stream
+                for await action in stream {
+                    // Check for cancellation
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    // Send each action
+                    await self.send(action)
+                }
+
+                // Clean up task reference
+                if let id = id {
+                    await MainActor.run {
+                        self.runningTasks[id] = nil
+                    }
+                }
+            }
+
+            // Store the task if it has an ID
+            if let id = id {
+                runningTasks[id] = task
+            }
+
         case .cancel(let id):
             // Cancel the running effect with the specified ID
             cancel(id: id)
