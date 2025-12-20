@@ -29,11 +29,7 @@ import Foundation
 /// // .list(.loadSucceeded(events, totalCount, sequenceNumber))
 /// ```
 public enum LogDetailAction: Equatable {
-    // MARK: - User Interactions (Legacy Actions - 待迁移到新 Feature)
-
-    /// Export logs (legacy, for backward compatibility)
-    /// ⚠️ TODO: 迁移到 .export(.export)
-    case exportLogs(format: ExportFormat, progress: @Sendable (Double) -> Void)
+    // MARK: - Sub-Feature Actions
 
     /// List feature actions (new TCA-based list)
     case list(LogList.Action)
@@ -53,28 +49,13 @@ public enum LogDetailAction: Equatable {
     /// Delete all logs
     case deleteAllLogs
 
-    // MARK: - System Responses (Legacy Actions - 待迁移到新 Feature)
-    // ✅ Removed: logsLoaded (已迁移到 .list(.loadSucceeded))
-
-    // MARK: - Export Progress Actions
-
-    /// Export started
-    case exportStarted
-
-    /// Export progress updated
-    case exportProgressUpdated(exported: Int, total: Int)
+    // MARK: - System Responses
 
     /// All events loaded for search preview
     case allEventsLoaded([LogEvent])
 
     /// Loading failed
     case loadingFailed(Error)
-
-    /// Export completed
-    case exportCompleted(URL)
-
-    /// Export failed
-    case exportFailed(Error)
 
     /// Deletion completed
     case deletionCompleted
@@ -120,17 +101,9 @@ public enum LogDetailAction: Equatable {
         switch (lhs, rhs) {
         case (.deleteAllLogs, .deleteAllLogs):
             return true
-        case (.exportStarted, .exportStarted):
-            return true
-        case (.exportProgressUpdated(let lExported, let lTotal), .exportProgressUpdated(let rExported, let rTotal)):
-            return lExported == rExported && lTotal == rTotal
         case (.allEventsLoaded(let lEvents), .allEventsLoaded(let rEvents)):
             return lEvents.count == rEvents.count
         case (.loadingFailed(let lError), .loadingFailed(let rError)):
-            return lError.localizedDescription == rError.localizedDescription
-        case (.exportCompleted(let lURL), .exportCompleted(let rURL)):
-            return lURL == rURL
-        case (.exportFailed(let lError), .exportFailed(let rError)):
             return lError.localizedDescription == rError.localizedDescription
         case (.deletionCompleted, .deletionCompleted):
             return true
@@ -152,9 +125,6 @@ public enum LogDetailAction: Equatable {
             return lValue == rValue
         case (.setExportErrorPresented(let lValue), .setExportErrorPresented(let rValue)):
             return lValue == rValue
-        case (.exportLogs, .exportLogs):
-            // Progress closures can't be compared
-            return true
         case (.export(let lAction), .export(let rAction)):
             return lAction == rAction
         case (.filter(let lAction), .filter(let rAction)):

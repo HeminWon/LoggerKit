@@ -448,64 +448,6 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
     public func exportLogsAsync(format: ExportFormat) async {
         await sendAsync(.export(.startExport(format: format)))
     }
-
-    /// 导出所有事件 (流式,带进度回调)
-    ///
-    /// 使用示例:
-    /// ```swift
-    /// do {
-    ///     let url = try await viewStore.exportAllEventsStreaming { exported, total in
-    ///         print("Progress: \(exported)/\(total)")
-    ///     }
-    ///     print("Exported to: \(url)")
-    /// } catch {
-    ///     print("Export failed: \(error)")
-    /// }
-    /// ```
-    ///
-    /// - Parameter progressHandler: 进度回调 (已导出数量, 总数量)
-    /// - Returns: 导出文件的 URL
-    /// - Throws: 导出失败时抛出错误
-    public func exportAllEventsStreaming(
-        progressHandler: @escaping (Int, Int) -> Void = { _, _ in }
-    ) async throws -> URL {
-        print("🔵 [ViewStore] Starting export...")
-
-        // 发送开始导出的 action
-        send(.exportStarted)
-
-        // 创建进度适配器:将 Double 转换为 (Int, Int)
-        let progress: @Sendable (Double) -> Void = { [weak self] progressPercent in
-            guard let self = self else { return }
-            Task { @MainActor in
-                let total = self.totalExportCount
-                let exported = Int(Double(total) * progressPercent)
-                progressHandler(exported, total)
-            }
-        }
-
-        // 发送导出 action 并等待完成
-        await sendAsync(.exportLogs(format: .log, progress: progress))
-
-        // 检查导出结果
-        if let url = state.exportFeature.exportedFileURL {
-            print("🟢 [ViewStore] Export completed: \(url.path)")
-            return url
-        }
-
-        // 如果有错误,抛出
-        if let error = state.error {
-            print("🔴 [ViewStore] Export failed: \(error.localizedDescription)")
-            throw error
-        }
-
-        // 没有 URL 也没有错误,说明出了问题
-        throw NSError(
-            domain: "LoggerKit",
-            code: -1,
-            userInfo: [NSLocalizedDescriptionKey: "Export completed but no file URL was returned"]
-        )
-    }
 }
 
 // MARK: - Type Alias (可选,让代码更简洁)
