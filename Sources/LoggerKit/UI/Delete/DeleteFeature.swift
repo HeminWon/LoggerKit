@@ -42,6 +42,11 @@ extension DeleteFeature {
         /// Error message (if deletion fails)
         public var error: Error?
 
+        // MARK: - Confirmation Dialog State
+
+        /// Confirmation dialog type (使用枚举表示互斥状态)
+        public var confirmationDialog: ConfirmationDialogType? = nil
+
         // MARK: - Computed Properties
 
         /// Whether any session is selected
@@ -58,6 +63,24 @@ extension DeleteFeature {
         public var isAllSessionsSelected: Bool {
             !availableSessions.isEmpty &&
             selectedSessionIds.count == availableSessions.count
+        }
+
+        /// Whether delete all confirmation is shown
+        public var showDeleteAllConfirmation: Bool {
+            if case .deleteAll = confirmationDialog { return true }
+            return false
+        }
+
+        /// Whether delete sessions confirmation is shown
+        public var showDeleteSessionsConfirmation: Bool {
+            if case .deleteSelectedSessions = confirmationDialog { return true }
+            return false
+        }
+
+        /// Whether error dialog is shown
+        public var showError: Bool {
+            if case .error = confirmationDialog { return true }
+            return false
         }
 
         // MARK: - Initializer
@@ -83,15 +106,27 @@ extension DeleteFeature {
             selectedSessionIds.removeAll()
         }
 
+        // MARK: - Confirmation Dialog Type
+
+        /// Confirmation dialog type enumeration
+        public enum ConfirmationDialogType: Equatable, Sendable {
+            case deleteAll              // 删除所有日志
+            case deleteSelectedSessions // 删除选中会话
+            case error(String)          // 错误提示（存储错误消息文本）
+        }
+
         // MARK: - Equatable
 
+        // ⚠️ 注意: 添加新属性时需要同步更新此 == 运算符实现
+        // 手动实现的 Equatable 需要在添加新字段时记得更新，否则会导致状态比较不准确
         public static func == (lhs: State, rhs: State) -> Bool {
             lhs.selectedSessionIds == rhs.selectedSessionIds &&
             lhs.availableSessions == rhs.availableSessions &&
             lhs.isLoadingSessions == rhs.isLoadingSessions &&
             lhs.isDeleting == rhs.isDeleting &&
             lhs.deleteProgress == rhs.deleteProgress &&
-            lhs.error?.localizedDescription == rhs.error?.localizedDescription
+            lhs.error?.localizedDescription == rhs.error?.localizedDescription &&
+            lhs.confirmationDialog == rhs.confirmationDialog  // ✅ 新增此行
         }
     }
 }
@@ -124,6 +159,21 @@ extension DeleteFeature {
         /// Reset all selections and state
         case reset
 
+        /// Show delete all confirmation dialog
+        case showDeleteAllConfirmation
+
+        /// Show delete sessions confirmation dialog
+        case showDeleteSessionsConfirmation
+
+        /// Dismiss confirmation dialog
+        case dismissConfirmationDialog
+
+        /// Confirm delete all logs
+        case confirmDeleteAll
+
+        /// Delete single session
+        case deleteSingleSession(String)
+
         // MARK: - System Feedback (事件型)
 
         /// Sessions loaded successfully
@@ -141,6 +191,9 @@ extension DeleteFeature {
         /// Delete operation has been confirmed (notifies parent to reload)
         case deletionConfirmed
 
+        /// Single session deleted
+        case singleSessionDeleted(Result<String, Error>)
+
         // MARK: - Equatable
 
         public static func == (lhs: Action, rhs: Action) -> Bool {
@@ -151,9 +204,15 @@ extension DeleteFeature {
                  (.confirmDelete, .confirmDelete),
                  (.cancelDelete, .cancelDelete),
                  (.reset, .reset),
-                 (.deletionConfirmed, .deletionConfirmed):
+                 (.deletionConfirmed, .deletionConfirmed),
+                 (.showDeleteAllConfirmation, .showDeleteAllConfirmation),
+                 (.showDeleteSessionsConfirmation, .showDeleteSessionsConfirmation),
+                 (.dismissConfirmationDialog, .dismissConfirmationDialog),
+                 (.confirmDeleteAll, .confirmDeleteAll):
                 return true
             case (.toggleSession(let l), .toggleSession(let r)):
+                return l == r
+            case (.deleteSingleSession(let l), .deleteSingleSession(let r)):
                 return l == r
             case (.sessionsLoaded(let l), .sessionsLoaded(let r)):
                 return l == r
@@ -165,6 +224,15 @@ extension DeleteFeature {
                 switch (l, r) {
                 case (.success, .success):
                     return true
+                case (.failure(let lErr), .failure(let rErr)):
+                    return lErr.localizedDescription == rErr.localizedDescription
+                default:
+                    return false
+                }
+            case (.singleSessionDeleted(let l), .singleSessionDeleted(let r)):
+                switch (l, r) {
+                case (.success(let lId), .success(let rId)):
+                    return lId == rId
                 case (.failure(let lErr), .failure(let rErr)):
                     return lErr.localizedDescription == rErr.localizedDescription
                 default:
@@ -231,10 +299,45 @@ extension DeleteFeature {
                 state.reset()
                 return .none
 
+            // MARK: - Confirmation Dialogs
+
+            case .showDeleteAllConfirmation:
+                state.confirmationDialog = .deleteAll
+                return .none
+
+            case .showDeleteSessionsConfirmation:
+                guard !state.selectedSessionIds.isEmpty else {
+                    state.confirmationDialog = .error(String(localized: "no_sessions_selected", defaultValue: "请先选择要删除的会话", bundle: .module))
+                    return .none
+                }
+                state.confirmationDialog = .deleteSelectedSessions
+                return .none
+
+            case .dismissConfirmationDialog:
+                state.confirmationDialog = nil
+                return .none
+
             // MARK: - Delete Operations
+
+            case .confirmDeleteAll:
+                state.confirmationDialog = nil
+                // 选中所有会话，复用现有的 confirmDelete 逻辑
+                state.selectedSessionIds = Set(state.availableSessions.map { $0.id })
+                return .send(.confirmDelete)
 
             case .confirmDelete:
                 return handleConfirmDelete(&state)
+
+            case .deleteSingleSession(let sessionId):
+                state.isDeleting = true
+                return .task { [environment] in
+                    do {
+                        try await environment.databaseManager.deleteSession(sessionId)
+                        return .singleSessionDeleted(.success(sessionId))
+                    } catch {
+                        return .singleSessionDeleted(.failure(error))
+                    }
+                }
 
             case .updateProgress(let progress):
                 state.deleteProgress = progress
@@ -242,6 +345,18 @@ extension DeleteFeature {
 
             case .deleteCompleted(let result):
                 return handleDeleteCompleted(&state, result: result)
+
+            case .singleSessionDeleted(let result):
+                state.isDeleting = false
+                switch result {
+                case .success(let sessionId):
+                    state.availableSessions.removeAll { $0.id == sessionId }
+                    state.selectedSessionIds.remove(sessionId)
+                    return .send(.loadSessions)  // 重新加载列表以确保同步
+                case .failure(let error):
+                    state.confirmationDialog = .error(error.localizedDescription)
+                    return .none
+                }
 
             case .cancelDelete:
                 state.isDeleting = false
@@ -326,7 +441,7 @@ extension DeleteFeature {
                 return .send(.deletionConfirmed)
 
             case .failure(let error):
-                state.error = error
+                state.confirmationDialog = .error(error.localizedDescription)  // ✅ 新增错误对话框
                 state.deleteProgress = 0
                 return .none
             }

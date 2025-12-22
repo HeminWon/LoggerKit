@@ -12,14 +12,6 @@ struct LogDeleteManagementSheet: View {
     @ObservedObject var viewStore: LogDetailViewStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var sessions: [SessionInfo] = []
-    @State private var selectedSessionIds: Set<String> = []
-    @State private var isLoading = false
-    @State private var showDeleteAllConfirmation = false
-    @State private var showDeleteSessionsConfirmation = false
-    @State private var deleteError: LogDatabaseError?
-    @State private var showError = false
-
     // 使用 ViewStore 初始化
     init(viewStore: LogDetailViewStore) {
         self.viewStore = viewStore
@@ -52,32 +44,47 @@ struct LogDeleteManagementSheet: View {
             }
         }
         .task {
-            await loadSessions()
+            viewStore.send(.delete(.loadSessions))
         }
         // 删除所有日志确认对话框
-        .alert(String(localized: "delete_all_confirmation_title", bundle: .module), isPresented: $showDeleteAllConfirmation) {
-            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
+        .alert(String(localized: "delete_all_confirmation_title", bundle: .module), isPresented: viewStore.binding(
+            get: { $0.deleteFeature.showDeleteAllConfirmation },
+            send: { _ in .delete(.dismissConfirmationDialog) }
+        )) {
+            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) {
+                viewStore.send(.delete(.dismissConfirmationDialog))
+            }
             Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
-                deleteAllLogs()
+                viewStore.send(.delete(.confirmDeleteAll))
             }
         } message: {
             Text(String(localized: "delete_all_confirmation_message", bundle: .module))
         }
         // 删除选中 Session 确认对话框
-        .alert(String(localized: "delete_sessions_confirmation_title", bundle: .module), isPresented: $showDeleteSessionsConfirmation) {
-            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
+        .alert(String(localized: "delete_sessions_confirmation_title", bundle: .module), isPresented: viewStore.binding(
+            get: { $0.deleteFeature.showDeleteSessionsConfirmation },
+            send: { _ in .delete(.dismissConfirmationDialog) }
+        )) {
+            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) {
+                viewStore.send(.delete(.dismissConfirmationDialog))
+            }
             Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
-                deleteSelectedSessions()
+                viewStore.send(.delete(.confirmDelete))
             }
         } message: {
-            Text(String(format: String(localized: "delete_sessions_confirmation_message", bundle: .module), selectedSessionIds.count))
+            Text(String(format: String(localized: "delete_sessions_confirmation_message", bundle: .module), viewStore.state.deleteFeature.selectedSessionCount))
         }
         // 错误提示
-        .alert(String(localized: "delete_failed_title", bundle: .module), isPresented: $showError) {
-            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
+        .alert(String(localized: "delete_failed_title", bundle: .module), isPresented: viewStore.binding(
+            get: { $0.deleteFeature.showError },
+            send: { _ in .delete(.dismissConfirmationDialog) }
+        )) {
+            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) {
+                viewStore.send(.delete(.dismissConfirmationDialog))
+            }
         } message: {
-            if let error = deleteError {
-                Text(error.localizedDescription)
+            if case .error(let errorMessage) = viewStore.state.deleteFeature.confirmationDialog {
+                Text(errorMessage)
             }
         }
     }
@@ -97,7 +104,7 @@ struct LogDeleteManagementSheet: View {
             }
 
             Button {
-                showDeleteAllConfirmation = true
+                viewStore.send(.delete(.showDeleteAllConfirmation))
             } label: {
                 HStack {
                     Image(systemName: "trash.fill")
@@ -118,13 +125,16 @@ struct LogDeleteManagementSheet: View {
 
     // MARK: - 按 Session 删除区域
     private var deleteBySessionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // 提取 deleteFeature 状态，避免重复访问嵌套路径
+        let deleteState = viewStore.state.deleteFeature
+
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(String(localized: "delete_by_session_title", bundle: .module))
                         .font(.headline)
-                    if !selectedSessionIds.isEmpty {
-                        Text(String(format: String(localized: "selected_sessions_count", bundle: .module), selectedSessionIds.count))
+                    if !deleteState.selectedSessionIds.isEmpty {
+                        Text(String(format: String(localized: "selected_sessions_count", bundle: .module), deleteState.selectedSessionCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     } else {
@@ -136,16 +146,16 @@ struct LogDeleteManagementSheet: View {
                 Spacer()
 
                 // 全选/清空按钮
-                if !sessions.isEmpty {
-                    if selectedSessionIds.isEmpty {
+                if !deleteState.availableSessions.isEmpty {
+                    if deleteState.selectedSessionIds.isEmpty {
                         Button(String(localized: "select_all", bundle: .module)) {
-                            selectedSessionIds = Set(sessions.map { $0.id })
+                            viewStore.send(.delete(.selectAllSessions))
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
                     } else {
                         Button(String(localized: "empty", bundle: .module)) {
-                            selectedSessionIds.removeAll()
+                            viewStore.send(.delete(.deselectAllSessions))
                         }
                         .font(.caption)
                         .foregroundColor(.red)
@@ -154,11 +164,11 @@ struct LogDeleteManagementSheet: View {
             }
 
             // Session 列表
-            if isLoading {
+            if deleteState.isLoadingSessions {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding()
-            } else if sessions.isEmpty {
+            } else if deleteState.availableSessions.isEmpty {
                 Text(String(localized: "no_session_records", bundle: .module))
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -169,13 +179,13 @@ struct LogDeleteManagementSheet: View {
             }
 
             // 删除选中会话按钮
-            if !selectedSessionIds.isEmpty {
+            if !deleteState.selectedSessionIds.isEmpty {
                 Button {
-                    showDeleteSessionsConfirmation = true
+                    viewStore.send(.delete(.showDeleteSessionsConfirmation))
                 } label: {
                     HStack {
                         Image(systemName: "trash.fill")
-                        Text(String(format: String(localized: "delete_selected_sessions_button", bundle: .module), selectedSessionIds.count))
+                        Text(String(format: String(localized: "delete_selected_sessions_button", bundle: .module), deleteState.selectedSessionCount))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -193,94 +203,24 @@ struct LogDeleteManagementSheet: View {
 
     // Session 芯片列表
     private var sessionList: some View {
-        VStack(spacing: 8) {
-            ForEach(sessions) { session in
+        // 提取 deleteFeature 状态，避免重复访问嵌套路径
+        let deleteState = viewStore.state.deleteFeature
+
+        return VStack(spacing: 8) {
+            ForEach(deleteState.availableSessions) { session in
                 // 复用 SessionChip，通过 onDelete 参数启用删除功能，fullWidth 启用全宽列表样式
                 SessionChip(
                     session: session,
-                    isSelected: selectedSessionIds.contains(session.id),
+                    isSelected: deleteState.selectedSessionIds.contains(session.id),
                     action: {
-                        if selectedSessionIds.contains(session.id) {
-                            selectedSessionIds.remove(session.id)
-                        } else {
-                            selectedSessionIds.insert(session.id)
-                        }
+                        viewStore.send(.delete(.toggleSession(session.id)))
                     },
                     onDelete: { sessionId in
-                        Task {
-                            await deleteSingleSession(sessionId)
-                        }
+                        viewStore.send(.delete(.deleteSingleSession(sessionId)))
                     },
                     fullWidth: true
                 )
             }
-        }
-    }
-
-    // MARK: - 数据加载
-    private func loadSessions() async {
-        isLoading = true
-
-        do {
-            guard let dbManager = LoggerEngine.shared.getDatabaseManager() else {
-                throw LogDatabaseError.databaseNotAvailable
-            }
-
-            let loadedSessions = try await Task.detached {
-                try dbManager.fetchAllSessions()
-            }.value
-
-            sessions = loadedSessions
-        } catch {
-            deleteError = error as? LogDatabaseError ?? .deleteFailed(underlying: error)
-            showError = true
-        }
-
-        isLoading = false
-    }
-
-    // MARK: - 删除操作
-    private func deleteAllLogs() {
-        Task {
-            do {
-                try await viewStore.deleteAllLogsAsync()
-                dismiss()
-            } catch {
-                deleteError = error as? LogDatabaseError ?? .deleteFailed(underlying: error)
-                showError = true
-            }
-        }
-    }
-
-    private func deleteSelectedSessions() {
-        Task {
-            do {
-                try await viewStore.deleteSessions(selectedSessionIds)
-
-                // 清空选中状态
-                selectedSessionIds.removeAll()
-
-                // 重新加载会话列表
-                await loadSessions()
-            } catch {
-                deleteError = error as? LogDatabaseError ?? .deleteFailed(underlying: error)
-                showError = true
-            }
-        }
-    }
-
-    private func deleteSingleSession(_ sessionId: String) async {
-        do {
-            try await viewStore.deleteSession(sessionId)
-
-            // 从选中列表移除
-            selectedSessionIds.remove(sessionId)
-
-            // 重新加载会话列表
-            await loadSessions()
-        } catch {
-            deleteError = error as? LogDatabaseError ?? .deleteFailed(underlying: error)
-            showError = true
         }
     }
 }
