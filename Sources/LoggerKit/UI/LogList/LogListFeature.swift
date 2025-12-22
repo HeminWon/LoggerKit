@@ -351,29 +351,16 @@ extension LogList {
 
             return .cancellable(id: "loadLogs") { [environment] in
                 do {
-                    // 将 FilterFeature.State 转换为 FilterState class
-                    let legacyFilterState = await MainActor.run {
-                        let fs = FilterState()
-                        fs.selectedLevels = filterState.selectedLevels
-                        fs.selectedFunctions = filterState.selectedFunctions
-                        fs.selectedFileNames = filterState.selectedFileNames
-                        fs.selectedContexts = filterState.selectedContexts
-                        fs.selectedThreads = filterState.selectedThreads
-                        fs.selectedMessageKeywords = filterState.selectedMessageKeywords
-                        fs.selectedSessionIds = filterState.selectedSessionIds
-                        return fs
-                    }
-
                     let events = try await environment.dataLoader.loadEvents(
                         sessionIds: sessionIds,
-                        filterState: legacyFilterState,
+                        filterState: filterState,
                         offset: offset,
                         limit: pageSize
                     )
 
                     let totalCount = try await environment.dataLoader.countEvents(
                         sessionIds: sessionIds,
-                        filterState: legacyFilterState
+                        filterState: filterState
                     )
 
                     return .loadSucceeded(

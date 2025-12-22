@@ -8,44 +8,6 @@
 
 import Foundation
 
-// MARK: - ExportState
-
-/// State for export operations
-///
-/// This struct contains all state related to log export:
-/// - Progress tracking (isExporting, progress, counts)
-/// - Result (exportedFileURL)
-///
-/// Kept separate from LoadingState to distinguish between:
-/// - Loading: Reading logs from database
-/// - Exporting: Writing logs to file
-public struct ExportState: Equatable, Sendable {
-    /// Whether export is currently in progress
-    public var isExporting: Bool = false
-
-    /// Export progress (0.0 to 1.0)
-    public var progress: Double = 0.0
-
-    /// Number of events exported so far
-    public var exportedCount: Int = 0
-
-    /// Total number of events to export
-    public var totalCount: Int = 0
-
-    /// URL of the exported file (set when export completes)
-    public var exportedFileURL: URL?
-
-    public init() {}
-
-    public static func == (lhs: ExportState, rhs: ExportState) -> Bool {
-        lhs.isExporting == rhs.isExporting &&
-        lhs.progress == rhs.progress &&
-        lhs.exportedCount == rhs.exportedCount &&
-        lhs.totalCount == rhs.totalCount &&
-        lhs.exportedFileURL == rhs.exportedFileURL
-    }
-}
-
 // MARK: - LogDetailState
 
 /// Immutable state for the log detail scene
@@ -107,9 +69,6 @@ public struct LogDetailState: Equatable {
 
     /// Export feature (new TCA-based export functionality)
     public var exportFeature: ExportFeature.State = ExportFeature.State()
-
-    /// Legacy export state (for backward compatibility, will be deprecated)
-    public var exportState: ExportState = ExportState()
 
     // MARK: - Filter State
 
@@ -268,7 +227,6 @@ public struct LogDetailState: Equatable {
             lhs.displayEvents.count == rhs.displayEvents.count &&
             lhs.error?.localizedDescription == rhs.error?.localizedDescription &&
             lhs.exportFeature == rhs.exportFeature &&
-            lhs.exportState == rhs.exportState &&
             lhs.filterFeature == rhs.filterFeature &&  // 包含: selectedLevels, selectedFunctions, selectedFileNames, 等所有筛选字段
             lhs.searchFeature == rhs.searchFeature &&
             lhs.deleteFeature == rhs.deleteFeature &&

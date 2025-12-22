@@ -27,7 +27,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func loadEvents(
         sessionIds: Set<String>,
-        filterState: FilterState,
+        filterState: FilterFeature.State,
         offset: Int,
         limit: Int
     ) async throws -> [LogEvent] {
@@ -90,7 +90,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func countEvents(
         sessionIds: Set<String>,
-        filterState: FilterState
+        filterState: FilterFeature.State
     ) async throws -> Int {
         // 在主线程捕获需要的值
         let dbManager = self.databaseManager
@@ -131,7 +131,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func loadAllEvents(
         sessionIds: Set<String>,
-        filterState: FilterState
+        filterState: FilterFeature.State
     ) async throws -> [LogEvent] {
         // 在主线程捕获需要的值
         let dbManager = self.databaseManager

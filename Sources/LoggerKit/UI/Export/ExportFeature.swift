@@ -304,10 +304,8 @@ extension ExportFeature {
                 AsyncStream { continuation in
                     Task {
                         do {
-                            // Convert filterOptions to FilterState on MainActor
-                            let filterState = await MainActor.run {
-                                filterOptions?.toFilterState() ?? FilterState()
-                            }
+                            // Convert filterOptions to FilterFeature.State
+                            let filterState = filterOptions?.toFilterState() ?? FilterFeature.State()
 
                             // Step 1: Notify preparation started
                             print("🔵 [ExportFeature] Export preparation started")

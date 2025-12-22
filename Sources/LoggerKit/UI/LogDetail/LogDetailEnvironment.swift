@@ -106,7 +106,7 @@ public final class MockLogDataLoader: LogDataLoaderProtocol {
 
     public func loadEvents(
         sessionIds: Set<String>,
-        filterState: FilterState,
+        filterState: FilterFeature.State,
         offset: Int,
         limit: Int
     ) async throws -> [LogEvent] {
@@ -137,7 +137,7 @@ public final class MockLogDataLoader: LogDataLoaderProtocol {
 
     public func countEvents(
         sessionIds: Set<String>,
-        filterState: FilterState
+        filterState: FilterFeature.State
     ) async throws -> Int {
         if shouldThrowError {
             throw MockError.loadFailed
@@ -147,7 +147,7 @@ public final class MockLogDataLoader: LogDataLoaderProtocol {
 
     public func loadAllEvents(
         sessionIds: Set<String>,
-        filterState: FilterState
+        filterState: FilterFeature.State
     ) async throws -> [LogEvent] {
         if shouldThrowError {
             throw MockError.loadFailed

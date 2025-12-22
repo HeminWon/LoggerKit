@@ -19,7 +19,7 @@ public protocol LogDataLoaderProtocol {
     /// - Returns: 日志事件数组
     func loadEvents(
         sessionIds: Set<String>,
-        filterState: FilterState,
+        filterState: FilterFeature.State,
         offset: Int,
         limit: Int
     ) async throws -> [LogEvent]
@@ -35,7 +35,7 @@ public protocol LogDataLoaderProtocol {
     /// - Returns: 日志总数
     func countEvents(
         sessionIds: Set<String>,
-        filterState: FilterState
+        filterState: FilterFeature.State
     ) async throws -> Int
 
     /// 加载所有符合条件的日志事件(用于导出)
@@ -45,7 +45,7 @@ public protocol LogDataLoaderProtocol {
     /// - Returns: 所有符合条件的日志事件数组
     func loadAllEvents(
         sessionIds: Set<String>,
-        filterState: FilterState
+        filterState: FilterFeature.State
     ) async throws -> [LogEvent]
 
     /// 加载所有日志事件用于搜索预览(不应用任何过滤条件)

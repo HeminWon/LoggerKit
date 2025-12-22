@@ -72,19 +72,20 @@ public struct ExportFilterOptions: Equatable, Sendable {
         self.sessionIds = sessionIds
     }
 
-    /// 转换为 FilterState
-    @MainActor
-    public func toFilterState() -> FilterState? {
-        guard !isEmpty else { return nil }
+    /// 转换为 FilterFeature.State
+    public func toFilterState() -> FilterFeature.State {
+        var state = FilterFeature.State()
 
-        let state = FilterState()
-        state.selectedLevels = levels
-        state.selectedFunctions = functions
-        state.selectedFileNames = fileNames
-        state.selectedContexts = contexts
-        state.selectedThreads = threads
-        state.selectedMessageKeywords = messageKeywords
-        state.selectedSessionIds = sessionIds
+        if !isEmpty {
+            state.selectedLevels = levels
+            state.selectedFunctions = functions
+            state.selectedFileNames = fileNames
+            state.selectedContexts = contexts
+            state.selectedThreads = threads
+            state.selectedMessageKeywords = messageKeywords
+            state.selectedSessionIds = sessionIds
+        }
+
         return state
     }
 
