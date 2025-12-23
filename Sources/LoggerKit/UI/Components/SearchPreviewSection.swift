@@ -270,11 +270,9 @@ struct SearchPreviewSection: View {
 
                     let isSelected = viewStore.isInFilter(item)
                     Button(action: {
+                        viewStore.toggleFilter(item)
                         if !isSelected {
-                            viewStore.addToFilter(item)
                             onFilterAdded?()
-                        } else {
-                            viewStore.removeFromFilter(item)
                         }
                     }) {
                         Image(systemName: isSelected ? "minus.circle" : "plus.circle")

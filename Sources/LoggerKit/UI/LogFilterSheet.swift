@@ -152,7 +152,7 @@ struct LogFilterSheet: View {
                 Button(String(localized: "clear_button", bundle: .module)) {
                     // 逐个移除所有关键词
                     viewStore.selectedMessageKeywords.forEach { keyword in
-                        viewStore.send(.filter(.removeMessageKeyword(keyword)))
+                        viewStore.send(.filter(.updateFilter(.messageKeyword, .toggle(keyword))))
                     }
                 }
                 .font(.caption)
@@ -167,7 +167,7 @@ struct LogFilterSheet: View {
                                 .font(.caption)
                                 .lineLimit(1)
                             Button(action: {
-                                viewStore.send(.filter(.removeMessageKeyword(keyword)))
+                                viewStore.send(.filter(.updateFilter(.messageKeyword, .toggle(keyword))))
                             }) {
                                 Image(systemName: "xmark")
                                     .font(.caption2)
@@ -293,11 +293,7 @@ struct SessionFilterSection: View {
                                 session: session,
                                 isSelected: viewStore.selectedSessionIds.contains(session.id)
                             ) {
-                                if viewStore.selectedSessionIds.contains(session.id) {
-                                    viewStore.send(.filter(.removeSessionId(session.id)))
-                                } else {
-                                    viewStore.send(.filter(.addSessionId(session.id)))
-                                }
+                                viewStore.send(.filter(.updateFilter(.sessionId, .toggle(session.id))))
                             }
                         }
                     }
@@ -444,84 +440,6 @@ struct SessionChip: View {
 }
 
 // MARK: - FilterSectionWrapper (临时包装器,简化 ViewStore 使用)
-struct FilterSectionWrapper: View {
-    let title: String
-    let options: [String]
-    let selected: Set<String>
-    let onAdd: (String) -> Void
-    let onRemove: (String) -> Void
-    let onSelectAll: () -> Void
-    let onClear: () -> Void
-
-    /// 排序后的选项列表：选中的在前，未选中的在后
-    private var sortedOptions: [String] {
-        let selectedArray = options.filter { selected.contains($0) }.sorted()
-        let unselected = options.filter { !selected.contains($0) }.sorted()
-        return selectedArray + unselected
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // 标题栏
-            HStack {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                if !selected.isEmpty {
-                    Text("(\(selected.count))")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-
-                Spacer()
-
-                if selected.isEmpty {
-                    // 没有选中时显示全选按钮
-                    Button(String(localized: "select_all_button", bundle: .module)) {
-                        onSelectAll()
-                    }
-                    .font(.caption)
-                    .foregroundColor(.blue)
-                } else {
-                    // 有选中时显示清除按钮
-                    Button(String(localized: "clear_button", bundle: .module)) {
-                        onClear()
-                    }
-                    .font(.caption)
-                    .foregroundColor(.red)
-                }
-            }
-
-            // 选项列表（水平滚动，使用 LazyHStack 优化性能）
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 8) {
-                    ForEach(sortedOptions, id: \.self) { option in
-                        FilterChip(
-                            title: truncateText(option, maxLength: 20),
-                            isSelected: selected.contains(option)
-                        ) {
-                            if selected.contains(option) {
-                                onRemove(option)
-                            } else {
-                                onAdd(option)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 1) // 防止 LazyHStack 裁剪阴影
-            }
-        }
-    }
-
-    private func truncateText(_ text: String, maxLength: Int) -> String {
-        if text.count > maxLength {
-            return String(text.prefix(maxLength)) + "..."
-        }
-        return text
-    }
-}
-
 #Preview {
     LogFilterSheet(viewStore: LoggerKit.makeViewStore())
 }

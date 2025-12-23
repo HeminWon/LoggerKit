@@ -150,13 +150,16 @@ extension FilterFeature {
         case context
         case thread
         case messageKeyword
+        case sessionId
     }
 
     /// 过滤器操作类型
     public enum FilterOperation: Equatable {
-        case toggle(String)
-        case selectAll
-        case clear
+        case toggle(String)    // 切换：存在则删除，不存在则添加
+        case add(String)       // 添加：确保添加（幂等）
+        case remove(String)    // 删除：确保删除（幂等）
+        case selectAll         // 全选
+        case clear             // 清空
     }
 }
 
@@ -174,42 +177,6 @@ extension FilterFeature {
 
         /// Toggle log level filter
         case toggleLevel(LogEvent.Level)
-
-        /// Add function filter
-        case addFunction(String)
-
-        /// Remove function filter
-        case removeFunction(String)
-
-        /// Add file name filter
-        case addFileName(String)
-
-        /// Remove file name filter
-        case removeFileName(String)
-
-        /// Add context filter
-        case addContext(String)
-
-        /// Remove context filter
-        case removeContext(String)
-
-        /// Add thread filter
-        case addThread(String)
-
-        /// Remove thread filter
-        case removeThread(String)
-
-        /// Add message keyword filter
-        case addMessageKeyword(String)
-
-        /// Remove message keyword filter
-        case removeMessageKeyword(String)
-
-        /// Add session ID filter
-        case addSessionId(String)
-
-        /// Remove session ID filter
-        case removeSessionId(String)
 
         /// Clear all session IDs
         case clearSessionIds
@@ -257,24 +224,6 @@ extension FilterFeature {
             case (.updateFilter(let lt, let lo), .updateFilter(let rt, let ro)):
                 return lt == rt && lo == ro
             case (.toggleLevel(let l), .toggleLevel(let r)):
-                return l == r
-            case (.addFunction(let l), .addFunction(let r)),
-                 (.removeFunction(let l), .removeFunction(let r)):
-                return l == r
-            case (.addFileName(let l), .addFileName(let r)),
-                 (.removeFileName(let l), .removeFileName(let r)):
-                return l == r
-            case (.addContext(let l), .addContext(let r)),
-                 (.removeContext(let l), .removeContext(let r)):
-                return l == r
-            case (.addThread(let l), .addThread(let r)),
-                 (.removeThread(let l), .removeThread(let r)):
-                return l == r
-            case (.addMessageKeyword(let l), .addMessageKeyword(let r)),
-                 (.removeMessageKeyword(let l), .removeMessageKeyword(let r)):
-                return l == r
-            case (.addSessionId(let l), .addSessionId(let r)),
-                 (.removeSessionId(let l), .removeSessionId(let r)):
                 return l == r
             case (.resetFilters, .resetFilters),
                  (.applyFilters, .applyFilters),
@@ -329,54 +278,6 @@ extension FilterFeature {
                 } else {
                     state.selectedLevels.insert(level)
                 }
-                return .send(.filtersApplied)
-
-            case .addFunction(let function):
-                state.selectedFunctions.insert(function)
-                return .send(.filtersApplied)
-
-            case .removeFunction(let function):
-                state.selectedFunctions.remove(function)
-                return .send(.filtersApplied)
-
-            case .addFileName(let fileName):
-                state.selectedFileNames.insert(fileName)
-                return .send(.filtersApplied)
-
-            case .removeFileName(let fileName):
-                state.selectedFileNames.remove(fileName)
-                return .send(.filtersApplied)
-
-            case .addContext(let context):
-                state.selectedContexts.insert(context)
-                return .send(.filtersApplied)
-
-            case .removeContext(let context):
-                state.selectedContexts.remove(context)
-                return .send(.filtersApplied)
-
-            case .addThread(let thread):
-                state.selectedThreads.insert(thread)
-                return .send(.filtersApplied)
-
-            case .removeThread(let thread):
-                state.selectedThreads.remove(thread)
-                return .send(.filtersApplied)
-
-            case .addMessageKeyword(let keyword):
-                state.selectedMessageKeywords.insert(keyword)
-                return .send(.filtersApplied)
-
-            case .removeMessageKeyword(let keyword):
-                state.selectedMessageKeywords.remove(keyword)
-                return .send(.filtersApplied)
-
-            case .addSessionId(let sessionId):
-                state.selectedSessionIds.insert(sessionId)
-                return .send(.filtersApplied)
-
-            case .removeSessionId(let sessionId):
-                state.selectedSessionIds.remove(sessionId)
                 return .send(.filtersApplied)
 
             case .clearSessionIds:
@@ -444,6 +345,10 @@ extension FilterFeature {
                 } else {
                     state.selectedFunctions.insert(value)
                 }
+            case (.function, .add(let value)):
+                state.selectedFunctions.insert(value)  // 幂等
+            case (.function, .remove(let value)):
+                state.selectedFunctions.remove(value)  // 幂等
             case (.function, .selectAll):
                 state.selectedFunctions = Set(state.availableFunctions)
             case (.function, .clear):
@@ -456,6 +361,10 @@ extension FilterFeature {
                 } else {
                     state.selectedFileNames.insert(value)
                 }
+            case (.fileName, .add(let value)):
+                state.selectedFileNames.insert(value)
+            case (.fileName, .remove(let value)):
+                state.selectedFileNames.remove(value)
             case (.fileName, .selectAll):
                 state.selectedFileNames = Set(state.availableFileNames)
             case (.fileName, .clear):
@@ -468,6 +377,10 @@ extension FilterFeature {
                 } else {
                     state.selectedContexts.insert(value)
                 }
+            case (.context, .add(let value)):
+                state.selectedContexts.insert(value)
+            case (.context, .remove(let value)):
+                state.selectedContexts.remove(value)
             case (.context, .selectAll):
                 state.selectedContexts = Set(state.availableContexts)
             case (.context, .clear):
@@ -480,6 +393,10 @@ extension FilterFeature {
                 } else {
                     state.selectedThreads.insert(value)
                 }
+            case (.thread, .add(let value)):
+                state.selectedThreads.insert(value)
+            case (.thread, .remove(let value)):
+                state.selectedThreads.remove(value)
             case (.thread, .selectAll):
                 state.selectedThreads = Set(state.availableThreads)
             case (.thread, .clear):
@@ -492,11 +409,31 @@ extension FilterFeature {
                 } else {
                     state.selectedMessageKeywords.insert(value)
                 }
+            case (.messageKeyword, .add(let value)):
+                state.selectedMessageKeywords.insert(value)
+            case (.messageKeyword, .remove(let value)):
+                state.selectedMessageKeywords.remove(value)
             case (.messageKeyword, .selectAll):
-                // MessageKeyword 没有 available 列表，暂不实现全选
+                // MessageKeyword 没有 available 列表，不支持 selectAll
                 break
             case (.messageKeyword, .clear):
                 state.selectedMessageKeywords.removeAll()
+
+            // MARK: - SessionId Filter
+            case (.sessionId, .toggle(let value)):
+                if state.selectedSessionIds.contains(value) {
+                    state.selectedSessionIds.remove(value)
+                } else {
+                    state.selectedSessionIds.insert(value)
+                }
+            case (.sessionId, .add(let value)):
+                state.selectedSessionIds.insert(value)
+            case (.sessionId, .remove(let value)):
+                state.selectedSessionIds.remove(value)
+            case (.sessionId, .selectAll):
+                state.selectedSessionIds = Set(state.availableSessions.map { $0.id })
+            case (.sessionId, .clear):
+                state.selectedSessionIds.removeAll()
             }
         }
 

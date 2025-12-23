@@ -414,35 +414,37 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
     ///
     /// - Parameter item: 搜索结果项
     public func addToFilter(_ item: SearchResultItem) {
-        switch item.field {
-        case .function:
-            send(.filter(.addFunction(item.value)))
-        case .fileName:
-            send(.filter(.addFileName(item.value)))
-        case .context:
-            send(.filter(.addContext(item.value)))
-        case .thread:
-            send(.filter(.addThread(item.value)))
-        case .message:
-            send(.filter(.addMessageKeyword(item.value)))
-        }
+        let filterType = mapFieldToFilterType(item.field)
+        send(.filter(.updateFilter(filterType, .add(item.value))))
     }
 
     /// 从过滤器中移除搜索结果项
     ///
     /// - Parameter item: 搜索结果项
     public func removeFromFilter(_ item: SearchResultItem) {
-        switch item.field {
-        case .function:
-            send(.filter(.removeFunction(item.value)))
-        case .fileName:
-            send(.filter(.removeFileName(item.value)))
-        case .context:
-            send(.filter(.removeContext(item.value)))
-        case .thread:
-            send(.filter(.removeThread(item.value)))
-        case .message:
-            send(.filter(.removeMessageKeyword(item.value)))
+        let filterType = mapFieldToFilterType(item.field)
+        send(.filter(.updateFilter(filterType, .remove(item.value))))
+    }
+
+    /// 切换搜索结果项的过滤器状态
+    ///
+    /// - Parameter item: 搜索结果项
+    public func toggleFilter(_ item: SearchResultItem) {
+        let filterType = mapFieldToFilterType(item.field)
+        send(.filter(.updateFilter(filterType, .toggle(item.value))))
+    }
+
+    /// 映射搜索字段到过滤器类型
+    ///
+    /// - Parameter field: 搜索字段
+    /// - Returns: 过滤器类型
+    private func mapFieldToFilterType(_ field: SearchField) -> FilterFeature.FilterType {
+        switch field {
+        case .function: return .function
+        case .fileName: return .fileName
+        case .context: return .context
+        case .thread: return .thread
+        case .message: return .messageKeyword
         }
     }
 
