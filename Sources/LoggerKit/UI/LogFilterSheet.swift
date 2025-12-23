@@ -47,56 +47,41 @@ struct LogFilterSheet: View {
 
                         Divider()
 
-                        // 模块筛选（折叠式） - 临时使用 State,未来版本将重构
+                        // 模块筛选（折叠式）
                         if !viewStore.availableContexts.isEmpty {
-                            FilterSectionWrapper(
+                            CollapsibleFilterSection(
                                 title: String(localized: "search_field_context", bundle: .module),
                                 options: viewStore.availableContexts,
-                                selected: viewStore.selectedContexts,
-                                onAdd: { viewStore.send(.filter(.addContext($0))) },
-                                onRemove: { viewStore.send(.filter(.removeContext($0))) },
-                                onSelectAll: {
-                                    viewStore.availableContexts.forEach { viewStore.send(.filter(.addContext($0))) }
-                                },
-                                onClear: {
-                                    viewStore.selectedContexts.forEach { viewStore.send(.filter(.removeContext($0))) }
-                                }
+                                selectedOptions: viewStore.selectedContexts,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.context, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.context, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.context, .clear))) }
                             )
                             Divider()
                         }
 
                         // 文件筛选（折叠式）
                         if !viewStore.availableFileNames.isEmpty {
-                            FilterSectionWrapper(
+                            CollapsibleFilterSection(
                                 title: String(localized: "search_field_file", bundle: .module),
                                 options: viewStore.availableFileNames,
-                                selected: viewStore.selectedFileNames,
-                                onAdd: { viewStore.send(.filter(.addFileName($0))) },
-                                onRemove: { viewStore.send(.filter(.removeFileName($0))) },
-                                onSelectAll: {
-                                    viewStore.availableFileNames.forEach { viewStore.send(.filter(.addFileName($0))) }
-                                },
-                                onClear: {
-                                    viewStore.selectedFileNames.forEach { viewStore.send(.filter(.removeFileName($0))) }
-                                }
+                                selectedOptions: viewStore.selectedFileNames,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.fileName, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.fileName, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.fileName, .clear))) }
                             )
                             Divider()
                         }
 
                         // 函数筛选（折叠式）
                         if !viewStore.availableFunctions.isEmpty {
-                            FilterSectionWrapper(
+                            CollapsibleFilterSection(
                                 title: String(localized: "search_field_function", bundle: .module),
                                 options: viewStore.availableFunctions,
-                                selected: viewStore.selectedFunctions,
-                                onAdd: { viewStore.send(.filter(.addFunction($0))) },
-                                onRemove: { viewStore.send(.filter(.removeFunction($0))) },
-                                onSelectAll: {
-                                    viewStore.availableFunctions.forEach { viewStore.send(.filter(.addFunction($0))) }
-                                },
-                                onClear: {
-                                    viewStore.selectedFunctions.forEach { viewStore.send(.filter(.removeFunction($0))) }
-                                }
+                                selectedOptions: viewStore.selectedFunctions,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.function, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.function, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.function, .clear))) }
                             )
                             Divider()
                         }
@@ -107,18 +92,13 @@ struct LogFilterSheet: View {
 
                         // 线程筛选（折叠式）
                         if !viewStore.availableThreads.isEmpty {
-                            FilterSectionWrapper(
+                            CollapsibleFilterSection(
                                 title: String(localized: "search_field_thread", bundle: .module),
                                 options: viewStore.availableThreads,
-                                selected: viewStore.selectedThreads,
-                                onAdd: { viewStore.send(.filter(.addThread($0))) },
-                                onRemove: { viewStore.send(.filter(.removeThread($0))) },
-                                onSelectAll: {
-                                    viewStore.availableThreads.forEach { viewStore.send(.filter(.addThread($0))) }
-                                },
-                                onClear: {
-                                    viewStore.selectedThreads.forEach { viewStore.send(.filter(.removeThread($0))) }
-                                }
+                                selectedOptions: viewStore.selectedThreads,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.thread, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.thread, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.thread, .clear))) }
                             )
                         }
                     }

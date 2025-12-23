@@ -140,11 +140,36 @@ extension FilterFeature {
     }
 }
 
+// MARK: - Filter Types
+
+extension FilterFeature {
+    /// 过滤器类型
+    public enum FilterType: Equatable {
+        case function
+        case fileName
+        case context
+        case thread
+        case messageKeyword
+    }
+
+    /// 过滤器操作类型
+    public enum FilterOperation: Equatable {
+        case toggle(String)
+        case selectAll
+        case clear
+    }
+}
+
 // MARK: - Action
 
 extension FilterFeature {
     /// Filter Actions
     public enum Action: Equatable {
+        // MARK: - Generic Filter Action (通用化过滤操作)
+
+        /// 通用过滤器更新操作
+        case updateFilter(FilterType, FilterOperation)
+
         // MARK: - User Actions (命令型)
 
         /// Toggle log level filter
@@ -229,6 +254,8 @@ extension FilterFeature {
 
         public static func == (lhs: Action, rhs: Action) -> Bool {
             switch (lhs, rhs) {
+            case (.updateFilter(let lt, let lo), .updateFilter(let rt, let ro)):
+                return lt == rt && lo == ro
             case (.toggleLevel(let l), .toggleLevel(let r)):
                 return l == r
             case (.addFunction(let l), .addFunction(let r)),
@@ -288,6 +315,12 @@ extension FilterFeature {
 
         public func reduce(_ state: inout State, _ action: Action) -> Effect<Action> {
             switch action {
+            // MARK: - Generic Filter Update
+
+            case let .updateFilter(filterType, operation):
+                handleFilterUpdate(&state, filterType: filterType, operation: operation)
+                return .send(.filtersApplied)
+
             // MARK: - Toggle Filters
 
             case .toggleLevel(let level):
@@ -400,6 +433,72 @@ extension FilterFeature {
         }
 
         // MARK: - Private Handlers
+
+        /// 处理通用过滤器更新
+        private func handleFilterUpdate(_ state: inout State, filterType: FilterType, operation: FilterOperation) {
+            switch (filterType, operation) {
+            // MARK: - Function Filter
+            case (.function, .toggle(let value)):
+                if state.selectedFunctions.contains(value) {
+                    state.selectedFunctions.remove(value)
+                } else {
+                    state.selectedFunctions.insert(value)
+                }
+            case (.function, .selectAll):
+                state.selectedFunctions = Set(state.availableFunctions)
+            case (.function, .clear):
+                state.selectedFunctions.removeAll()
+
+            // MARK: - FileName Filter
+            case (.fileName, .toggle(let value)):
+                if state.selectedFileNames.contains(value) {
+                    state.selectedFileNames.remove(value)
+                } else {
+                    state.selectedFileNames.insert(value)
+                }
+            case (.fileName, .selectAll):
+                state.selectedFileNames = Set(state.availableFileNames)
+            case (.fileName, .clear):
+                state.selectedFileNames.removeAll()
+
+            // MARK: - Context Filter
+            case (.context, .toggle(let value)):
+                if state.selectedContexts.contains(value) {
+                    state.selectedContexts.remove(value)
+                } else {
+                    state.selectedContexts.insert(value)
+                }
+            case (.context, .selectAll):
+                state.selectedContexts = Set(state.availableContexts)
+            case (.context, .clear):
+                state.selectedContexts.removeAll()
+
+            // MARK: - Thread Filter
+            case (.thread, .toggle(let value)):
+                if state.selectedThreads.contains(value) {
+                    state.selectedThreads.remove(value)
+                } else {
+                    state.selectedThreads.insert(value)
+                }
+            case (.thread, .selectAll):
+                state.selectedThreads = Set(state.availableThreads)
+            case (.thread, .clear):
+                state.selectedThreads.removeAll()
+
+            // MARK: - MessageKeyword Filter
+            case (.messageKeyword, .toggle(let value)):
+                if state.selectedMessageKeywords.contains(value) {
+                    state.selectedMessageKeywords.remove(value)
+                } else {
+                    state.selectedMessageKeywords.insert(value)
+                }
+            case (.messageKeyword, .selectAll):
+                // MessageKeyword 没有 available 列表，暂不实现全选
+                break
+            case (.messageKeyword, .clear):
+                state.selectedMessageKeywords.removeAll()
+            }
+        }
 
         private func handleLoadSessions(_ state: inout State) -> Effect<Action> {
             // 缓存机制: 避免重复加载
