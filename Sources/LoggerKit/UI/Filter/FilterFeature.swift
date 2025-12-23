@@ -46,6 +46,17 @@ extension FilterFeature {
         /// Selected session IDs
         public var selectedSessionIds: Set<String> = []
 
+        // MARK: - Session Management
+
+        /// Available sessions for filtering
+        public var availableSessions: [SessionInfo] = []
+
+        /// Loading state for sessions
+        public var isLoadingSessions: Bool = false
+
+        /// Error message for session loading failures
+        public var sessionLoadingError: String?
+
         // MARK: - Available Options (用于 UI 展示)
 
         /// Available functions (从 statistics 获取)
@@ -116,6 +127,9 @@ extension FilterFeature {
             lhs.selectedThreads == rhs.selectedThreads &&
             lhs.selectedMessageKeywords == rhs.selectedMessageKeywords &&
             lhs.selectedSessionIds == rhs.selectedSessionIds &&
+            lhs.availableSessions == rhs.availableSessions &&
+            lhs.isLoadingSessions == rhs.isLoadingSessions &&
+            lhs.sessionLoadingError == rhs.sessionLoadingError &&
             lhs.availableFunctions == rhs.availableFunctions &&
             lhs.availableFileNames == rhs.availableFileNames &&
             lhs.availableContexts == rhs.availableContexts &&
@@ -184,6 +198,17 @@ extension FilterFeature {
         /// Load available options (functions, file names, etc.)
         case loadAvailableOptions
 
+        // MARK: - Session Loading
+
+        /// Load available sessions from database
+        case loadSessions
+
+        /// Sessions loaded successfully
+        case sessionsLoaded([SessionInfo])
+
+        /// Loading sessions failed
+        case loadingSessionsFailed(String)
+
         // MARK: - System Feedback (事件型)
 
         /// Filters have been applied successfully (notifies parent to reload)
@@ -228,8 +253,13 @@ extension FilterFeature {
                  (.applyFilters, .applyFilters),
                  (.filtersApplied, .filtersApplied),
                  (.loadAvailableOptions, .loadAvailableOptions),
-                 (.clearSessionIds, .clearSessionIds):
+                 (.clearSessionIds, .clearSessionIds),
+                 (.loadSessions, .loadSessions):
                 return true
+            case (.sessionsLoaded(let l), .sessionsLoaded(let r)):
+                return l == r
+            case (.loadingSessionsFailed(let l), .loadingSessionsFailed(let r)):
+                return l == r
             case (.availableOptionsLoaded(let lf, let ln, let lc, let lt),
                   .availableOptionsLoaded(let rf, let rn, let rc, let rt)):
                 return lf == rf && ln == rn && lc == rc && lt == rt
@@ -350,10 +380,53 @@ extension FilterFeature {
                 state.isLoadingOptions = false
                 state.error = error
                 return .none
+
+            // MARK: - Load Sessions
+
+            case .loadSessions:
+                return handleLoadSessions(&state)
+
+            case .sessionsLoaded(let sessions):
+                state.isLoadingSessions = false
+                state.availableSessions = sessions
+                state.sessionLoadingError = nil
+                return .none
+
+            case .loadingSessionsFailed(let errorMessage):
+                state.isLoadingSessions = false
+                state.sessionLoadingError = errorMessage
+                return .none
             }
         }
 
         // MARK: - Private Handlers
+
+        private func handleLoadSessions(_ state: inout State) -> Effect<Action> {
+            // 缓存机制: 避免重复加载
+            guard state.availableSessions.isEmpty, !state.isLoadingSessions else {
+                print("⚠️ [FilterFeature] Sessions already loaded or loading, skipping...")
+                return .none
+            }
+
+            state.isLoadingSessions = true
+            state.sessionLoadingError = nil
+
+            return .task { [environment] in
+                do {
+                    print("🔵 [FilterFeature] Loading available sessions...")
+
+                    let sessions = try await environment.databaseManager.fetchAllSessions()
+
+                    print("🟢 [FilterFeature] Sessions loaded: \(sessions.count) sessions")
+
+                    return .sessionsLoaded(sessions)
+                } catch {
+                    let errorMessage = error.localizedDescription
+                    print("🔴 [FilterFeature] Failed to load sessions: \(errorMessage)")
+                    return .loadingSessionsFailed(errorMessage)
+                }
+            }
+        }
 
         private func handleLoadAvailableOptions(_ state: inout State) -> Effect<Action> {
             state.isLoadingOptions = true
@@ -394,30 +467,45 @@ extension FilterFeature {
         /// Data loader for fetching available filter options
         let dataLoader: LogDataLoaderProtocol
 
+        /// Database manager for fetching sessions
+        let databaseManager: LogDatabaseManagerProtocol
+
         // MARK: - Initialization
 
-        public init(dataLoader: LogDataLoaderProtocol) {
+        public init(
+            dataLoader: LogDataLoaderProtocol,
+            databaseManager: LogDatabaseManagerProtocol
+        ) {
             self.dataLoader = dataLoader
+            self.databaseManager = databaseManager
         }
 
         // MARK: - Live Environment
 
-        /// Create live environment with given dataLoader
-        /// - Parameter dataLoader: The data loader to use
+        /// Create live environment with given dataLoader and databaseManager
+        /// - Parameters:
+        ///   - dataLoader: The data loader to use
+        ///   - databaseManager: The database manager to use
         /// - Returns: Live environment
-        public static func live(dataLoader: LogDataLoaderProtocol) -> Environment {
+        public static func live(
+            dataLoader: LogDataLoaderProtocol,
+            databaseManager: LogDatabaseManagerProtocol
+        ) -> Environment {
             Environment(
-                dataLoader: dataLoader
+                dataLoader: dataLoader,
+                databaseManager: databaseManager
             )
         }
 
         // MARK: - Mock Environment (for testing)
 
         public static func mock(
-            dataLoader: LogDataLoaderProtocol
+            dataLoader: LogDataLoaderProtocol,
+            databaseManager: LogDatabaseManagerProtocol
         ) -> Environment {
             Environment(
-                dataLoader: dataLoader
+                dataLoader: dataLoader,
+                databaseManager: databaseManager
             )
         }
     }

@@ -234,6 +234,23 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
         state.filterFeature.selectedSessionIds
     }
 
+    // MARK: - 会话管理便捷访问器
+
+    /// 可用的会话列表
+    public var availableSessions: [SessionInfo] {
+        state.filterFeature.availableSessions
+    }
+
+    /// 会话加载状态
+    public var isLoadingSessions: Bool {
+        state.filterFeature.isLoadingSessions
+    }
+
+    /// 会话加载错误信息
+    public var sessionLoadingError: String? {
+        state.filterFeature.sessionLoadingError
+    }
+
     // MARK: - 搜索便捷访问器
 
     /// 搜索字段

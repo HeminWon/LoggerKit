@@ -257,14 +257,6 @@ struct LogFilterSheet: View {
 // MARK: - 会话筛选 Section
 struct SessionFilterSection: View {
     @ObservedObject var viewStore: LogDetailViewStore
-    @State private var sessions: [SessionInfo] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-
-    // 使用 ViewStore 初始化
-    init(viewStore: LogDetailViewStore) {
-        self.viewStore = viewStore
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -276,7 +268,7 @@ struct SessionFilterSection: View {
                     .font(.caption)
                     .foregroundColor(.blue)
                 Spacer()
-                // 有选中时显示清除按钮
+
                 if !viewStore.selectedSessionIds.isEmpty {
                     Button(String(localized: "clear_button", bundle: .module)) {
                         viewStore.send(.filter(.clearSessionIds))
@@ -286,27 +278,41 @@ struct SessionFilterSection: View {
                 }
             }
 
-            if isLoading {
+            // 使用 ViewStore 状态
+            if viewStore.isLoadingSessions {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding()
-            } else if let error = errorMessage {
-                Text(error)
+            } else if let errorMessage = viewStore.sessionLoadingError {
+                // 错误展示
+                VStack(spacing: 4) {
+                    Text(String(localized: "session_load_failed", bundle: .module))
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Text(errorMessage)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Button(String(localized: "retry_button", bundle: .module)) {
+                        viewStore.send(.filter(.loadSessions))
+                    }
                     .font(.caption)
-                    .foregroundColor(.red)
-            } else if sessions.isEmpty {
+                    .foregroundColor(.blue)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            } else if viewStore.availableSessions.isEmpty {
                 Text(String(localized: "session_empty_message", bundle: .module))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(sessions) { session in
+                        // 使用 ViewStore 中的会话列表
+                        ForEach(viewStore.availableSessions) { session in
                             SessionChip(
                                 session: session,
                                 isSelected: viewStore.selectedSessionIds.contains(session.id)
                             ) {
-                                // 切换会话筛选
                                 if viewStore.selectedSessionIds.contains(session.id) {
                                     viewStore.send(.filter(.removeSessionId(session.id)))
                                 } else {
@@ -319,31 +325,9 @@ struct SessionFilterSection: View {
             }
         }
         .task {
-            await loadSessions()
+            // 通过 Action 触发加载（缓存机制在 Reducer 中处理）
+            viewStore.send(.filter(.loadSessions))
         }
-    }
-
-    private func loadSessions() async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            guard let dbManager = LoggerEngine.shared.getDatabaseManager() else {
-                errorMessage = "Database manager not available"
-                isLoading = false
-                return
-            }
-
-            let loadedSessions = try await Task.detached {
-                try dbManager.fetchAllSessions()
-            }.value
-
-            sessions = loadedSessions
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
     }
 }
 

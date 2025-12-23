@@ -62,7 +62,8 @@ public struct LogDetailReducer: Reducer {
 
         // Initialize FilterFeature.Reducer with FilterFeature.Environment
         let filterFeatureEnvironment = FilterFeature.Environment.live(
-            dataLoader: environment.dataLoader
+            dataLoader: environment.dataLoader,
+            databaseManager: environment.databaseManager
         )
         self.filterFeatureReducer = FilterFeature.Reducer(environment: filterFeatureEnvironment)
 
@@ -258,6 +259,14 @@ public struct LogDetailReducer: Reducer {
         case .delete(let deleteAction):
             // Delegate to DeleteFeature.DeleteReducer
             let deleteEffect = deleteFeatureReducer.reduce(&state.deleteFeature, deleteAction)
+
+            // 监听删除成功事件，同步更新 FilterFeature 的会话列表
+            if case .singleSessionDeleted(.success(let sessionId)) = deleteAction {
+                // 同步更新 FilterFeature 的状态
+                state.filterFeature.availableSessions.removeAll { $0.id == sessionId }
+                state.filterFeature.selectedSessionIds.remove(sessionId)
+                print("🟢 [LogDetailReducer] Session \(sessionId) deleted, synced to FilterFeature")
+            }
 
             // Check if this is the deletionConfirmed event
             if case .deletionConfirmed = deleteAction {
