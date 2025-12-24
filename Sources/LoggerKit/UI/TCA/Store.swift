@@ -90,6 +90,8 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
             logAction(action)
         }
 
+        print("📨 [Store] 收到 action: \(String(describing: action).prefix(100))")
+
         // Create a copy of state for mutation
         var newState = state
 
@@ -99,7 +101,10 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
         // Update state (triggers @Observable -> SwiftUI updates)
         let hasChanged = state != newState
         if hasChanged {
+            print("📝 [Store] State 已变化，触发 SwiftUI 更新")
             state = newState
+        } else {
+            print("📝 [Store] State 未变化")
         }
 
         // Execute effects
@@ -116,12 +121,17 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
             return
 
         case .task(let asyncTask):
+            print("🎬 [Store] 执行 .task effect")
             // Execute task and send resulting action
             if let action = await asyncTask() {
+                print("🎬 [Store] .task 返回 action")
                 await send(action)
+            } else {
+                print("🎬 [Store] .task 返回 nil")
             }
 
         case .cancellable(let id, let asyncTask):
+            print("🎬 [Store] 执行 .cancellable effect - id: \(id)")
             // Cancel any existing task with this ID
             cancel(id: id)
 
@@ -129,9 +139,19 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
             runningTasks[id] = Task { [weak self] in
                 guard let self = self else { return }
 
+                print("🎬 [Store] .cancellable Task 开始执行 - id: \(id)")
                 // Execute task
-                if let action = try? await asyncTask() {
-                    await self.send(action)
+                do {
+                    if let action = try await asyncTask() {
+                        print("✅ [Store] .cancellable 成功返回 action - id: \(id)")
+                        await self.send(action)
+                    } else {
+                        print("⚠️ [Store] .cancellable 返回 nil - id: \(id)")
+                    }
+                } catch is CancellationError {
+                    print("🚫 [Store] .cancellable Task 被取消 - id: \(id)")
+                } catch {
+                    print("❌ [Store] .cancellable 抛出异常: \(error) - id: \(id)")
                 }
 
                 // Clean up task reference
@@ -141,6 +161,7 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
             }
 
         case .stream(let id, let streamBuilder):
+            print("🎬 [Store] 执行 .stream effect - id: \(id as Any)")
             // Cancel any existing task with this ID (if ID is provided)
             if let id = id {
                 cancel(id: id)
@@ -153,16 +174,20 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
             let task = Task { [weak self] in
                 guard let self = self else { return }
 
+                print("🎬 [Store] .stream Task 开始执行 - id: \(id as Any)")
                 // Iterate through all actions in the stream
                 for await action in stream {
+                    print("🎬 [Store] .stream 收到 action - id: \(id as Any)")
                     // Check for cancellation
                     guard !Task.isCancelled else {
+                        print("🎬 [Store] .stream Task 被取消 - id: \(id as Any)")
                         break
                     }
                     // Send each action
                     await self.send(action)
                 }
 
+                print("🎬 [Store] .stream 结束 - id: \(id as Any)")
                 // Clean up task reference
                 if let id = id {
                     await MainActor.run {
@@ -177,10 +202,12 @@ public final class Store<State: Equatable, Action>: ObservableObject, EffectExec
             }
 
         case .cancel(let id):
+            print("🎬 [Store] 执行 .cancel - id: \(id)")
             // Cancel the running effect with the specified ID
             cancel(id: id)
 
         case .multiple(let effects):
+            print("🎬 [Store] 执行 .multiple - 数量: \(effects.count)")
             // Execute all effects concurrently
             await withTaskGroup(of: Void.self) { group in
                 for effect in effects {

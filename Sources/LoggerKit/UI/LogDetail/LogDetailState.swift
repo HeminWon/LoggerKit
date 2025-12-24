@@ -254,7 +254,7 @@ public struct LogDetailState: Equatable {
 
     /// Whether search is active
     public var isSearchActive: Bool {
-        searchFeature.isSearchActive
+        !searchFeature.searchText.isEmpty && searchFeature.searchPhase != .idle
     }
 
     // MARK: - Helper Methods

@@ -593,4 +593,119 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
         return attributes[.size] as? Int64 ?? 0
     }
+
+    // MARK: - Deep Search Support
+
+    /// 排序顺序
+    public enum SessionSortOrder {
+        case timeAscending
+        case timeDescending
+    }
+
+    /// 获取指定的 sessions（按时间排序）
+    /// - Parameters:
+    ///   - context: 可选的 NSManagedObjectContext
+    ///   - sessionIds: 要获取的 session IDs（如果为空，返回所有）
+    ///   - sortOrder: 排序顺序
+    /// - Returns: SessionInfo 数组
+    public func getSessions(
+        in context: NSManagedObjectContext? = nil,
+        sessionIds: Set<String>,
+        sortOrder: SessionSortOrder = .timeDescending
+    ) throws -> [SessionInfo] {
+        let targetContext = context ?? coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        // 配置 GROUP BY 查询
+        fetchRequest.propertiesToGroupBy = ["sessionId"]
+        fetchRequest.returnsDistinctResults = true
+        fetchRequest.resultType = .dictionaryResultType
+
+        // Session 过滤
+        if !sessionIds.isEmpty {
+            fetchRequest.predicate = NSPredicate(format: "sessionId IN %@", Array(sessionIds))
+        }
+
+        // 添加 MAX(sessionStartTime) 表达式
+        let startTimeExpression = NSExpression(forFunction: "max:", arguments: [NSExpression(forKeyPath: "sessionStartTime")])
+        let startTimeDescription = NSExpressionDescription()
+        startTimeDescription.name = "sessionStartTime"
+        startTimeDescription.expression = startTimeExpression
+        startTimeDescription.expressionResultType = .doubleAttributeType
+
+        // 添加 COUNT 表达式
+        let countExpression = NSExpression(forFunction: "count:", arguments: [NSExpression(forKeyPath: "sessionId")])
+        let countDescription = NSExpressionDescription()
+        countDescription.name = "logCount"
+        countDescription.expression = countExpression
+        countDescription.expressionResultType = .integer64AttributeType
+
+        fetchRequest.propertiesToFetch = ["sessionId", startTimeDescription, countDescription]
+
+        // 排序
+        let ascending = sortOrder == .timeAscending
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "sessionStartTime", ascending: ascending)]
+
+        let results = try targetContext.fetch(fetchRequest) as! [NSDictionary]
+
+        return results.compactMap { dict -> SessionInfo? in
+            guard let sessionId = dict["sessionId"] as? String,
+                  let sessionStartTime = dict["sessionStartTime"] as? Double,
+                  let logCount = dict["logCount"] as? Int else {
+                return nil
+            }
+            return SessionInfo(id: sessionId, startTime: sessionStartTime, logCount: logCount)
+        }
+    }
+
+    /// 在数据库层搜索日志事件
+    /// - Parameters:
+    ///   - context: 可选的 NSManagedObjectContext
+    ///   - sessionIds: 要搜索的 session IDs
+    ///   - searchText: 搜索关键词
+    ///   - searchFields: 搜索字段（message, fileName, function, context, thread）
+    ///   - limit: 结果数量限制
+    /// - Returns: 匹配的 LogEvent 数组（按时间倒序）
+    public func searchEvents(
+        in context: NSManagedObjectContext? = nil,
+        sessionIds: Set<String>,
+        searchText: String,
+        searchFields: [String],
+        limit: Int
+    ) throws -> [LogEvent] {
+        let targetContext = context ?? coreDataStack.viewContext
+        let fetchRequest = LogEventEntity.fetchRequest()
+
+        var predicates: [NSPredicate] = []
+
+        // Session 过滤
+        if !sessionIds.isEmpty {
+            predicates.append(NSPredicate(format: "sessionId IN %@", Array(sessionIds)))
+        }
+
+        // 搜索字段过滤（OR 逻辑）
+        if !searchFields.isEmpty {
+            var searchPredicates: [NSPredicate] = []
+            for field in searchFields {
+                searchPredicates.append(NSPredicate(format: "%K CONTAINS[cd] %@", field, searchText))
+            }
+            let combinedSearchPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: searchPredicates)
+            predicates.append(combinedSearchPredicate)
+        }
+
+        // 组合所有谓词（AND 逻辑）
+        if !predicates.isEmpty {
+            fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        }
+
+        // 按时间倒序排序
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+
+        // 限制结果数量
+        fetchRequest.fetchLimit = limit
+
+        // 执行查询
+        let entities = try targetContext.fetch(fetchRequest)
+        return entities.map { $0.toLogEvent() }
+    }
 }

@@ -97,4 +97,22 @@ public protocol LogDatabaseManagerProtocol {
 
     /// 获取数据库文件大小
     func databaseSize() -> Int64
+
+    // MARK: - Deep Search Support
+
+    /// 获取指定的 sessions（按时间排序）
+    func getSessions(
+        in context: NSManagedObjectContext?,
+        sessionIds: Set<String>,
+        sortOrder: LogDatabaseManager.SessionSortOrder
+    ) throws -> [SessionInfo]
+
+    /// 在数据库层搜索日志事件
+    func searchEvents(
+        in context: NSManagedObjectContext?,
+        sessionIds: Set<String>,
+        searchText: String,
+        searchFields: [String],
+        limit: Int
+    ) throws -> [LogEvent]
 }

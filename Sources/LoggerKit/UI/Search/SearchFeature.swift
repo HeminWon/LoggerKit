@@ -25,7 +25,7 @@ public struct SearchFeature {
 
     // MARK: - State
 
-    /// Search State
+    /// Search State (Deep Log Search)
     public struct State: Equatable, Sendable {
         // MARK: - Search Input
 
@@ -35,31 +35,176 @@ public struct SearchFeature {
         /// Selected search fields (message, function, fileName, etc.)
         public var searchFields: Set<SearchField> = [.message]
 
-        // MARK: - Search Results (搜索建议)
+        // MARK: - Progressive Search State
 
-        /// Categorized search results (建议列表)
-        public var cachedSearchResults: CategorizedSearchResults = .init()
+        /// 当前搜索阶段
+        public var searchPhase: SearchPhase = .idle
 
-        // MARK: - Preview Data (用于内存搜索)
+        /// Preview 的缓存结果
+        public var previewResults: [LogEvent] = []
 
-        /// All events for search preview (limited to recent 10000)
-        public var allEventsForSearchPreview: [LogEvent] = []
+        /// Full Search 的完整结果（有序维护）
+        public var fullSearchResults: [LogEvent] = []
+
+        /// 搜索快照（搜索开始时创建，保证整个搜索过程的一致性）
+        public var searchSnapshot: SearchSnapshot? = nil
+
+        /// 搜索结果的最大限制
+        public var searchResultsLimit: Int = 5000
+
+        /// Preview 搜索的 session 数量（固定为 3，无论用户选了多少）
+        public let previewSessionCount: Int = 3
+
+        // MARK: - Filter State Sync (通过 Action 同步，不直接访问外部)
+
+        /// 当前选中的 session IDs（从 FilterFeature 同步）
+        public var selectedSessionIds: Set<String> = []
+
+        /// 所有可用的 session IDs（从外部同步）
+        public var allAvailableSessionIds: Set<String> = []
+
+        // MARK: - Timing
+
+        /// Typing 防抖延迟（毫秒）
+        public let typingDebounceDelay: Int = 300
+
+        // MARK: - New Result Tracking
+
+        /// 新结果的 IDs（用于 UI 高亮，通过 Effect 定时清除）
+        public var newResultIds: Set<String> = []
 
         // MARK: - Computed Properties
 
-        /// Whether search is active (has text)
-        public var isSearchActive: Bool {
-            !searchText.isEmpty
+        /// 所有搜索结果（供 UI 展示）
+        public var allSearchResults: [LogEvent] {
+            let result: [LogEvent]
+            switch searchPhase {
+            case .idle, .typing:
+                result = []
+
+            case .previewSearching, .previewCompleted:
+                result = previewResults
+
+            case .fullSearching, .completed:
+                // 合并 preview 和 full search 结果
+                result = mergeOrderedResults(previewResults, fullSearchResults)
+
+            case .failed, .tooManyResults, .cancelled:
+                result = []
+            }
+            print("🖼️ [State.allSearchResults] 被访问 - searchPhase: \(searchPhase), 返回数量: \(result.count)")
+            return result
         }
 
-        /// Total results count
-        public var totalResultsCount: Int {
-            cachedSearchResults.totalCount
+        /// 搜索进度百分比 (0.0 - 1.0)
+        public var searchProgress: Double {
+            guard case .fullSearching(let currentIndex, let total, _, _) = searchPhase else {
+                return 0.0
+            }
+            return total > 0 ? Double(currentIndex + 1) / Double(total) : 0.0
         }
 
-        /// Whether search can be executed (has text, fields, and data)
-        public var canExecuteSearch: Bool {
-            !searchText.isEmpty && !searchFields.isEmpty && !allEventsForSearchPreview.isEmpty
+        /// 是否正在搜索
+        public var isSearching: Bool {
+            switch searchPhase {
+            case .typing, .previewSearching, .fullSearching:
+                return true
+            default:
+                return false
+            }
+        }
+
+        /// 是否正在完整搜索
+        public var isFullSearching: Bool {
+            if case .fullSearching = searchPhase {
+                return true
+            }
+            return false
+        }
+
+        /// 分类搜索结果（用于向后兼容旧 UI）
+        public var categorizedResults: CategorizedSearchResults {
+            print("🖼️ [categorizedResults] 被访问")
+            print("   - searchText: '\(searchText)'")
+            print("   - searchPhase: \(searchPhase)")
+            print("   - previewResults.count: \(previewResults.count)")
+            print("   - allSearchResults.count: \(allSearchResults.count)")
+
+            // 如果没有搜索文本或者搜索为空，返回空结果
+            guard !searchText.isEmpty, !allSearchResults.isEmpty else {
+                print("   → 返回空结果（searchText 为空或 allSearchResults 为空）")
+                return CategorizedSearchResults()
+            }
+
+            // 按搜索字段分组统计
+            var functionItems: [SearchResultItem] = []
+            var fileNameItems: [SearchResultItem] = []
+            var contextItems: [SearchResultItem] = []
+            var threadItems: [SearchResultItem] = []
+            var messageItems: [SearchResultItem] = []
+
+            let searchTextLowercased = searchText.lowercased()
+
+            // 统计每个字段的匹配项
+            var functionCounts: [String: Int] = [:]
+            var fileNameCounts: [String: Int] = [:]
+            var contextCounts: [String: Int] = [:]
+            var threadCounts: [String: Int] = [:]
+            var messageCount: Int = 0
+
+            for event in allSearchResults {
+                if searchFields.contains(.function) && event.function.lowercased().contains(searchTextLowercased) {
+                    functionCounts[event.function, default: 0] += 1
+                }
+                if searchFields.contains(.fileName) && event.fileName.lowercased().contains(searchTextLowercased) {
+                    fileNameCounts[event.fileName, default: 0] += 1
+                }
+                if searchFields.contains(.context) && event.context.lowercased().contains(searchTextLowercased) {
+                    contextCounts[event.context, default: 0] += 1
+                }
+                if searchFields.contains(.thread) && event.thread.lowercased().contains(searchTextLowercased) {
+                    threadCounts[event.thread, default: 0] += 1
+                }
+                if searchFields.contains(.message) && event.message.lowercased().contains(searchTextLowercased) {
+                    messageCount += 1
+                }
+            }
+
+            // 构建 SearchResultItem 数组
+            functionItems = functionCounts.map { SearchResultItem(field: .function, value: $0.key, matchCount: $0.value) }
+                .sorted(by: { $0.matchCount > $1.matchCount })
+            fileNameItems = fileNameCounts.map { SearchResultItem(field: .fileName, value: $0.key, matchCount: $0.value) }
+                .sorted(by: { $0.matchCount > $1.matchCount })
+            contextItems = contextCounts.map { SearchResultItem(field: .context, value: $0.key, matchCount: $0.value) }
+                .sorted(by: { $0.matchCount > $1.matchCount })
+            threadItems = threadCounts.map { SearchResultItem(field: .thread, value: $0.key, matchCount: $0.value) }
+                .sorted(by: { $0.matchCount > $1.matchCount })
+
+            // 消息匹配只显示一个示例
+            if messageCount > 0 {
+                if let firstMatch = allSearchResults.first(where: {
+                    searchFields.contains(.message) && $0.message.lowercased().contains(searchTextLowercased)
+                }) {
+                    messageItems = [SearchResultItem(field: .message, value: firstMatch.message, matchCount: messageCount)]
+                }
+            }
+
+            var result = CategorizedSearchResults()
+            result.function = functionItems
+            result.fileName = fileNameItems
+            result.context = contextItems
+            result.thread = threadItems
+            result.message = messageItems
+
+            print("   → 返回分类结果:")
+            print("      - function: \(functionItems.count)")
+            print("      - fileName: \(fileNameItems.count)")
+            print("      - context: \(contextItems.count)")
+            print("      - thread: \(threadItems.count)")
+            print("      - message: \(messageItems.count)")
+            print("      - totalCount: \(result.totalCount)")
+
+            return result
         }
 
         // MARK: - Initializer
@@ -68,25 +213,58 @@ public struct SearchFeature {
 
         // MARK: - State Mutations
 
-        /// Clear search results
-        public mutating func clearResults() {
-            cachedSearchResults = .init()
+        /// 清空搜索结果
+        public mutating func clearSearchResults() {
+            previewResults = []
+            fullSearchResults = []
+            searchSnapshot = nil
+            newResultIds = []
+        }
+
+        // MARK: - Private Helpers
+
+        /// 合并两个有序数组（按时间倒序）
+        private func mergeOrderedResults(
+            _ preview: [LogEvent],
+            _ full: [LogEvent]
+        ) -> [LogEvent] {
+            var result: [LogEvent] = []
+            var i = 0, j = 0
+
+            while i < preview.count && j < full.count {
+                if preview[i].timestamp > full[j].timestamp {
+                    result.append(preview[i])
+                    i += 1
+                } else {
+                    result.append(full[j])
+                    j += 1
+                }
+            }
+
+            result.append(contentsOf: preview[i...])
+            result.append(contentsOf: full[j...])
+
+            return result
         }
 
         // MARK: - Equatable
 
-        /// Custom Equatable implementation (比较 count 而不是内容)
+        /// Custom Equatable implementation
         public static func == (lhs: State, rhs: State) -> Bool {
             lhs.searchText == rhs.searchText &&
             lhs.searchFields == rhs.searchFields &&
-            lhs.cachedSearchResults == rhs.cachedSearchResults &&
-            lhs.allEventsForSearchPreview.count == rhs.allEventsForSearchPreview.count
+            lhs.searchPhase == rhs.searchPhase &&
+            lhs.previewResults.count == rhs.previewResults.count &&
+            lhs.fullSearchResults.count == rhs.fullSearchResults.count &&
+            lhs.selectedSessionIds == rhs.selectedSessionIds &&
+            lhs.allAvailableSessionIds == rhs.allAvailableSessionIds &&
+            lhs.newResultIds == rhs.newResultIds
         }
     }
 
     // MARK: - Action
 
-    /// Search Actions
+    /// Search Actions (Deep Log Search)
     public enum Action: Equatable {
         // MARK: - User Actions
 
@@ -96,31 +274,104 @@ public struct SearchFeature {
         /// Toggle search field
         case toggleSearchField(SearchField)
 
-        /// Execute search (在内存中搜索)
-        case executeSearch
+        /// User requested full search (点击"搜索更多"按钮)
+        case userRequestedFullSearch
 
-        /// All events for search preview loaded
-        case allEventsLoaded([LogEvent])
+        // MARK: - Filter State Sync
 
-        // MARK: - System Feedback
+        /// Sync filter state (FilterFeature 状态变化时触发)
+        case syncFilterState(selectedSessionIds: Set<String>, allAvailableSessionIds: Set<String>)
 
-        /// Search completed with results
-        case searchCompleted(CategorizedSearchResults)
+        // MARK: - Progressive Search Actions
+
+        /// Start preview search (typing 防抖完成后触发)
+        case startPreviewSearch
+
+        /// Preview search completed
+        case previewSearchCompleted(
+            snapshot: SearchSnapshot,
+            matches: [LogEvent],
+            searchedSessions: Int,
+            hasMoreSessions: Bool
+        )
+
+        /// Preview search failed
+        case previewSearchFailed(Error)
+
+        /// Update full search progress
+        case updateFullSearchProgress(
+            currentSessionIndex: Int,
+            totalSessions: Int,
+            matchCount: Int,
+            scannedEvents: Int
+        )
+
+        /// Full search batch completed (每个 session 完成时)
+        case fullSearchBatchCompleted(
+            newMatches: [LogEvent],
+            currentSessionIndex: Int,
+            totalSessions: Int
+        )
+
+        /// Full search completed
+        case fullSearchCompleted(searchedSessions: Int)
+
+        /// Full search failed
+        case fullSearchFailed(Error)
+
+        /// Full search cancelled
+        case fullSearchCancelled
+
+        /// Search results exceeded
+        case searchResultsExceeded(currentCount: Int, stage: SearchStage)
+
+        /// Cancel all searches
+        case cancelAllSearches
+
+        /// Clear new result badges (定时触发)
+        case clearNewResultBadges(Set<String>)
+
+        // MARK: - Helper Enum
+
+        public enum SearchStage: Equatable {
+            case preview
+            case fullSearch
+        }
 
         // MARK: - Equatable
 
-        /// Custom Equatable implementation (比较 LogEvent count 而不是内容)
+        /// Custom Equatable implementation
         public static func == (lhs: Action, rhs: Action) -> Bool {
             switch (lhs, rhs) {
             case (.updateSearchText(let l), .updateSearchText(let r)):
                 return l == r
             case (.toggleSearchField(let l), .toggleSearchField(let r)):
                 return l == r
-            case (.executeSearch, .executeSearch):
+            case (.userRequestedFullSearch, .userRequestedFullSearch):
                 return true
-            case (.allEventsLoaded(let l), .allEventsLoaded(let r)):
-                return l.count == r.count
-            case (.searchCompleted(let l), .searchCompleted(let r)):
+            case (.syncFilterState(let l1, let l2), .syncFilterState(let r1, let r2)):
+                return l1 == r1 && l2 == r2
+            case (.startPreviewSearch, .startPreviewSearch):
+                return true
+            case (.previewSearchCompleted(let l0, let l1, let l2, let l3), .previewSearchCompleted(let r0, let r1, let r2, let r3)):
+                return l0 == r0 && l1.count == r1.count && l2 == r2 && l3 == r3
+            case (.previewSearchFailed, .previewSearchFailed):
+                return true
+            case (.updateFullSearchProgress(let l1, let l2, let l3, let l4), .updateFullSearchProgress(let r1, let r2, let r3, let r4)):
+                return l1 == r1 && l2 == r2 && l3 == r3 && l4 == r4
+            case (.fullSearchBatchCompleted(let l1, let l2, let l3), .fullSearchBatchCompleted(let r1, let r2, let r3)):
+                return l1.count == r1.count && l2 == r2 && l3 == r3
+            case (.fullSearchCompleted(let l), .fullSearchCompleted(let r)):
+                return l == r
+            case (.fullSearchFailed, .fullSearchFailed):
+                return true
+            case (.fullSearchCancelled, .fullSearchCancelled):
+                return true
+            case (.searchResultsExceeded(let l1, let l2), .searchResultsExceeded(let r1, let r2)):
+                return l1 == r1 && l2 == r2
+            case (.cancelAllSearches, .cancelAllSearches):
+                return true
+            case (.clearNewResultBadges(let l), .clearNewResultBadges(let r)):
                 return l == r
             default:
                 return false
@@ -130,37 +381,74 @@ public struct SearchFeature {
 
     // MARK: - Reducer
 
-    /// Search Reducer (在内存中搜索，返回建议)
+    /// Search Reducer (Deep Log Search - Database-based)
     public struct Reducer: ReducerProtocol {
         public typealias State = SearchFeature.State
         public typealias Action = SearchFeature.Action
 
-        public init() {}
+        // 注入 DataLoader 依赖
+        let dataLoader: LogDataLoaderProtocol
+
+        public init(dataLoader: LogDataLoaderProtocol) {
+            self.dataLoader = dataLoader
+        }
+
+        // Cancellation IDs
+        private enum CancellationId: Hashable {
+            case typingDebounce
+            case previewSearch
+            case fullSearch
+            case newResultBadgeTimer
+        }
 
         public func reduce(_ state: inout State, _ action: Action) -> Effect<Action> {
             switch action {
-            // MARK: - Update Search Input
+            // MARK: - User Actions
 
             case .updateSearchText(let text):
-                state.searchText = text
+                let oldText = state.searchText
+                print("🔍 [SearchFeature] updateSearchText: '\(oldText)' -> '\(text)' (相同: \(oldText == text))")
 
-                // Clear results if text is empty
-                if text.isEmpty {
-                    state.clearResults()
+                // 如果文本没有变化，直接返回
+                guard text != oldText else {
+                    print("⚠️ [SearchFeature] 文本未变化，忽略此次更新")
                     return .none
                 }
 
-                // Trigger search if we have preview data
-                print("🔵 [SearchFeature] updateSearchText: '\(text)', dataReady=\(!state.allEventsForSearchPreview.isEmpty), count=\(state.allEventsForSearchPreview.count)")
-                if !state.allEventsForSearchPreview.isEmpty {
-                    return .send(.executeSearch)
+                state.searchText = text
+
+                if text.isEmpty {
+                    print("🔍 [SearchFeature] 搜索文本为空，清空搜索")
+                    // 清空搜索
+                    state.searchPhase = .idle
+                    state.clearSearchResults()
+                    return .merge(
+                        .cancel(id: CancellationId.previewSearch),
+                        .cancel(id: CancellationId.fullSearch),
+                        .cancel(id: CancellationId.newResultBadgeTimer)
+                    )
                 }
 
-                return .none
+                // 清空旧的搜索结果
+                if state.searchPhase != .idle {
+                    state.clearSearchResults()
+                }
+
+                // 直接开始搜索（UI 层已经做了防抖）
+                print("🔍 [SearchFeature] 立即开始 preview search（UI 层已防抖）")
+                state.searchPhase = .previewSearching(sessionCount: state.previewSessionCount)
+
+                // 取消不相关的搜索任务
+                // 注意：不需要 cancel previewSearch，因为 handlePreviewSearch 内部的 .stream 会自动处理
+                return .merge(
+                    .cancel(id: CancellationId.fullSearch),
+                    .cancel(id: CancellationId.newResultBadgeTimer),
+                    handlePreviewSearch(state: state)
+                )
 
             case .toggleSearchField(let field):
                 if state.searchFields.contains(field) {
-                    // Keep at least one field
+                    // 至少保留一个字段
                     if state.searchFields.count > 1 {
                         state.searchFields.remove(field)
                     }
@@ -168,136 +456,403 @@ public struct SearchFeature {
                     state.searchFields.insert(field)
                 }
 
-                // Re-execute search if active
-                if !state.searchText.isEmpty && !state.allEventsForSearchPreview.isEmpty {
-                    return .send(.executeSearch)
-                }
-
-                return .none
-
-            // MARK: - Execute Search (在内存中搜索)
-
-            case .executeSearch:
-                return handleExecuteSearch(state: state)
-
-            case .searchCompleted(let results):
-                state.cachedSearchResults = results
-                return .none
-
-            case .allEventsLoaded(let events):
-                state.allEventsForSearchPreview = events
-                print("🟢 [SearchFeature] allEventsLoaded: \(events.count) events, currentSearchText='\(state.searchText)'")
-                // Trigger search if we have search text
+                // 重新执行搜索（如果正在搜索）
                 if !state.searchText.isEmpty {
-                    print("🔵 [SearchFeature] Auto-triggering search after data load")
-                    return .send(.executeSearch)
+                    switch state.searchPhase {
+                    case .previewCompleted, .completed:
+                        // 清空旧结果
+                        state.clearSearchResults()
+                        // 重新触发 Preview
+                        return .send(.startPreviewSearch)
+
+                    case .previewSearching, .fullSearching:
+                        // 正在搜索中，取消并重新开始
+                        return .merge(
+                            .task { .cancelAllSearches },
+                            .task {
+                                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                                return .startPreviewSearch
+                            }
+                        )
+
+                    default:
+                        return .none
+                    }
                 }
+
+                return .none
+
+            case .userRequestedFullSearch:
+                print("🔍 [SearchFeature] userRequestedFullSearch 触发")
+                guard let snapshot = state.searchSnapshot else {
+                    print("⚠️ [SearchFeature] searchSnapshot 为 nil，无法执行 full search")
+                    return .none
+                }
+
+                guard !snapshot.fullSearchSessions.isEmpty else {
+                    print("⚠️ [SearchFeature] 没有更多 session 需要搜索")
+                    // 没有更多 session 需要搜索
+                    return .none
+                }
+
+                print("🔍 [SearchFeature] 开始 full search - 需要搜索 \(snapshot.fullSearchSessions.count) 个 sessions")
+                state.searchPhase = .fullSearching(
+                    currentSessionIndex: 0,
+                    totalSessions: snapshot.fullSearchSessions.count,
+                    matchCount: state.previewResults.count,
+                    scannedEvents: 0
+                )
+
+                return handleFullSearch(state: state, snapshot: snapshot)
+
+            // MARK: - Filter State Sync
+
+            case .syncFilterState(let selectedIds, let allIds):
+                print("🔍 [SearchFeature] syncFilterState - selected: \(selectedIds.count), all: \(allIds.count)")
+                state.selectedSessionIds = selectedIds
+                state.allAvailableSessionIds = allIds
+
+                // 如果正在搜索，且 filter 发生了重大变化，取消当前搜索
+                if state.isSearching {
+                    let snapshotIds = state.searchSnapshot?.selectedSessionIds ?? []
+                    if snapshotIds != selectedIds {
+                        print("⚠️ [SearchFeature] Filter 发生变化，取消当前搜索")
+                        return .send(.cancelAllSearches)
+                    }
+                }
+
+                return .none
+
+            // MARK: - Preview Search
+
+            case .startPreviewSearch:
+                print("🔍 [SearchFeature] startPreviewSearch 触发")
+                guard !state.searchText.isEmpty else {
+                    print("⚠️ [SearchFeature] 搜索文本为空，忽略 startPreviewSearch")
+                    return .none
+                }
+
+                print("🔍 [SearchFeature] 进入 previewSearching 状态，预览 session 数: \(state.previewSessionCount)")
+                state.searchPhase = .previewSearching(sessionCount: state.previewSessionCount)
+
+                return handlePreviewSearch(state: state)
+
+            case .previewSearchCompleted(let snapshot, let matches, let sessions, let hasMore):
+                print("✅ [SearchFeature] previewSearchCompleted - 匹配数: \(matches.count), 已搜索 sessions: \(sessions), 还有更多: \(hasMore)")
+                print("🔍 [SearchFeature] Snapshot - preview sessions: \(snapshot.previewSessions.count), full search sessions: \(snapshot.fullSearchSessions.count)")
+                print("🔍 [SearchFeature] 当前 searchText: '\(state.searchText)'")
+                print("🔍 [SearchFeature] Snapshot searchText: '\(snapshot.searchText)'")
+                print("🔍 [SearchFeature] matches 详情: \(matches.map { "\($0.message.prefix(50))..." })")
+
+                state.searchSnapshot = snapshot
+                state.previewResults = matches
+                let newPhase: SearchPhase = .previewCompleted(
+                    matchCount: matches.count,
+                    searchedSessions: sessions,
+                    hasMoreSessions: hasMore
+                )
+                print("🔍 [SearchFeature] 更新 searchPhase: \(state.searchPhase) -> \(newPhase)")
+                state.searchPhase = newPhase
+                print("✅ [SearchFeature] State 更新完成:")
+                print("   - previewResults.count: \(state.previewResults.count)")
+                print("   - searchPhase: \(state.searchPhase)")
+                print("   - searchText: '\(state.searchText)'")
+                print("   - allSearchResults.count: \(state.allSearchResults.count)")
+
+                // 测试：手动调用 categorizedResults 看看会发生什么
+                let testResults = state.categorizedResults
+                print("🧪 [测试] categorizedResults.totalCount: \(testResults.totalCount)")
+
+                return .none
+
+            case .previewSearchFailed(let error):
+                print("❌ [SearchFeature] previewSearchFailed - 错误: \(error.localizedDescription)")
+                state.searchPhase = .failed(message: error.localizedDescription)
+                state.searchSnapshot = nil
+                return .none
+
+            // MARK: - Full Search
+
+            case .updateFullSearchProgress(let index, let total, let matches, let scanned):
+                state.searchPhase = .fullSearching(
+                    currentSessionIndex: index,
+                    totalSessions: total,
+                    matchCount: matches,
+                    scannedEvents: scanned
+                )
+                return .none
+
+            case .fullSearchBatchCompleted(let newMatches, let index, let total):
+                // 按时间倒序插入
+                state.fullSearchResults = insertOrderedMatches(
+                    existing: state.fullSearchResults,
+                    new: newMatches
+                )
+
+                // 标记新结果
+                let newIds = Set(newMatches.map { $0.id.uuidString })
+                state.newResultIds.formUnion(newIds)
+
+                // 更新进度
+                let totalMatches = state.previewResults.count + state.fullSearchResults.count
+
+                // 检查是否超过限制
+                if totalMatches > state.searchResultsLimit {
+                    return .merge(
+                        .send(.searchResultsExceeded(currentCount: totalMatches, stage: .fullSearch)),
+                        .cancel(id: CancellationId.fullSearch)
+                    )
+                }
+
+                state.searchPhase = .fullSearching(
+                    currentSessionIndex: index,
+                    totalSessions: total,
+                    matchCount: totalMatches,
+                    scannedEvents: state.fullSearchResults.count
+                )
+
+                // 使用 Effect 定时清除新标记
+                return .task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3秒
+                    return .clearNewResultBadges(newIds)
+                }
+
+            case .fullSearchCompleted(let sessions):
+                let totalMatches = state.previewResults.count + state.fullSearchResults.count
+                state.searchPhase = .completed(
+                    totalMatches: totalMatches,
+                    searchedSessions: (state.searchSnapshot?.previewSessions.count ?? 0) + sessions
+                )
+                return .none
+
+            case .fullSearchFailed(let error):
+                state.searchPhase = .failed(message: error.localizedDescription)
+                state.searchSnapshot = nil
+                return .none
+
+            case .fullSearchCancelled:
+                state.searchPhase = .cancelled
+                state.searchSnapshot = nil
+                return .none
+
+            case .searchResultsExceeded(let count, _):
+                state.searchPhase = .tooManyResults(currentCount: count, limit: state.searchResultsLimit)
+                state.clearSearchResults()
+                return .cancel(id: CancellationId.fullSearch)
+
+            case .cancelAllSearches:
+                state.searchPhase = .cancelled
+                state.searchSnapshot = nil
+                return .merge(
+                    .cancel(id: CancellationId.typingDebounce),
+                    .cancel(id: CancellationId.previewSearch),
+                    .cancel(id: CancellationId.fullSearch),
+                    .cancel(id: CancellationId.newResultBadgeTimer)
+                )
+
+            case .clearNewResultBadges(let ids):
+                state.newResultIds.subtract(ids)
                 return .none
             }
         }
 
         // MARK: - Private Handlers
 
-        private func handleExecuteSearch(state: State) -> Effect<Action> {
-            guard state.canExecuteSearch else {
-                return .task { .searchCompleted(.init()) }
-            }
-
+        private func handlePreviewSearch(state: State) -> Effect<Action> {
             let searchText = state.searchText
             let searchFields = state.searchFields
-            let allEvents = state.allEventsForSearchPreview
+            let selectedSessionIds = state.selectedSessionIds
+            let allAvailableSessionIds = state.allAvailableSessionIds
+            let previewSessionCount = state.previewSessionCount
+            let resultsLimit = state.searchResultsLimit
 
-            return .task {
-                let results = await performSearch(
-                    searchText: searchText,
-                    searchFields: searchFields,
-                    events: allEvents
-                )
-                return .searchCompleted(results)
-            }
-        }
+            print("🔍 [SearchFeature] handlePreviewSearch 开始")
+            print("🔍 [SearchFeature] - searchText: '\(searchText)'")
+            print("🔍 [SearchFeature] - searchFields: \(searchFields)")
+            print("🔍 [SearchFeature] - selectedSessionIds: \(selectedSessionIds.count) 个")
+            print("🔍 [SearchFeature] - allAvailableSessionIds: \(allAvailableSessionIds.count) 个")
+            print("🔍 [SearchFeature] - previewSessionCount: \(previewSessionCount)")
+            print("🔍 [SearchFeature] - resultsLimit: \(resultsLimit)")
 
-        /// Perform in-memory search (返回搜索建议)
-        private func performSearch(
-            searchText: String,
-            searchFields: Set<SearchField>,
-            events: [LogEvent]
-        ) async -> CategorizedSearchResults {
-            var results = CategorizedSearchResults()
-            let lowercasedSearch = searchText.lowercased()
-
-            print("🔎 [SearchFeature] Searching: '\(searchText)' in \(events.count) events, fields: \(searchFields)")
-
-            // Sets for deduplication
-            var messageSet = Set<String>()
-            var fileNameSet = Set<String>()
-            var functionSet = Set<String>()
-            var contextSet = Set<String>()
-            var threadSet = Set<String>()
-
-            // Single pass to collect all matches
-            for event in events {
-                // Message matches (limit to first 5 unique messages)
-                if searchFields.contains(.message) && results.message.count < 5 {
-                    if event.message.lowercased().contains(lowercasedSearch) {
-                        if !messageSet.contains(event.message) {
-                            messageSet.insert(event.message)
-                            results.message.append(
-                                SearchResultItem(field: .message, value: event.message, matchCount: 1)
+            return .stream(id: CancellationId.previewSearch) { [dataLoader = self.dataLoader] in
+                AsyncStream { continuation in
+                    Task { @MainActor in
+                        do {
+                            print("🔍 [SearchFeature] Task 开始执行 (MainActor)")
+                            // 1. 创建搜索快照
+                            print("🔍 [SearchFeature] 步骤 1: 创建搜索快照...")
+                            let snapshot = try await createSearchSnapshot(
+                                dataLoader: dataLoader,
+                                searchText: searchText,
+                                searchFields: searchFields,
+                                selectedSessionIds: selectedSessionIds,
+                                allAvailableSessionIds: allAvailableSessionIds,
+                                previewSessionCount: previewSessionCount
                             )
+                            print("✅ [SearchFeature] 快照创建完成 - preview sessions: \(snapshot.previewSessions.count), full search sessions: \(snapshot.fullSearchSessions.count)")
+
+                            // 2. 查询 Preview sessions 的所有日志
+                            print("🔍 [SearchFeature] 步骤 2: 查询 Preview sessions 的日志...")
+                            let previewSessionIds = Set(snapshot.previewSessions.map { $0.id })
+                            print("🔍 [SearchFeature] - 查询 session IDs: \(previewSessionIds)")
+                            let matches = try await dataLoader.searchEvents(
+                                sessionIds: previewSessionIds,
+                                searchText: searchText,
+                                searchFields: searchFields,
+                                limit: resultsLimit
+                            )
+                            print("✅ [SearchFeature] 查询完成 - 找到 \(matches.count) 条匹配")
+
+                            // 3. 检查结果数量
+                            if matches.count > resultsLimit {
+                                print("⚠️ [SearchFeature] 结果超过限制: \(matches.count) > \(resultsLimit)")
+                                continuation.yield(.searchResultsExceeded(currentCount: matches.count, stage: .preview))
+                                continuation.finish()
+                                return
+                            }
+
+                            // 4. 完成 Preview
+                            print("🔍 [SearchFeature] 步骤 4: 发送 previewSearchCompleted")
+                            continuation.yield(.previewSearchCompleted(
+                                snapshot: snapshot,
+                                matches: matches,
+                                searchedSessions: snapshot.previewSessions.count,
+                                hasMoreSessions: !snapshot.fullSearchSessions.isEmpty
+                            ))
+                            continuation.finish()
+                            print("✅ [SearchFeature] Preview Search 流程完成")
+
+                        } catch {
+                            print("❌ [SearchFeature] Preview Search 失败: \(error)")
+                            continuation.yield(.previewSearchFailed(error))
+                            continuation.finish()
                         }
                     }
                 }
+            }
+        }
 
-                // File name matches
-                if searchFields.contains(.fileName) {
-                    if event.fileName.lowercased().contains(lowercasedSearch) {
-                        fileNameSet.insert(event.fileName)
+        private func handleFullSearch(state: State, snapshot: SearchSnapshot) -> Effect<Action> {
+            let resultsLimit = state.searchResultsLimit
+            let alreadyFoundCount = state.previewResults.count
+
+            return .stream(id: CancellationId.fullSearch) { [dataLoader = self.dataLoader] in
+                AsyncStream { continuation in
+                    Task { @MainActor in
+                        do {
+                            let totalSessions = snapshot.fullSearchSessions.count
+
+                            // 逐个 session 搜索
+                            for (index, session) in snapshot.fullSearchSessions.enumerated() {
+                                // 检查取消
+                                try Task.checkCancellation()
+
+                                // 更新进度
+                                continuation.yield(.updateFullSearchProgress(
+                                    currentSessionIndex: index,
+                                    totalSessions: totalSessions,
+                                    matchCount: alreadyFoundCount,
+                                    scannedEvents: 0
+                                ))
+
+                                // 使用数据库搜索
+                                let sessionMatches = try await dataLoader.searchEvents(
+                                    sessionIds: [session.id],
+                                    searchText: snapshot.searchText,
+                                    searchFields: snapshot.searchFields,
+                                    limit: resultsLimit
+                                )
+
+                                // 每个 session 完成后立即更新
+                                continuation.yield(.fullSearchBatchCompleted(
+                                    newMatches: sessionMatches,
+                                    currentSessionIndex: index,
+                                    totalSessions: totalSessions
+                                ))
+                            }
+
+                            // 全部完成
+                            continuation.yield(.fullSearchCompleted(searchedSessions: totalSessions))
+                            continuation.finish()
+
+                        } catch is CancellationError {
+                            continuation.yield(.fullSearchCancelled)
+                            continuation.finish()
+                        } catch {
+                            continuation.yield(.fullSearchFailed(error))
+                            continuation.finish()
+                        }
                     }
                 }
+            }
+        }
 
-                // Function matches
-                if searchFields.contains(.function) {
-                    if event.function.lowercased().contains(lowercasedSearch) {
-                        functionSet.insert(event.function)
-                    }
-                }
+        // MARK: - Helper Methods
 
-                // Context matches
-                if searchFields.contains(.context) {
-                    if !event.context.isEmpty && event.context.lowercased().contains(lowercasedSearch) {
-                        contextSet.insert(event.context)
-                    }
-                }
+        /// 创建搜索快照
+        private func createSearchSnapshot(
+            dataLoader: LogDataLoaderProtocol,
+            searchText: String,
+            searchFields: Set<SearchField>,
+            selectedSessionIds: Set<String>,
+            allAvailableSessionIds: Set<String>,
+            previewSessionCount: Int
+        ) async throws -> SearchSnapshot {
+            print("🔍 [createSearchSnapshot] 开始创建快照")
+            print("🔍 [createSearchSnapshot] - selectedSessionIds: \(selectedSessionIds)")
+            print("🔍 [createSearchSnapshot] - allAvailableSessionIds: \(allAvailableSessionIds)")
 
-                // Thread matches
-                if searchFields.contains(.thread) {
-                    if !event.thread.isEmpty && event.thread.lowercased().contains(lowercasedSearch) {
-                        threadSet.insert(event.thread)
-                    }
-                }
+            // 确定搜索范围
+            let searchSessionIds: Set<String>
+            if selectedSessionIds.isEmpty || selectedSessionIds.count == allAvailableSessionIds.count {
+                // 未选或全选 → 搜索所有
+                searchSessionIds = allAvailableSessionIds
+                print("🔍 [createSearchSnapshot] 使用所有 sessions: \(searchSessionIds.count) 个")
+            } else {
+                // 选中特定 session → 只搜索这些
+                searchSessionIds = selectedSessionIds
+                print("🔍 [createSearchSnapshot] 使用选中的 sessions: \(searchSessionIds.count) 个")
             }
 
-            // Build results for other fields (sorted)
-            results.fileName = fileNameSet.sorted().map { fileName in
-                SearchResultItem(field: .fileName, value: fileName, matchCount: 1)
+            // 获取所有 sessions（按时间倒序）
+            print("🔍 [createSearchSnapshot] 调用 dataLoader.getSessions...")
+            let allSessions = try await dataLoader.getSessions(
+                sessionIds: searchSessionIds,
+                sortOrder: .timeDescending
+            )
+            print("✅ [createSearchSnapshot] 获取到 \(allSessions.count) 个 sessions")
+
+            // Preview 始终只取最新 N 个
+            let previewSessions = Array(allSessions.prefix(previewSessionCount))
+            let fullSearchSessions = Array(allSessions.dropFirst(previewSessionCount))
+
+            return SearchSnapshot(
+                searchText: searchText,
+                searchFields: searchFields,
+                selectedSessionIds: selectedSessionIds,
+                allAvailableSessionIds: allAvailableSessionIds,
+                allSessions: allSessions,
+                previewSessions: previewSessions,
+                fullSearchSessions: fullSearchSessions,
+                createdAt: Date()
+            )
+        }
+
+        /// 按时间倒序插入新结果
+        private func insertOrderedMatches(
+            existing: [LogEvent],
+            new: [LogEvent]
+        ) -> [LogEvent] {
+            let sorted = new.sorted { $0.timestamp > $1.timestamp }
+            var result = existing
+
+            for event in sorted {
+                // 二分插入
+                let index = result.firstIndex { $0.timestamp < event.timestamp } ?? result.count
+                result.insert(event, at: index)
             }
 
-            results.function = functionSet.sorted().map { function in
-                SearchResultItem(field: .function, value: function, matchCount: 1)
-            }
-
-            results.context = contextSet.sorted().map { context in
-                SearchResultItem(field: .context, value: context, matchCount: 1)
-            }
-
-            results.thread = threadSet.sorted().map { thread in
-                SearchResultItem(field: .thread, value: thread, matchCount: 1)
-            }
-
-            print("📊 [SearchFeature] Results: message=\(results.message.count), fileName=\(results.fileName.count), function=\(results.function.count), context=\(results.context.count), thread=\(results.thread.count)")
-
-            return results
+            return result
         }
     }
 }

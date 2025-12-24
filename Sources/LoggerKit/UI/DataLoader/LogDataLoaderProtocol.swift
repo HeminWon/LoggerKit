@@ -74,4 +74,30 @@ public protocol LogDataLoaderProtocol {
 
     /// 获取所有可用的线程名
     func getAvailableThreads() async throws -> [String]
+
+    // MARK: - Deep Search Support
+
+    /// 获取指定的 sessions（按时间排序）
+    /// - Parameters:
+    ///   - sessionIds: 要获取的 session IDs（如果为空，返回所有）
+    ///   - sortOrder: 排序顺序
+    /// - Returns: SessionInfo 数组
+    func getSessions(
+        sessionIds: Set<String>,
+        sortOrder: LogDatabaseManager.SessionSortOrder
+    ) async throws -> [SessionInfo]
+
+    /// 在数据库层搜索日志事件
+    /// - Parameters:
+    ///   - sessionIds: 要搜索的 session IDs
+    ///   - searchText: 搜索关键词
+    ///   - searchFields: 搜索字段
+    ///   - limit: 结果数量限制
+    /// - Returns: 匹配的 LogEvent 数组（按时间倒序）
+    func searchEvents(
+        sessionIds: Set<String>,
+        searchText: String,
+        searchFields: Set<SearchField>,
+        limit: Int
+    ) async throws -> [LogEvent]
 }

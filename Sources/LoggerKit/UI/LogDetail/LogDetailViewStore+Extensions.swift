@@ -63,7 +63,7 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
 
     /// 是否正在搜索
     public var isSearchActive: Bool {
-        state.searchFeature.isSearchActive
+        !state.searchFeature.searchText.isEmpty && state.searchFeature.searchPhase != .idle
     }
 
     /// 错误信息
@@ -260,7 +260,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
 
     /// 搜索结果
     public var searchResults: CategorizedSearchResults {
-        state.searchFeature.cachedSearchResults
+        // 使用新的深度搜索结果构建分类结果
+        state.searchFeature.categorizedResults
     }
 
     // MARK: - 便捷方法 (Action 封装)
@@ -369,7 +370,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
 
     /// 执行搜索
     public func executeSearch() {
-        send(.search(.executeSearch))
+        // 新的深度搜索通过 updateSearchText 自动触发
+        // 这里保持接口兼容性，实际不执行任何操作
     }
 
     /// 清除搜索（通过设置空文本实现）
@@ -379,7 +381,8 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
 
     /// 刷新搜索结果
     public func refreshSearch() {
-        send(.search(.executeSearch))
+        // 新的深度搜索通过 updateSearchText 自动触发
+        // 这里保持接口兼容性，实际不执行任何操作
     }
 
     /// 切换搜索字段

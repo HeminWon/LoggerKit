@@ -199,6 +199,32 @@ public final class MockLogDataLoader: LogDataLoaderProtocol {
         return ["main", "background"]
     }
 
+    // MARK: - Deep Search Support
+
+    public func getSessions(
+        sessionIds: Set<String>,
+        sortOrder: LogDatabaseManager.SessionSortOrder
+    ) async throws -> [SessionInfo] {
+        if shouldThrowError {
+            throw MockError.loadFailed
+        }
+        // Return empty array for mock
+        return []
+    }
+
+    public func searchEvents(
+        sessionIds: Set<String>,
+        searchText: String,
+        searchFields: Set<SearchField>,
+        limit: Int
+    ) async throws -> [LogEvent] {
+        if shouldThrowError {
+            throw MockError.loadFailed
+        }
+        // Simple mock implementation: filter mockEvents by searchText in message
+        return mockEvents.filter { $0.message.contains(searchText) }
+    }
+
     enum MockError: Error {
         case loadFailed
     }
@@ -319,5 +345,25 @@ public final class MockLogDatabaseManager: LogDatabaseManagerProtocol {
 
     public func databaseSize() -> Int64 {
         return 0
+    }
+
+    // MARK: - Deep Search Support
+
+    public func getSessions(
+        in context: NSManagedObjectContext?,
+        sessionIds: Set<String>,
+        sortOrder: LogDatabaseManager.SessionSortOrder
+    ) throws -> [SessionInfo] {
+        return []
+    }
+
+    public func searchEvents(
+        in context: NSManagedObjectContext?,
+        sessionIds: Set<String>,
+        searchText: String,
+        searchFields: [String],
+        limit: Int
+    ) throws -> [LogEvent] {
+        return []
     }
 }

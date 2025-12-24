@@ -108,6 +108,7 @@ public final class ViewStore<State: Equatable, Action>: ObservableObject {
     ///
     /// - Parameter action: 要发送的 Action
     public func send(_ action: Action) {
+        print("📤 [ViewStore] send() 被调用 - Thread: \(Thread.isMainThread ? "Main" : "Background")")
         Task {
             await store.send(action)
         }
@@ -147,13 +148,25 @@ public final class ViewStore<State: Equatable, Action>: ObservableObject {
     ///   - get: 从 State 获取值的闭包
     ///   - send: 将新值转换为 Action 的闭包
     /// - Returns: SwiftUI Binding
-    public func binding<Value>(
+    public func binding<Value: Equatable>(
         get: @escaping (State) -> Value,
         send toAction: @escaping (Value) -> Action
     ) -> Binding<Value> {
         Binding(
-            get: { get(self.state) },
+            get: {
+                let value = get(self.state)
+                return value
+            },
             set: { newValue in
+                print("📝 [ViewStore] Binding.set 被调用 - 新值: \(newValue)")
+                // 去重：只有值真正变化时才发送 action
+                let currentValue = get(self.state)
+                print("📝 [ViewStore] 当前值: \(currentValue), 新值: \(newValue)")
+                guard newValue != currentValue else {
+                    print("📝 [ViewStore] Binding 值未变化，跳过发送 action")
+                    return
+                }
+                print("📝 [ViewStore] Binding 值变化，发送 action")
                 self.send(toAction(newValue))  // ✅ 同步 send,不阻塞
             }
         )

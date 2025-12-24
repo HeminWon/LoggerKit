@@ -264,4 +264,65 @@ public class LogDataLoader: LogDataLoaderProtocol {
             }
         }
     }
+
+    // MARK: - Deep Search Support
+
+    public func getSessions(
+        sessionIds: Set<String>,
+        sortOrder: LogDatabaseManager.SessionSortOrder
+    ) async throws -> [SessionInfo] {
+        let dbManager = self.databaseManager
+
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    let sessions = try dbManager.getSessions(
+                        in: context,
+                        sessionIds: sessionIds,
+                        sortOrder: sortOrder
+                    )
+                    continuation.resume(returning: sessions)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func searchEvents(
+        sessionIds: Set<String>,
+        searchText: String,
+        searchFields: Set<SearchField>,
+        limit: Int
+    ) async throws -> [LogEvent] {
+        let dbManager = self.databaseManager
+
+        // 将 SearchField 转换为字段名字符串数组
+        let fieldNames = searchFields.map { field in
+            switch field {
+            case .message: return "message"
+            case .fileName: return "fileName"
+            case .function: return "function"
+            case .context: return "context"
+            case .thread: return "thread"
+            }
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+                do {
+                    let events = try dbManager.searchEvents(
+                        in: context,
+                        sessionIds: sessionIds,
+                        searchText: searchText,
+                        searchFields: fieldNames,
+                        limit: limit
+                    )
+                    continuation.resume(returning: events)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 }

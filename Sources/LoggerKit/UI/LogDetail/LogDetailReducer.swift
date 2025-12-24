@@ -67,8 +67,8 @@ public struct LogDetailReducer: Reducer {
         )
         self.filterFeatureReducer = FilterFeature.Reducer(environment: filterFeatureEnvironment)
 
-        // Initialize SearchFeature.Reducer
-        self.searchFeatureReducer = SearchFeature.Reducer()
+        // Initialize SearchFeature.Reducer with dataLoader dependency
+        self.searchFeatureReducer = SearchFeature.Reducer(dataLoader: environment.dataLoader)
 
         // Initialize DeleteFeature.DeleteReducer with DeleteFeature.Environment
         let deleteFeatureEnvironment = DeleteFeature.Environment(
@@ -108,10 +108,11 @@ public struct LogDetailReducer: Reducer {
     private func reduceCoreActions(_ state: inout LogDetailState, _ action: LogDetailAction) -> Effect<LogDetailAction> {
         switch action {
         case .allEventsLoaded(let events):
+            // 保留 allEventsForSearchPreview 用于其他功能（如筛选选项提取）
             state.allEventsForSearchPreview = events
-            print("🔵 [LogDetailReducer] Forwarding \(events.count) events to SearchFeature")
-            // Sync to SearchFeature
-            return .task { .search(.allEventsLoaded(events)) }
+            print("🔵 [LogDetailReducer] Loaded \(events.count) events for preview (not forwarding to SearchFeature - using DB search now)")
+            // 新的深度搜索不再需要 allEventsLoaded，直接查询数据库
+            return .none
 
         case .loadingFailed(let error):
             state.loadingState = .failed(error)
