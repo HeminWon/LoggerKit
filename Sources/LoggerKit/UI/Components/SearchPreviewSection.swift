@@ -31,7 +31,7 @@ struct SearchPreviewSection: View {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("正在加载搜索数据...")
+                    Text(String(localized: "loading_search_data", bundle: .module))
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
@@ -218,9 +218,9 @@ struct SearchPreviewSection: View {
                 // 添加/移除搜索词按钮
                 Button(action: {
                     if isKeywordSelected {
-                        viewStore.send(.filter(.removeMessageKeyword(keyword)))
+                        viewStore.send(.filter(.updateFilter(.messageKeyword, .remove(keyword))))
                     } else {
-                        viewStore.send(.filter(.addMessageKeyword(keyword)))
+                        viewStore.send(.filter(.updateFilter(.messageKeyword, .add(keyword))))
                         onFilterAdded?()
                     }
                 }) {

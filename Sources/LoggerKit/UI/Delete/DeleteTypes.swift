@@ -85,13 +85,13 @@ public enum DeleteError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .loadingSessionsFailed:
-            return "加载会话列表失败"
+            return String(localized: "delete_load_sessions_failed", bundle: .module)
         case .noSessionsSelected:
-            return "未选择要删除的会话"
+            return String(localized: "delete_no_sessions_selected", bundle: .module)
         case .deletionFailed:
-            return "删除操作失败"
+            return String(localized: "delete_operation_failed", bundle: .module)
         case .sessionNotFound(let sessionId):
-            return "会话不存在: \(sessionId)"
+            return String(localized: "delete_session_not_found", bundle: .module).replacingOccurrences(of: "%@", with: sessionId)
         }
     }
 }

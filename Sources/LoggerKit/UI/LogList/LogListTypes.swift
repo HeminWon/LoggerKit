@@ -19,11 +19,11 @@ public enum LogListError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .loadFailed(let message):
-            return "加载失败: \(message)"
+            return String(localized: "list_load_failed", bundle: .module).replacingOccurrences(of: "%@", with: message)
         case .emptyResult:
-            return "没有找到日志"
+            return String(localized: "list_no_logs_found", bundle: .module)
         case .invalidSequenceNumber:
-            return "查询序列号无效"
+            return String(localized: "list_invalid_sequence", bundle: .module)
         }
     }
 }

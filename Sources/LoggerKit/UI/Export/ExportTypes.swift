@@ -33,11 +33,11 @@ public enum ExportFeatureError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .emptyData:
-            return "无数据可导出"
+            return String(localized: "export_no_data", bundle: .module)
         case .exportError(let error):
             return error.errorDescription
         case .cancelled:
-            return "用户取消导出"
+            return String(localized: "export_cancelled_by_user", bundle: .module)
         }
     }
 }

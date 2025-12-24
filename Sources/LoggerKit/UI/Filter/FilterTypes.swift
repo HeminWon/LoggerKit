@@ -18,9 +18,9 @@ public enum FilterError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .loadingOptionsFailed:
-            return "加载筛选选项失败"
+            return String(localized: "filter_load_options_failed", bundle: .module)
         case .emptyFilterResult:
-            return "筛选结果为空"
+            return String(localized: "filter_empty_result", bundle: .module)
         }
     }
 }
