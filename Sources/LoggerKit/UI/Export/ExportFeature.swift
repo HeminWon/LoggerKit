@@ -31,6 +31,12 @@ extension ExportFeature {
         /// Filter options (optional, for exporting filtered results)
         public var filterOptions: ExportFilterOptions?
 
+        /// Bundle ID（用于文件名，可选）
+        public var bundleId: String?
+
+        /// 导出标识符（用于文件名，可选）
+        public var exportIdentifier: String?
+
         // MARK: - Progress State
 
         /// Whether export is currently in progress
@@ -299,8 +305,10 @@ extension ExportFeature {
             // Capture values
             let sessionIds = state.sessionIds.isEmpty ? environment.allSessionIds : state.sessionIds
             let filterOptions = state.filterOptions
+            let bundleId = state.bundleId
+            let exportIdentifier = state.exportIdentifier
 
-            return .stream(id: CancellationID.export) { [environment, filterOptions] in
+            return .stream(id: CancellationID.export) { [environment, filterOptions, bundleId, exportIdentifier] in
                 AsyncStream { continuation in
                     Task {
                         do {
@@ -328,7 +336,8 @@ extension ExportFeature {
 
                             // Step 4: Generate file name
                             let fileName = generateFileName(
-                                sessionIds: sessionIds,
+                                bundleId: bundleId,
+                                exportIdentifier: exportIdentifier,
                                 format: format
                             )
 
@@ -402,15 +411,36 @@ extension ExportFeature {
 
         // MARK: - Helpers
 
-        private func generateFileName(sessionIds: Set<String>, format: ExportFormat) -> String {
+        private func generateFileName(bundleId: String?, exportIdentifier: String?, format: ExportFormat) -> String {
+            // 1. 日期时间部分 - 格式：yyyy-MM-dd_HHmmss
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+            dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
             let dateString = dateFormatter.string(from: Date())
 
-            let sessionIdentifier = sessionIds.count == 1 ? sessionIds.first! : "all"
+            // 2. bundleId 部分 - 如果为 nil，从 Bundle.main 获取
+            let resolvedBundleId = bundleId ?? Bundle.main.bundleIdentifier
+
+            // 3. 构建前缀部分
+            var components: [String] = []
+
+            // 添加 bundleId（如果存在且非空）
+            if let resolvedBundleId = resolvedBundleId, !resolvedBundleId.isEmpty {
+                components.append(resolvedBundleId)
+            }
+
+            // 添加 identifier（如果存在且非空）
+            if let exportIdentifier = exportIdentifier, !exportIdentifier.isEmpty {
+                components.append(exportIdentifier)
+            }
+
+            // 4. 组合文件名
+            let prefix = components.joined(separator: "_")
+            let fileName = prefix.isEmpty ? dateString : "\(prefix)_\(dateString)"
+
+            // 5. 添加扩展名
             let ext = format == .log ? "log" : "json"
 
-            return "logs_\(sessionIdentifier)_\(dateString).\(ext)"
+            return "\(fileName).\(ext)"
         }
 
         /// 清理临时文件

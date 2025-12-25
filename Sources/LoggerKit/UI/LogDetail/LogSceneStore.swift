@@ -37,17 +37,25 @@ extension LogSceneStore {
     /// - Parameters:
     ///   - sessionIds: Session IDs to filter (empty for all sessions)
     ///   - enableActionLogging: Whether to enable action logging for debugging
+    ///   - bundleId: Bundle ID for export file naming (optional)
+    ///   - exportIdentifier: Custom identifier for export file naming (optional)
     /// - Returns: A configured LogSceneStore
     @MainActor
     public static func create(
         sessionIds: Set<String> = [],
-        enableActionLogging: Bool = false
+        enableActionLogging: Bool = false,
+        bundleId: String? = nil,
+        exportIdentifier: String? = nil
     ) -> LogSceneStore {
         let environment = LogDetailEnvironment.live(sessionIds: sessionIds)
         let reducer = LogDetailReducer(environment: environment)
 
+        var initialState = LogDetailState()
+        initialState.exportFeature.bundleId = bundleId
+        initialState.exportFeature.exportIdentifier = exportIdentifier
+
         return LogSceneStore(
-            initialState: LogDetailState(),
+            initialState: initialState,
             reducer: AnyReducer(reducer),
             enableActionLogging: enableActionLogging
         )

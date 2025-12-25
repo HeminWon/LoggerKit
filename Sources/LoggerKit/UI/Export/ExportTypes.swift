@@ -96,3 +96,20 @@ public struct ExportFilterOptions: Equatable, Sendable {
         sessionIds.isEmpty
     }
 }
+
+// MARK: - FilterFeature.State Extension
+
+extension FilterFeature.State {
+    /// 转换为 ExportFilterOptions
+    public func toExportFilterOptions() -> ExportFilterOptions {
+        ExportFilterOptions(
+            levels: selectedLevels,
+            functions: selectedFunctions,
+            fileNames: selectedFileNames,
+            contexts: selectedContexts,
+            threads: selectedThreads,
+            messageKeywords: selectedMessageKeywords,
+            sessionIds: selectedSessionIds
+        )
+    }
+}

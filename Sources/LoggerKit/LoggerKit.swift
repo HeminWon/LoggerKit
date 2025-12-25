@@ -25,16 +25,30 @@ public enum LoggerKit {
         /// 是否启用 Action 日志记录（用于调试）
         public let enableActionLogging: Bool
 
+        /// Bundle ID（用于导出文件命名，可选）
+        /// 如果为 nil，导出时将使用 Bundle.main.bundleIdentifier
+        public let bundleId: String?
+
+        /// 导出标识符（用于导出文件命名，可选）
+        /// 自定义标识符，用于区分不同的导出文件
+        public let exportIdentifier: String?
+
         /// 初始化配置
         /// - Parameters:
         ///   - sessionIds: 需要过滤的会话 ID 集合，默认为空（显示所有会话）
         ///   - enableActionLogging: 是否启用 TCA Action 日志，默认为 false
+        ///   - bundleId: 导出文件使用的 Bundle ID，默认为 Bundle.main.bundleIdentifier
+        ///   - exportIdentifier: 导出文件使用的自定义标识符，默认为 nil
         public init(
             sessionIds: Set<String> = [],
-            enableActionLogging: Bool = false
+            enableActionLogging: Bool = false,
+            bundleId: String? = Bundle.main.bundleIdentifier,
+            exportIdentifier: String? = nil
         ) {
             self.sessionIds = sessionIds
             self.enableActionLogging = enableActionLogging
+            self.bundleId = bundleId
+            self.exportIdentifier = exportIdentifier
         }
 
         /// 默认配置
@@ -91,7 +105,9 @@ public enum LoggerKit {
     ) -> LogSceneStore {
         return LogSceneStore.create(
             sessionIds: configuration.sessionIds,
-            enableActionLogging: configuration.enableActionLogging
+            enableActionLogging: configuration.enableActionLogging,
+            bundleId: configuration.bundleId,
+            exportIdentifier: configuration.exportIdentifier
         )
     }
 

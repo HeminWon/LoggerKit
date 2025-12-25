@@ -194,6 +194,11 @@ public struct LogDetailReducer: Reducer {
             return listEffect.map { .list($0) }
 
         case .export(let exportAction):
+            // 同步过滤状态到导出功能（类似第 223 行对列表的同步）
+            if case .startExport = exportAction {
+                state.exportFeature.filterOptions = state.filterFeature.toExportFilterOptions()
+            }
+
             // Delegate to ExportFeature.Reducer
             let exportEffect = exportReducer.reduce(&state.exportFeature, exportAction)
 
