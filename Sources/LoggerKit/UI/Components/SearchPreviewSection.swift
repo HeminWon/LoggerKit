@@ -199,7 +199,7 @@ struct SearchPreviewSection: View {
             }
             .padding(.vertical, 8)
 
-        case .fullSearching(let currentIndex, let totalSessions, let matchCount, let scannedEvents):
+        case .fullSearching(let scannedEvents, let totalEstimated, let matchCount):
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     ProgressView()
@@ -228,7 +228,7 @@ struct SearchPreviewSection: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    // 进度条
+                    // 进度条（基于日志数量）
                     GeometryReader { geometry in
                         ZStack(alignment: .leading) {
                             // 背景
@@ -240,20 +240,18 @@ struct SearchPreviewSection: View {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(Color.blue)
                                 .frame(
-                                    width: geometry.size.width * CGFloat(currentIndex) / CGFloat(max(totalSessions, 1)),
+                                    width: geometry.size.width * CGFloat(scannedEvents) / CGFloat(max(totalEstimated, 1)),
                                     height: 4
                                 )
                         }
                     }
                     .frame(height: 4)
 
-                    // 状态信息
+                    // 状态信息（显示日志数量）
                     HStack(spacing: 12) {
-                        Text("\(currentIndex)/\(totalSessions) sessions")
+                        Text("已扫描 \(scannedEvents)/\(totalEstimated) 条日志")
                             .font(.caption2)
-                        Text("\(matchCount) 条匹配")
-                            .font(.caption2)
-                        Text("\(scannedEvents) 条已扫描")
+                        Text("找到 \(matchCount) 条匹配")
                             .font(.caption2)
                     }
                     .foregroundColor(.gray)
@@ -461,9 +459,18 @@ struct SearchPreviewSection: View {
             HStack {
                 Image(systemName: "text.bubble")
                     .font(.caption2)
-                Text("\(String(localized: "search_field_message", bundle: .module)) (\(items.count))")
+
+                // 显示去重消息数量
+                Text("\(String(localized: "search_field_message", bundle: .module)) (\(items.count) 条去重)")
                     .font(.caption)
                     .fontWeight(.medium)
+
+                // 显示总匹配数（所有消息的 matchCount 总和）
+                let totalMatches = items.map { $0.matchCount }.reduce(0, +)
+                Text("共 \(totalMatches) 条匹配")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+
                 Spacer()
                 // 添加/移除搜索词按钮
                 Button(action: {
@@ -486,10 +493,27 @@ struct SearchPreviewSection: View {
             .foregroundColor(.gray)
 
             ForEach(items) { item in
-                Text(highlightedText(item.value))
-                    .font(.caption)
-                    .lineLimit(1)
-                    .padding(.vertical, 2)
+                HStack(alignment: .top, spacing: 4) {
+                    Text(highlightedText(item.value))
+                        .font(.caption)
+                        .lineLimit(2)  // 允许换行显示（原来是 1 行）
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Spacer()
+
+                    // 显示该消息出现的次数
+                    if item.matchCount > 1 {
+                        Text("\(item.matchCount)×")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.secondary.opacity(0.1))
+                            )
+                    }
+                }
+                .padding(.vertical, 2)
             }
         }
     }

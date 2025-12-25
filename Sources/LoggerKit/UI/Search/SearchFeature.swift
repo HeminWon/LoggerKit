@@ -99,12 +99,12 @@ public struct SearchFeature {
             return result
         }
 
-        /// 搜索进度百分比 (0.0 - 1.0)
+        /// 搜索进度百分比 (0.0 - 1.0) - 基于日志数量
         public var searchProgress: Double {
-            guard case .fullSearching(let currentIndex, let total, _, _) = searchPhase else {
+            guard case .fullSearching(let scannedEvents, let totalEstimated, _) = searchPhase else {
                 return 0.0
             }
-            return total > 0 ? Double(currentIndex + 1) / Double(total) : 0.0
+            return totalEstimated > 0 ? Double(scannedEvents) / Double(totalEstimated) : 0.0
         }
 
         /// 是否正在搜索
@@ -197,13 +197,45 @@ public struct SearchFeature {
             threadItems = threadCounts.map { SearchResultItem(field: .thread, value: $0.key, matchCount: $0.value) }
                 .sorted(by: { $0.matchCount > $1.matchCount })
 
-            // 消息匹配只显示一个示例
+            // 消息匹配：去重 + 最新 + 限制数量
             if messageCount > 0 {
-                if let firstMatch = allResults.first(where: {
+                // 1. 筛选所有匹配的日志
+                let matchedEvents = allResults.filter {
                     searchFields.contains(.message) && $0.message.lowercased().contains(searchTextLowercased)
-                }) {
-                    messageItems = [SearchResultItem(field: .message, value: firstMatch.message, matchCount: messageCount)]
                 }
+
+                // 2. 按消息内容去重，保留最新的 event 和出现次数
+                var uniqueMessages: [String: LogEvent] = [:]
+                var messageCounts: [String: Int] = [:]
+
+                for event in matchedEvents {
+                    messageCounts[event.message, default: 0] += 1
+
+                    if let existing = uniqueMessages[event.message] {
+                        // 保留时间戳更新的
+                        if event.timestamp > existing.timestamp {
+                            uniqueMessages[event.message] = event
+                        }
+                    } else {
+                        uniqueMessages[event.message] = event
+                    }
+                }
+
+                // 3. 转换为 SearchResultItem，按时间戳倒序排序，取前 10 条
+                messageItems = uniqueMessages
+                    .map { message, event in
+                        (
+                            item: SearchResultItem(
+                                field: .message,
+                                value: message,
+                                matchCount: messageCounts[message] ?? 1
+                            ),
+                            timestamp: event.timestamp
+                        )
+                    }
+                    .sorted { $0.timestamp > $1.timestamp }  // 最新的在前
+                    .prefix(10)
+                    .map { $0.item }
             }
 
             var result = CategorizedSearchResults()
@@ -319,17 +351,16 @@ public struct SearchFeature {
 
         /// Update full search progress
         case updateFullSearchProgress(
-            currentSessionIndex: Int,
-            totalSessions: Int,
-            matchCount: Int,
-            scannedEvents: Int
+            scannedEvents: Int,
+            totalEstimatedEvents: Int,
+            matchCount: Int
         )
 
-        /// Full search batch completed (每个 session 完成时)
+        /// Full search batch completed (每个批次完成时)
         case fullSearchBatchCompleted(
             newMatches: [LogEvent],
-            currentSessionIndex: Int,
-            totalSessions: Int
+            scannedEvents: Int,
+            totalEstimatedEvents: Int
         )
 
         /// Full search completed
@@ -376,8 +407,8 @@ public struct SearchFeature {
                 return l0 == r0 && l1.count == r1.count && l2 == r2 && l3 == r3
             case (.previewSearchFailed, .previewSearchFailed):
                 return true
-            case (.updateFullSearchProgress(let l1, let l2, let l3, let l4), .updateFullSearchProgress(let r1, let r2, let r3, let r4)):
-                return l1 == r1 && l2 == r2 && l3 == r3 && l4 == r4
+            case (.updateFullSearchProgress(let l1, let l2, let l3), .updateFullSearchProgress(let r1, let r2, let r3)):
+                return l1 == r1 && l2 == r2 && l3 == r3
             case (.fullSearchBatchCompleted(let l1, let l2, let l3), .fullSearchBatchCompleted(let r1, let r2, let r3)):
                 return l1.count == r1.count && l2 == r2 && l3 == r3
             case (.fullSearchCompleted(let l), .fullSearchCompleted(let r)):
@@ -529,13 +560,12 @@ public struct SearchFeature {
                 }
 
                 #if DEBUG
-                print("🔍 [SearchFeature] 开始 full search - 需要搜索 \(snapshot.fullSearchSessions.count) 个 sessions")
+                print("🔍 [SearchFeature] 开始 full search - 需要搜索 \(snapshot.fullSearchSessions.count) 个 sessions, 预估 \(snapshot.estimatedTotalEvents) 条日志")
                 #endif
                 state.searchPhase = .fullSearching(
-                    currentSessionIndex: 0,
-                    totalSessions: snapshot.fullSearchSessions.count,
-                    matchCount: state.previewResults.count,
-                    scannedEvents: 0
+                    scannedEvents: 0,
+                    totalEstimatedEvents: snapshot.estimatedTotalEvents,
+                    matchCount: state.previewResults.count
                 )
 
                 return handleFullSearch(state: state, snapshot: snapshot)
@@ -626,17 +656,16 @@ public struct SearchFeature {
 
             // MARK: - Full Search
 
-            case .updateFullSearchProgress(let index, let total, let matches, let scanned):
+            case .updateFullSearchProgress(let scannedEvents, let totalEstimated, let matchCount):
                 state.searchPhase = .fullSearching(
-                    currentSessionIndex: index,
-                    totalSessions: total,
-                    matchCount: matches,
-                    scannedEvents: scanned
+                    scannedEvents: scannedEvents,
+                    totalEstimatedEvents: totalEstimated,
+                    matchCount: matchCount
                 )
                 return .none
 
-            case .fullSearchBatchCompleted(let newMatches, let index, let total):
-                // 按时间倒序插入
+            case .fullSearchBatchCompleted(let newMatches, let scannedEvents, let totalEstimated):
+                // 按时间倒序合并（O(N)算法）
                 state.fullSearchResults = insertOrderedMatches(
                     existing: state.fullSearchResults,
                     new: newMatches
@@ -646,7 +675,7 @@ public struct SearchFeature {
                 let newIds = Set(newMatches.map { $0.id.uuidString })
                 state.newResultIds.formUnion(newIds)
 
-                // 更新进度
+                // 计算总匹配数
                 let totalMatches = state.previewResults.count + state.fullSearchResults.count
 
                 // 检查是否超过限制
@@ -657,11 +686,11 @@ public struct SearchFeature {
                     )
                 }
 
+                // 更新搜索阶段（使用新参数）
                 state.searchPhase = .fullSearching(
-                    currentSessionIndex: index,
-                    totalSessions: total,
-                    matchCount: totalMatches,
-                    scannedEvents: state.fullSearchResults.count
+                    scannedEvents: scannedEvents,
+                    totalEstimatedEvents: totalEstimated,
+                    matchCount: totalMatches
                 )
 
                 // 使用 Effect 定时清除新标记
@@ -806,45 +835,74 @@ public struct SearchFeature {
         private func handleFullSearch(state: State, snapshot: SearchSnapshot) -> Effect<Action> {
             let resultsLimit = state.searchResultsLimit
             let alreadyFoundCount = state.previewResults.count
+            let totalEstimatedEvents = snapshot.estimatedTotalEvents
 
             return .stream(id: CancellationId.fullSearch) { [dataLoader = self.dataLoader] in
                 AsyncStream { continuation in
                     Task { @MainActor in
                         do {
-                            let totalSessions = snapshot.fullSearchSessions.count
+                            // ✅ 创建智能批次
+                            let batches = self.createSearchBatches(
+                                sessions: snapshot.fullSearchSessions,
+                                targetBatchSize: 2000
+                            )
 
-                            // 逐个 session 搜索
-                            for (index, session) in snapshot.fullSearchSessions.enumerated() {
+                            var scannedEvents = 0  // 累积扫描的日志数
+
+                            #if DEBUG
+                            print("🔍 [Full Search] 开始批量搜索 - 共 \(batches.count) 个批次")
+                            #endif
+
+                            // ✅ 按批次查询
+                            for (batchIndex, batch) in batches.enumerated() {
                                 // 检查取消
                                 try Task.checkCancellation()
 
-                                // 更新进度
+                                #if DEBUG
+                                print("🔍 [Full Search] 批次 \(batchIndex + 1)/\(batches.count)")
+                                print("   - Sessions: \(batch.sessionIds.count)")
+                                print("   - Estimated events: \(batch.estimatedEventCount)")
+                                #endif
+
+                                // 更新进度（批次开始前）
                                 continuation.yield(.updateFullSearchProgress(
-                                    currentSessionIndex: index,
-                                    totalSessions: totalSessions,
-                                    matchCount: alreadyFoundCount,
-                                    scannedEvents: 0
+                                    scannedEvents: scannedEvents,
+                                    totalEstimatedEvents: totalEstimatedEvents,
+                                    matchCount: alreadyFoundCount
                                 ))
 
-                                // 使用数据库搜索
-                                let sessionMatches = try await dataLoader.searchEvents(
-                                    sessionIds: [session.id],
+                                // ✅ 批量查询（多个session）
+                                let batchMatches = try await dataLoader.searchEvents(
+                                    sessionIds: Set(batch.sessionIds),
                                     searchText: snapshot.searchText,
                                     searchFields: snapshot.searchFields,
                                     limit: resultsLimit
                                 )
 
-                                // 每个 session 完成后立即更新
+                                // 累加扫描的日志数
+                                scannedEvents += batch.estimatedEventCount
+
+                                // 批次完成
                                 continuation.yield(.fullSearchBatchCompleted(
-                                    newMatches: sessionMatches,
-                                    currentSessionIndex: index,
-                                    totalSessions: totalSessions
+                                    newMatches: batchMatches,
+                                    scannedEvents: scannedEvents,
+                                    totalEstimatedEvents: totalEstimatedEvents
                                 ))
+
+                                #if DEBUG
+                                print("✅ [Full Search] 批次完成 - 找到 \(batchMatches.count) 条匹配")
+                                print("   - 总进度: \(scannedEvents)/\(totalEstimatedEvents)")
+                                #endif
                             }
 
                             // 全部完成
+                            let totalSessions = snapshot.fullSearchSessions.count
                             continuation.yield(.fullSearchCompleted(searchedSessions: totalSessions))
                             continuation.finish()
+
+                            #if DEBUG
+                            print("🎉 [Full Search] 全部完成 - 共搜索 \(totalSessions) 个 sessions")
+                            #endif
 
                         } catch is CancellationError {
                             continuation.yield(.fullSearchCancelled)
@@ -917,6 +975,85 @@ public struct SearchFeature {
                 fullSearchSessions: fullSearchSessions,
                 createdAt: Date()
             )
+        }
+
+        // MARK: - Search Batch Helper
+
+        /// 搜索批次（用于动态批量查询）
+        private struct SearchBatch {
+            let sessionIds: [String]
+            let estimatedEventCount: Int
+        }
+
+        /// 创建智能搜索批次
+        /// - Parameters:
+        ///   - sessions: 待搜索的sessions（按时间倒序）
+        ///   - targetBatchSize: 每批的目标日志数（默认2000）
+        /// - Returns: 搜索批次数组
+        private func createSearchBatches(
+            sessions: [SessionInfo],
+            targetBatchSize: Int = 2000
+        ) -> [SearchBatch] {
+            guard !sessions.isEmpty else { return [] }
+
+            var batches: [SearchBatch] = []
+            var currentBatch: [String] = []
+            var currentCount = 0
+
+            for session in sessions {
+                let eventCount = session.eventCount
+
+                // 策略1：大session(>=2000条)单独成批
+                if eventCount >= targetBatchSize {
+                    // 先提交当前批次（如果有）
+                    if !currentBatch.isEmpty {
+                        batches.append(SearchBatch(
+                            sessionIds: currentBatch,
+                            estimatedEventCount: currentCount
+                        ))
+                        currentBatch = []
+                        currentCount = 0
+                    }
+
+                    // 大session单独查询
+                    batches.append(SearchBatch(
+                        sessionIds: [session.id],
+                        estimatedEventCount: eventCount
+                    ))
+                    continue
+                }
+
+                // 策略2：累积小session
+                currentBatch.append(session.id)
+                currentCount += eventCount
+
+                // 策略3：达到阈值即提交批次
+                if currentCount >= targetBatchSize {
+                    batches.append(SearchBatch(
+                        sessionIds: currentBatch,
+                        estimatedEventCount: currentCount
+                    ))
+                    currentBatch = []
+                    currentCount = 0
+                }
+            }
+
+            // 策略4：剩余的也作为一批
+            if !currentBatch.isEmpty {
+                batches.append(SearchBatch(
+                    sessionIds: currentBatch,
+                    estimatedEventCount: currentCount
+                ))
+            }
+
+            #if DEBUG
+            print("📦 [createSearchBatches] 创建了 \(batches.count) 个批次")
+            for (index, batch) in batches.enumerated() {
+                print("   批次 \(index + 1): \(batch.sessionIds.count) sessions, ~\(batch.estimatedEventCount) events")
+            }
+            #endif
+
+            return batches
         }
 
         /// 按时间倒序合并新结果（优化: O(N²) → O(N)）

@@ -165,16 +165,14 @@ public enum SearchPhase: Equatable, Sendable {
     /// - hasMoreSessions: 是否还有更多 session 可搜索
     case previewCompleted(matchCount: Int, searchedSessions: Int, hasMoreSessions: Bool)
 
-    /// 完整搜索中 - 按 session 逐步往前搜索
-    /// - currentSessionIndex: 当前搜索到第几个 session（从0开始）
-    /// - totalSessions: 总 session 数量
-    /// - matchCount: 已找到的匹配数量
+    /// 完整搜索中 - 批量扫描日志
     /// - scannedEvents: 已扫描的日志事件数量
+    /// - totalEstimatedEvents: 预估总日志事件数量
+    /// - matchCount: 已找到的匹配数量
     case fullSearching(
-        currentSessionIndex: Int,
-        totalSessions: Int,
-        matchCount: Int,
-        scannedEvents: Int
+        scannedEvents: Int,
+        totalEstimatedEvents: Int,
+        matchCount: Int
     )
 
     /// 搜索完成
