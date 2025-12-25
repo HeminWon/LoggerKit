@@ -8,5 +8,9 @@ DerivedData/
 .netrc
 Package.resolved
 
+# Xcode build outputs
+build/
+*.build/
+
 # OpenSpec archived changes
 Examples/iOS/LoggerKitExample/openspec/changes/archive/

@@ -27,6 +27,8 @@
 "clear_button" = "Clear";
 "select_all_button" = "Select All";
 "log_level" = "Log Level";
+"filter_load_options_failed" = "Failed to load filter options";
+"filter_empty_result" = "No results matching filters";
 
 // MARK: - Search Preview Section
 "keyword_search" = "Keyword Search";
@@ -40,6 +42,7 @@
 "remove_keyword" = "Remove Keyword";
 "add_keyword" = "Add Keyword";
 "no_match_items" = "No matches";
+"loading_search_data" = "Loading search data...";
 
 // MARK: - Collapsible Filter Section
 "search_prompt" = "Search %@...";
@@ -51,3 +54,45 @@
 
 // MARK: - Log List Scene
 "clear_all" = "Clear All";
+"list_load_failed" = "Load failed: %@";
+"list_no_logs_found" = "No logs found";
+"list_invalid_sequence" = "Invalid query sequence";
+
+// MARK: - Log Detail Scene - Toolbar
+"export_logs" = "Export Logs";
+"delete_management" = "Delete Management";
+"loaded_total_count" = "Loaded %d / Total %d";
+
+// MARK: - Export
+"export_failed" = "Export Failed";
+"confirm_button" = "OK";
+"exporting_progress" = "Exporting";
+"export_no_data" = "No data to export";
+"export_cancelled_by_user" = "Export cancelled by user";
+
+// MARK: - Delete Management Sheet
+"delete_management_title" = "Log Delete Management";
+"delete_all_logs_title" = "Delete All Logs";
+"delete_all_logs_description" = "Clear all log records from the database";
+"delete_all_logs_button" = "Delete All Logs";
+"delete_all_confirmation_title" = "Confirm Delete All Logs";
+"delete_all_confirmation_message" = "This action will delete all log records and cannot be undone.";
+"delete_by_session_title" = "Delete by Session";
+"delete_by_session_description" = "Select sessions to delete";
+"selected_sessions_count" = "%d session(s) selected";
+"select_all" = "Select All";
+"empty" = "Clear";
+"no_session_records" = "No session records";
+"delete_selected_sessions_button" = "Delete Selected Sessions (%d)";
+"delete_sessions_confirmation_title" = "Confirm Delete Selected Sessions";
+"delete_sessions_confirmation_message" = "This will delete all logs from %d session(s) and cannot be undone.";
+"delete_session_context_menu" = "Delete This Session";
+"delete_session_confirmation_title" = "Confirm Delete Session %@";
+"delete_session_confirmation_message" = "This will delete %d log(s) from this session and cannot be undone.";
+"delete_failed_title" = "Delete Failed";
+"cancel_button" = "Cancel";
+"delete_button" = "Delete";
+"delete_load_sessions_failed" = "Failed to load session list";
+"delete_no_sessions_selected" = "No sessions selected for deletion";
+"delete_operation_failed" = "Delete operation failed";
+"delete_session_not_found" = "Session not found: %@";

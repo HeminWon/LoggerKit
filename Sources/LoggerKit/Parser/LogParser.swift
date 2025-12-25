@@ -91,20 +91,123 @@ public struct LogEvent: Codable, Identifiable, Sendable {
     }
     
     var prefix: String {
+        // 只显示前8位 sessionID
+        let shortSessionId = String(sessionId.prefix(8))
+
         if thread.isEmpty {
-            return "\(formattedDate) [\(level.severity)] - (\(function) at \(fileName):\(line))"
+            return "\(formattedDate) [\(shortSessionId)] [\(level.severity)] - (\(function) at \(fileName):\(line))"
         }
-        return "\(formattedDate) [\(level.severity)] <\(context)> \(thread) - (\(function) at \(fileName):\(line))"
+        return "\(formattedDate) [\(shortSessionId)] [\(level.severity)] <\(context)> \(thread) - (\(function) at \(fileName):\(line))"
     }
 }
 
 public struct LogParser {
 
-    // LogEvent to temp file 格式化后的 log
-    public static func logEventToTempFile(fileName: String, events: [LogEvent]) -> URL {
+    // MARK: - 流式导出 (推荐)
+
+    /// 流式导出日志到临时文件 - 内存优化版本
+    ///
+    /// 使用分批查询和追加写入,避免全量内存加载,适用于大量日志导出场景。
+    ///
+    /// - Parameters:
+    ///   - fileName: 导出文件名
+    ///   - batchSize: 每批查询的日志数量,默认 1000 条
+    ///   - progressHandler: 进度回调 (已导出条数, 总条数)
+    ///   - eventFetcher: 分批获取日志的闭包 (offset, limit) -> [LogEvent]
+    /// - Returns: 导出文件的 URL
+    /// - Throws: 文件创建失败或查询错误
+    ///
+    /// 示例:
+    /// ```swift
+    /// let url = try await LogParser.logEventToTempFileStreaming(
+    ///     fileName: "logs.txt",
+    ///     progressHandler: { written, total in
+    ///         print("进度: \(written)/\(total)")
+    ///     },
+    ///     eventFetcher: { offset, limit in
+    ///         try await dataLoader.loadEvents(offset: offset, limit: limit)
+    ///     }
+    /// )
+    /// ```
+    public static func logEventToTempFileStreaming(
+        fileName: String,
+        batchSize: Int = 1000,
+        progressHandler: @escaping (Int, Int) -> Void,
+        eventFetcher: (Int, Int) async throws -> [LogEvent]
+    ) async throws -> URL {
         let tempFile = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
-        let lines = events.map { "\($0.prefix) - \($0.message)" }.joined(separator: "\n")
-        try? lines.write(to: tempFile, atomically: true, encoding: .utf8)
+
+        // 创建空文件
+        guard FileManager.default.createFile(atPath: tempFile.path, contents: nil, attributes: nil) else {
+            throw ExportError.fileCreationFailed
+        }
+
+        // 获取文件句柄
+        guard let fileHandle = try? FileHandle(forWritingTo: tempFile) else {
+            throw ExportError.fileHandleCreationFailed
+        }
+
+        // 确保资源释放
+        defer {
+            try? fileHandle.close()
+        }
+
+        var offset = 0
+        var totalWritten = 0
+
+        // 分批查询和写入
+        while true {
+            // 检查任务是否被取消
+            if Task.isCancelled {
+                try? FileManager.default.removeItem(at: tempFile)
+                throw CancellationError()
+            }
+
+            // 获取当前批次数据
+            let events = try await eventFetcher(offset, batchSize)
+            if events.isEmpty { break }
+
+            // 转换为字符串
+            let lines = events.map { "\($0.prefix) - \($0.message)" }
+            let text = lines.joined(separator: "\n") + "\n"
+
+            // 追加写入文件
+            if let data = text.data(using: .utf8) {
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(data)
+                totalWritten += events.count
+
+                // 更新进度 (在主线程回调)
+                await MainActor.run {
+                    progressHandler(totalWritten, -1)  // -1 表示总数未知,由调用方计算
+                }
+            }
+
+            offset += batchSize
+        }
+
         return tempFile
+    }
+
+}
+
+// MARK: - 导出错误
+
+public enum ExportError: Error {
+    case fileCreationFailed
+    case fileHandleCreationFailed
+    case emptyData
+}
+
+extension ExportError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .fileCreationFailed:
+            return "文件创建失败"
+        case .fileHandleCreationFailed:
+            return "文件句柄创建失败"
+        case .emptyData:
+            return "没有可导出的日志数据"
+        }
     }
 }

@@ -7,11 +7,14 @@
 
 import SwiftUI
 
-/// 水平滚动筛选区域组件
+/// 水平滚动筛选区域组件（纯 View，符合 TCA 单向数据流）
 struct CollapsibleFilterSection: View {
     let title: String
     let options: [String]
-    @Binding var selectedOptions: Set<String>
+    let selectedOptions: Set<String>
+    let onToggle: (String) -> Void
+    let onSelectAll: () -> Void
+    let onClear: () -> Void
 
     /// 排序后的选项列表：选中的在前，未选中的在后
     private var sortedOptions: [String] {
@@ -39,14 +42,14 @@ struct CollapsibleFilterSection: View {
                 if selectedOptions.isEmpty {
                     // 没有选中时显示全选按钮
                     Button(String(localized: "select_all_button", bundle: .module)) {
-                        selectedOptions = Set(options)
+                        onSelectAll()
                     }
                     .font(.caption)
                     .foregroundColor(.blue)
                 } else {
                     // 有选中时显示清除按钮
                     Button(String(localized: "clear_button", bundle: .module)) {
-                        selectedOptions.removeAll()
+                        onClear()
                     }
                     .font(.caption)
                     .foregroundColor(.red)
@@ -61,11 +64,7 @@ struct CollapsibleFilterSection: View {
                             title: truncateText(option, maxLength: 20),
                             isSelected: selectedOptions.contains(option)
                         ) {
-                            if selectedOptions.contains(option) {
-                                selectedOptions.remove(option)
-                            } else {
-                                selectedOptions.insert(option)
-                            }
+                            onToggle(option)
                         }
                     }
                 }

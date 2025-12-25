@@ -9,12 +9,17 @@ import SwiftUI
 
 /// 半屏筛选面板
 struct LogFilterSheet: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
     @Environment(\.dismiss) private var dismiss
+
+    // 使用 ViewStore 初始化
+    init(viewStore: LogDetailViewStore) {
+        self.viewStore = viewStore
+    }
 
     /// 是否处于预览模式：有搜索文本且有匹配结果
     private var isInPreviewMode: Bool {
-        !sceneState.searchText.isEmpty && !sceneState.searchResults.isEmpty
+        !viewStore.searchText.isEmpty && !viewStore.searchResults.isEmpty
     }
 
     var body: some View {
@@ -22,9 +27,9 @@ struct LogFilterSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // 搜索区域（含实时预览）
-                    SearchPreviewSection(sceneState: sceneState) {
+                    SearchPreviewSection(viewStore: viewStore) {
                         // 添加筛选后清空搜索框，退出预览模式
-                        sceneState.searchText = ""
+                        viewStore.send(.search(.updateSearchText("")))
                     }
 
                     // 预览模式下不显示其他筛选条件
@@ -32,7 +37,7 @@ struct LogFilterSheet: View {
                         Divider()
 
                         // 消息关键词筛选
-                        if !sceneState.selectedMessageKeywords.isEmpty {
+                        if !viewStore.state.filterFeature.selectedMessageKeywords.isEmpty {
                             messageKeywordsSection
                             Divider()
                         }
@@ -43,45 +48,57 @@ struct LogFilterSheet: View {
                         Divider()
 
                         // 模块筛选（折叠式）
-                        if !sceneState.availableContexts.isEmpty {
+                        if !viewStore.availableContexts.isEmpty {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_context", bundle: .module),
-                                options: sceneState.availableContexts,
-                                selectedOptions: $sceneState.selectedContexts
+                                options: viewStore.availableContexts,
+                                selectedOptions: viewStore.selectedContexts,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.context, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.context, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.context, .clear))) }
                             )
                             Divider()
                         }
 
                         // 文件筛选（折叠式）
-                        if !sceneState.availableFileNames.isEmpty {
+                        if !viewStore.availableFileNames.isEmpty {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_file", bundle: .module),
-                                options: sceneState.availableFileNames,
-                                selectedOptions: $sceneState.selectedFileNames
+                                options: viewStore.availableFileNames,
+                                selectedOptions: viewStore.selectedFileNames,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.fileName, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.fileName, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.fileName, .clear))) }
                             )
                             Divider()
                         }
 
                         // 函数筛选（折叠式）
-                        if !sceneState.availableFunctions.isEmpty {
+                        if !viewStore.availableFunctions.isEmpty {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_function", bundle: .module),
-                                options: sceneState.availableFunctions,
-                                selectedOptions: $sceneState.selectedFunctions
+                                options: viewStore.availableFunctions,
+                                selectedOptions: viewStore.selectedFunctions,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.function, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.function, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.function, .clear))) }
                             )
                             Divider()
                         }
 
                         // 会话筛选
-                        SessionFilterSection(sceneState: sceneState)
+                        SessionFilterSection(viewStore: viewStore)
                         Divider()
 
                         // 线程筛选（折叠式）
-                        if !sceneState.availableThreads.isEmpty {
+                        if !viewStore.availableThreads.isEmpty {
                             CollapsibleFilterSection(
                                 title: String(localized: "search_field_thread", bundle: .module),
-                                options: sceneState.availableThreads,
-                                selectedOptions: $sceneState.selectedThreads
+                                options: viewStore.availableThreads,
+                                selectedOptions: viewStore.selectedThreads,
+                                onToggle: { viewStore.send(.filter(.updateFilter(.thread, .toggle($0)))) },
+                                onSelectAll: { viewStore.send(.filter(.updateFilter(.thread, .selectAll))) },
+                                onClear: { viewStore.send(.filter(.updateFilter(.thread, .clear))) }
                             )
                         }
                     }
@@ -97,14 +114,14 @@ struct LogFilterSheet: View {
                     VStack(spacing: 2) {
                         Text(String(localized: "filter_title", bundle: .module))
                             .font(.headline)
-                        Text(String(format: String(localized: "match_count", bundle: .module), sceneState.filteredEvents.count))
+                        Text(String(format: String(localized: "match_count", bundle: .module), viewStore.totalCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "reset_button", bundle: .module)) {
-                        sceneState.resetFilters()
+                        viewStore.resetFilters()
                     }
                     .foregroundColor(.red)
                 }
@@ -113,6 +130,10 @@ struct LogFilterSheet: View {
                         dismiss()
                     }
                 }
+            }
+            .task {
+                // 打开筛选页面时加载全量选项
+                viewStore.send(.filter(.loadAvailableOptions))
             }
         }
     }
@@ -124,12 +145,15 @@ struct LogFilterSheet: View {
                 Text(String(localized: "message_keywords", bundle: .module))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("(\(sceneState.selectedMessageKeywords.count))")
+                Text("(\(viewStore.state.filterFeature.selectedMessageKeywords.count))")
                     .font(.caption)
                     .foregroundColor(.blue)
                 Spacer()
                 Button(String(localized: "clear_button", bundle: .module)) {
-                    sceneState.selectedMessageKeywords.removeAll()
+                    // 逐个移除所有关键词
+                    viewStore.selectedMessageKeywords.forEach { keyword in
+                        viewStore.send(.filter(.updateFilter(.messageKeyword, .toggle(keyword))))
+                    }
                 }
                 .font(.caption)
                 .foregroundColor(.red)
@@ -137,13 +161,13 @@ struct LogFilterSheet: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(Array(sceneState.selectedMessageKeywords).sorted(), id: \.self) { keyword in
+                    ForEach(Array(viewStore.state.filterFeature.selectedMessageKeywords).sorted(), id: \.self) { keyword in
                         HStack(spacing: 4) {
                             Text(keyword)
                                 .font(.caption)
                                 .lineLimit(1)
                             Button(action: {
-                                sceneState.selectedMessageKeywords.remove(keyword)
+                                viewStore.send(.filter(.updateFilter(.messageKeyword, .toggle(keyword))))
                             }) {
                                 Image(systemName: "xmark")
                                     .font(.caption2)
@@ -172,11 +196,21 @@ struct LogFilterSheet: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                Button(sceneState.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
-                    if sceneState.selectedLevels.count == 5 {
-                        sceneState.selectedLevels.removeAll()
+                Button(viewStore.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
+                    if viewStore.selectedLevels.count == 5 {
+                        // 清除所有:逐个toggle
+                        [LogEvent.Level.verbose, .debug, .info, .warning, .error].forEach { level in
+                            if viewStore.selectedLevels.contains(level) {
+                                viewStore.send(.filter(.toggleLevel(level)))
+                            }
+                        }
                     } else {
-                        sceneState.selectedLevels = [.verbose, .debug, .info, .warning, .error]
+                        // 全选:逐个toggle
+                        [LogEvent.Level.verbose, .debug, .info, .warning, .error].forEach { level in
+                            if !viewStore.selectedLevels.contains(level) {
+                                viewStore.send(.filter(.toggleLevel(level)))
+                            }
+                        }
                     }
                 }
                 .font(.caption)
@@ -188,10 +222,10 @@ struct LogFilterSheet: View {
                     ForEach([LogEvent.Level.verbose, .debug, .info, .warning, .error], id: \.self) { level in
                         FilterChip(
                             title: level.severity,
-                            isSelected: sceneState.selectedLevels.contains(level),
+                            isSelected: viewStore.state.filterFeature.selectedLevels.contains(level),
                             color: level.color
                         ) {
-                            sceneState.toggleLevel(level)
+                            viewStore.toggleLevel(level)
                         }
                     }
                 }
@@ -202,10 +236,7 @@ struct LogFilterSheet: View {
 
 // MARK: - 会话筛选 Section
 struct SessionFilterSection: View {
-    @ObservedObject var sceneState: LogDetailSceneState
-    @State private var sessions: [SessionInfo] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    @ObservedObject var viewStore: LogDetailViewStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -213,41 +244,56 @@ struct SessionFilterSection: View {
                 Text(String(localized: "session_filter_title", bundle: .module))
                     .font(.subheadline)
                     .fontWeight(.medium)
+                Text("(\(viewStore.selectedSessionIds.count))")
+                    .font(.caption)
+                    .foregroundColor(.blue)
                 Spacer()
-                if let _ = sceneState.selectedSessionId {
+
+                if !viewStore.selectedSessionIds.isEmpty {
                     Button(String(localized: "clear_button", bundle: .module)) {
-                        sceneState.selectedSessionId = nil
+                        viewStore.send(.filter(.clearSessionIds))
                     }
                     .font(.caption)
                     .foregroundColor(.red)
                 }
             }
 
-            if isLoading {
+            // 使用 ViewStore 状态
+            if viewStore.isLoadingSessions {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding()
-            } else if let error = errorMessage {
-                Text(error)
+            } else if let errorMessage = viewStore.sessionLoadingError {
+                // 错误展示
+                VStack(spacing: 4) {
+                    Text(String(localized: "session_load_failed", bundle: .module))
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Text(errorMessage)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Button(String(localized: "retry_button", bundle: .module)) {
+                        viewStore.send(.filter(.loadSessions))
+                    }
                     .font(.caption)
-                    .foregroundColor(.red)
-            } else if sessions.isEmpty {
+                    .foregroundColor(.blue)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            } else if viewStore.availableSessions.isEmpty {
                 Text(String(localized: "session_empty_message", bundle: .module))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(sessions) { session in
+                        // 使用 ViewStore 中的会话列表
+                        ForEach(viewStore.availableSessions) { session in
                             SessionChip(
                                 session: session,
-                                isSelected: sceneState.selectedSessionId == session.id
+                                isSelected: viewStore.selectedSessionIds.contains(session.id)
                             ) {
-                                if sceneState.selectedSessionId == session.id {
-                                    sceneState.selectedSessionId = nil
-                                } else {
-                                    sceneState.selectedSessionId = session.id
-                                }
+                                viewStore.send(.filter(.updateFilter(.sessionId, .toggle(session.id))))
                             }
                         }
                     }
@@ -255,31 +301,9 @@ struct SessionFilterSection: View {
             }
         }
         .task {
-            await loadSessions()
+            // 通过 Action 触发加载（缓存机制在 Reducer 中处理）
+            viewStore.send(.filter(.loadSessions))
         }
-    }
-
-    private func loadSessions() async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            guard let dbManager = LoggerEngine.shared.getDatabaseManager() else {
-                errorMessage = "Database manager not available"
-                isLoading = false
-                return
-            }
-
-            let loadedSessions = try await Task.detached {
-                try dbManager.fetchAllSessions()
-            }.value
-
-            sessions = loadedSessions
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
     }
 }
 
@@ -288,39 +312,123 @@ struct SessionChip: View {
     let session: SessionInfo
     let isSelected: Bool
     let action: () -> Void
+    let onDelete: ((String) -> Void)? // 可选的删除回调
+    let fullWidth: Bool // 是否全宽显示（纵向列表模式）
+
+    @State private var showDeleteConfirmation = false
+
+    // 提供默认初始化器，让 onDelete 和 fullWidth 可选
+    init(
+        session: SessionInfo,
+        isSelected: Bool,
+        action: @escaping () -> Void,
+        onDelete: ((String) -> Void)? = nil,
+        fullWidth: Bool = false
+    ) {
+        self.session = session
+        self.isSelected = isSelected
+        self.action = action
+        self.onDelete = onDelete
+        self.fullWidth = fullWidth
+    }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(session.id)
-                        .font(.caption)
-                        .fontWeight(.medium)
+            if fullWidth {
+                // 全宽列表项样式（用于纵向列表）
+                HStack(spacing: 12) {
+                    // 左侧：会话信息
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.id)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        HStack(spacing: 8) {
+                            Text(formattedDate)
+                                .font(.caption)
+                                .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+
+                            Text("•")
+                                .font(.caption)
+                                .foregroundColor(isSelected ? .white.opacity(0.6) : .secondary)
+
+                            Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                                .font(.caption)
+                                .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // 右侧：选中图标
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
+                            .font(.title3)
+                            .foregroundColor(.white)
                     }
                 }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.1))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
+                )
+            } else {
+                // 紧凑卡片样式（用于横向滚动）
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text(session.id)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                        }
+                    }
 
-                Text(formattedDate)
-                    .font(.caption2)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    Text(formattedDate)
+                        .font(.caption2)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
 
-                Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
-                    .font(.caption2)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                        .font(.caption2)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.2))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
+                )
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(isSelected ? Color.accentColor : Color.gray.opacity(0.2))
-            .foregroundColor(isSelected ? .white : .primary)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
+        // 仅当提供 onDelete 回调时显示 Context Menu
+        .contextMenu {
+            if onDelete != nil {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label(String(localized: "delete_session_context_menu", bundle: .module), systemImage: "trash")
+                }
+            }
+        }
+        // 删除确认对话框（仅在删除模式下显示）
+        .alert(String(format: String(localized: "delete_session_confirmation_title", bundle: .module), session.id), isPresented: $showDeleteConfirmation) {
+            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
+            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
+                onDelete?(session.id)
+            }
+        } message: {
+            Text(String(format: String(localized: "delete_session_confirmation_message", bundle: .module), session.logCount))
+        }
     }
 
     private var formattedDate: String {
@@ -331,10 +439,7 @@ struct SessionChip: View {
     }
 }
 
+// MARK: - FilterSectionWrapper (临时包装器,简化 ViewStore 使用)
 #Preview {
-    LogFilterSheet(sceneState: LogDetailSceneState(
-        logFileURL: URL(fileURLWithPath: "/tmp/test.log"),
-        prefix: "test",
-        identifier: "123"
-    ))
+    LogFilterSheet(viewStore: LoggerKit.makeViewStore())
 }

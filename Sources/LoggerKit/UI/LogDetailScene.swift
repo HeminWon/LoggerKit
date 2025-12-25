@@ -14,13 +14,11 @@ import AppKit
 #endif
 
 public struct LogDetailScene: View {
-    @ObservedObject var sceneState: LogDetailSceneState
+    @ObservedObject var viewStore: LogDetailViewStore
 
-    @State var isSharePresented: Bool = false
-    @State var isFilterPresented: Bool = false
-
-    public init(sceneState: LogDetailSceneState? = nil) {
-        self.sceneState = sceneState ?? LogDetailSceneState()
+    /// 使用 ViewStore 初始化
+    public init(viewStore: LogDetailViewStore) {
+        self.viewStore = viewStore
     }
 
     // MARK: - Localized Strings
@@ -48,13 +46,23 @@ public struct LogDetailScene: View {
         String(localized: "share_log", bundle: .module)
     }
 
+    /// 是否没有日志（根据 totalCount 和 loadingState 判断）
+    private var hasNoLogs: Bool {
+        // 加载中不禁用，避免闪烁
+        if viewStore.isLoading {
+            return false
+        }
+        // 总数为 0 且不在加载状态时才禁用
+        return viewStore.totalCount == 0 && viewStore.loadingState == .loaded
+    }
+
     public var body: some View {
         VStack {
-            if sceneState.isLoading {
+            if viewStore.isLoading {
                 Spacer()
                 ProgressView(loadingText)
                 Spacer()
-            } else if let error = sceneState.error {
+            } else if let error = viewStore.error {
                 Spacer()
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
@@ -69,76 +77,186 @@ public struct LogDetailScene: View {
             } else {
                 // 1️⃣ 筛选结果统计
                 HStack {
-                    Text(String(format: totalCountFormat, sceneState.filteredEvents.count))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if sceneState.activeFilterCount > 0 {
-                        Text(String(format: filterCountFormat, sceneState.activeFilterCount))
+                    if viewStore.totalCount > 0 {
+                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), viewStore.displayEvents.count, viewStore.totalCount))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(String(format: totalCountFormat, viewStore.displayEvents.count))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    if viewStore.activeFilterCount > 0 {
+                        Text(String(format: filterCountFormat, viewStore.activeFilterCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                     Spacer()
+
+                    // 导出进度显示
+                    if viewStore.isExporting {
+                        HStack(spacing: 4) {
+                            // 圆环进度
+                            if viewStore.totalExportCount > 0 {
+                                ZStack {
+                                    Circle()
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 2)
+                                        .frame(width: 16, height: 16)
+                                    Circle()
+                                        .trim(from: 0, to: viewStore.exportProgress)
+                                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                        .frame(width: 16, height: 16)
+                                        .rotationEffect(.degrees(-90))
+                                        .animation(.linear(duration: 0.1), value: viewStore.exportProgress)
+                                }
+                            } else {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .frame(width: 16, height: 16)
+                            }
+
+                            // 进度文字
+                            Text(String(localized: "exporting_progress", bundle: .module))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            if viewStore.totalExportCount > 0 {
+                                Text("\(viewStore.exportedCount)/\(viewStore.totalExportCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
 
                 Divider()
 
-                // 2️⃣ 日志列表
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(sceneState.filteredEvents, id: \.id) { logEvent in
-                            LogRowView(event: logEvent)
+                // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
+                List {
+                    ForEach(viewStore.displayEvents) { viewModel in
+                        if #available(iOS 15.0, macOS 13.0, *) {
+                            LogRowView(viewModel: viewModel)
+                                .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                                .listRowSeparator(.hidden)
+                                .onAppear {
+                                    // 滚动到底部时加载更多
+                                    if viewModel.id == viewStore.displayEvents.last?.id {
+                                        viewStore.loadMore()
+                                    }
+                                }
+                        } else {
+                            LogRowView(viewModel: viewModel)
+                                .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                                .onAppear {
+                                    // 滚动到底部时加载更多
+                                    if viewModel.id == viewStore.displayEvents.last?.id {
+                                        viewStore.loadMore()
+                                    }
+                                }
                         }
                     }
-                    .padding(.horizontal)
+
+                    // 分页加载指示器
+                    if viewStore.loadingState == .loadingMore {
+                        if #available(iOS 15.0, macOS 13.0, *) {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                        } else {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                            .listRowInsets(EdgeInsets())
+                        }
+                    }
                 }
+                .listStyle(.plain)
             }
         }
         .task {
-            await sceneState.loadLogFile()
+            await viewStore.loadLogFileAsync()
         }
-        .sheet(isPresented: $isFilterPresented) {
+        .sheet(isPresented: viewStore.filterPresentedBinding) {
             if #available(iOS 16.0, macOS 13.0, *) {
-                LogFilterSheet(sceneState: sceneState)
+                LogFilterSheet(viewStore: viewStore)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             } else {
-                LogFilterSheet(sceneState: sceneState)
+                LogFilterSheet(viewStore: viewStore)
+            }
+        }
+        .sheet(isPresented: viewStore.deleteManagementPresentedBinding) {
+            if #available(iOS 16.0, macOS 13.0, *) {
+                LogDeleteManagementSheet(viewStore: viewStore)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            } else {
+                LogDeleteManagementSheet(viewStore: viewStore)
             }
         }
         #if canImport(UIKit)
-        .sheet(isPresented: $isSharePresented) {
-            let shareSheet = ShareSheet(activityItems: [activityItem]) {
-                isSharePresented = false
-            }
-            if #available(iOS 16.0, *) {
-                shareSheet
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            } else  {
-                shareSheet
+        .sheet(isPresented: viewStore.sharePresentedBinding) {
+            if let url = viewStore.exportedFileURL {
+                let shareSheet = ShareSheet(activityItems: [url]) {
+                    viewStore.send(.setSharePresented(false))
+                }
+                if #available(iOS 16.0, *) {
+                    shareSheet
+                        .presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
+                } else  {
+                    shareSheet
+                }
             }
         }
         #endif
-        .navigationTitle(sceneState.displayTitle)
+        .navigationTitle(viewStore.displayTitle)
         #if os(iOS) || os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                // 筛选按钮
+                // 筛选按钮（高频操作，独立显示）
                 Button {
-                    isFilterPresented = true
+                    viewStore.send(.setFilterPresented(true))
                 } label: {
-                    if sceneState.activeFilterCount > 0 {
+                    if viewStore.activeFilterCount > 0 {
                         Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle.fill")
                     } else {
                         Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle")
                     }
                 }
+                .disabled(hasNoLogs)
 
-                // 分享按钮
-                shareButton
+                // 更多菜单（中低频操作）
+                Menu {
+                    // 导出日志
+                    Button {
+                        viewStore.startExport(format: .log)
+                    } label: {
+                        Label(String(localized: "export_logs", bundle: .module), systemImage: "square.and.arrow.up")
+                    }
+
+                    Divider()
+
+                    // 删除管理（危险操作）
+                    Button(role: .destructive) {
+                        viewStore.send(.setDeleteManagementPresented(true))
+                    } label: {
+                        Label(String(localized: "delete_management", bundle: .module), systemImage: "trash.circle")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .disabled(hasNoLogs)
             }
         }
         #else
@@ -153,14 +271,53 @@ public struct LogDetailScene: View {
     // MARK: - Subviews
     private var shareButton: some View {
         Button {
-            isSharePresented = true
+            viewStore.startExport(format: .log)
         } label: {
-            Label(shareLogText, systemImage: "square.and.arrow.up")
-        }
-    }
+            // 使用固定尺寸的 ZStack 确保布局不会因图标切换而变化
+            ZStack {
+                if viewStore.isExporting {
+                    // 圆环进度条
+                    if viewStore.totalExportCount > 0 {
+                        ZStack {
+                            // 背景圆环
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 2.5)
+                                .frame(width: 24, height: 24)
 
-    private var activityItem: URL {
-        LogParser.logEventToTempFile(fileName: sceneState.exportFileName, events: sceneState.filteredEvents)
+                            // 进度圆环
+                            Circle()
+                                .trim(from: 0, to: viewStore.exportProgress)
+                                .stroke(Color.blue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                                .frame(width: 24, height: 24)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 0.1), value: viewStore.exportProgress)
+
+                            // 百分比文字
+                            Text("\(Int(viewStore.exportProgress * 100))")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(.blue)
+                        }
+                    } else {
+                        // 初始化阶段,显示不定进度的圆环
+                        ProgressView()
+                            .frame(width: 24, height: 24)
+                    }
+                } else {
+                    // 分享图标
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 17))
+                }
+            }
+            .frame(width: 32, height: 32) // 固定尺寸,避免布局变化
+        }
+        .disabled(viewStore.isExporting || hasNoLogs)
+        .alert(String(localized: "export_failed", bundle: .module), isPresented: viewStore.exportErrorPresentedBinding) {
+            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
+        } message: {
+            if let error = viewStore.error {
+                Text(error.localizedDescription)
+            }
+        }
     }
 
     private func copyToClipboard(text: String) {
@@ -174,41 +331,19 @@ public struct LogDetailScene: View {
 
 }
 
-struct LogRowView: View {
-    let event: LogEvent
+// MARK: - LogRowViewModel
+/// LogRowView 的专用数据模型,封装了显示所需的 event、index 和预计算的颜色
+public struct LogRowViewModel: Identifiable {
+    public let id: UUID              // 使用 event.id 作为唯一标识
+    public let event: LogEvent       // 原始日志数据
+    public let index: Int            // 显示序号
+    public let cachedColor: Color    // 预计算的 session 颜色
 
-    // 缓存计算的颜色,避免每次重绘都计算
-    private let cachedSessionColor: Color
-
-    public init(event: LogEvent) {
+    public init(event: LogEvent, index: Int) {
+        self.id = event.id
         self.event = event
-        self.cachedSessionColor = Self.sessionColor(for: event.sessionId)
-    }
-
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(event.sessionId)
-                .foregroundColor(cachedSessionColor)
-                .font(.system(size: 9))
-            + Text(" ")
-                .font(.system(size: 9))
-            + Text(event.prefix)
-                .foregroundColor(.gray)
-                .font(.system(size: 9))
-
-            Text(event.message)
-                .foregroundColor(event.level.color)
-                .font(.caption2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 1)
-        // 长按弹出复制菜单
-        .contextMenu {
-            Button(action: { copyLog() }) {
-                Label(String(localized: "copy_log", bundle: .module), systemImage: "doc.on.doc")
-            }
-        }
+        self.index = index
+        self.cachedColor = Self.sessionColor(for: event.sessionId)
     }
 
     // 根据 sessionId 生成一致的柔和随机颜色
@@ -231,33 +366,55 @@ struct LogRowView: View {
         // 返回柔和的颜色,前景色使用完全不透明
         return Color(hue: hue, saturation: saturation, brightness: brightness, opacity: 1.0)
     }
-    
+}
+
+struct LogRowView: View {
+    let viewModel: LogRowViewModel
+
+    public init(viewModel: LogRowViewModel) {
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(viewModel.event.sessionId)
+                .foregroundColor(viewModel.cachedColor)
+                .font(.system(size: 9))
+            + Text(" #\(viewModel.index)")
+                .foregroundColor(.secondary)
+                .font(.system(size: 9))
+            + Text(" ")
+                .font(.system(size: 9))
+            + Text(viewModel.event.prefix)
+                .foregroundColor(.gray)
+                .font(.system(size: 9))
+
+            Text(viewModel.event.message)
+                .foregroundColor(viewModel.event.level.color)
+                .font(.caption2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 1)
+        // 长按弹出复制菜单
+        .contextMenu {
+            Button(action: { copyLog() }) {
+                Label(String(localized: "copy_log", bundle: .module), systemImage: "doc.on.doc")
+            }
+        }
+    }
+
     private func copyLog() {
         #if canImport(UIKit)
         let pasteboard = UIPasteboard.general
         // 复制完整日志内容：前缀 + message
-        pasteboard.string = "\(event.prefix) - \(event.message)"
+        pasteboard.string = "\(viewModel.event.prefix) - \(viewModel.event.message)"
         #elseif canImport(AppKit)
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("\(event.prefix) - \(event.message)", forType: .string)
+        NSPasteboard.general.setString("\(viewModel.event.prefix) - \(viewModel.event.message)", forType: .string)
         #endif
     }
 }
 
 #Preview {
 }
-
-#if canImport(UIKit)
-extension LogDetailScene {
-    /// 创建一个包含 LogDetailScene 的 UIViewController,方便在 UIKit 项目中使用
-    /// - Parameter sceneState: 可选的场景状态,不传则使用默认状态（加载所有日志）
-    /// - Returns: 包含 LogDetailScene 的 UIViewController,外部可以自行决定如何展示 (present/push)
-    public static func makeViewController(sceneState: LogDetailSceneState? = nil) -> UIViewController {
-        let state = sceneState ?? LogDetailSceneState()
-        let scene = LogDetailScene(sceneState: state)
-        let hostingController = UIHostingController(rootView: scene)
-        hostingController.title = "Logs"
-        return hostingController
-    }
-}
-#endif

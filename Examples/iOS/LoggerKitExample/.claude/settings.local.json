@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "mcp__thinking__sequentialthinking",
+      "Bash(swift test:*)",
+      "Bash(tee:*)",
+      "Bash(swift build:*)",
+      "Bash(git config:*)",
+      "Bash(openspec list:*)",
+      "Bash(openspec show:*)",
+      "Bash(openspec validate:*)",
+      "Bash(openspec archive:*)",
+      "Bash(mkdir:*)",
+      "Bash(xcodebuild:*)",
+      "SlashCommand(/openspec:proposal)"
     ],
     "deny": [],
     "ask": []

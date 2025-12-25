@@ -27,6 +27,8 @@
 "clear_button" = "清空";
 "select_all_button" = "全选";
 "log_level" = "日志等级";
+"filter_load_options_failed" = "加载筛选选项失败";
+"filter_empty_result" = "筛选结果为空";
 
 // MARK: - Search Preview Section
 "keyword_search" = "关键词搜索";
@@ -40,6 +42,7 @@
 "remove_keyword" = "移除关键词";
 "add_keyword" = "添加关键词";
 "no_match_items" = "无匹配项";
+"loading_search_data" = "正在加载搜索数据...";
 
 // MARK: - Collapsible Filter Section
 "search_prompt" = "搜索%@...";
@@ -51,3 +54,45 @@
 
 // MARK: - Log List Scene
 "clear_all" = "清除全部";
+"list_load_failed" = "加载失败: %@";
+"list_no_logs_found" = "没有找到日志";
+"list_invalid_sequence" = "查询序列号无效";
+
+// MARK: - Log Detail Scene - Toolbar
+"export_logs" = "导出日志";
+"delete_management" = "删除管理";
+"loaded_total_count" = "已加载 %d / 总计 %d 条";
+
+// MARK: - Export
+"export_failed" = "导出失败";
+"confirm_button" = "确定";
+"exporting_progress" = "正在导出";
+"export_no_data" = "无数据可导出";
+"export_cancelled_by_user" = "用户取消导出";
+
+// MARK: - Delete Management Sheet
+"delete_management_title" = "日志删除管理";
+"delete_all_logs_title" = "删除所有日志";
+"delete_all_logs_description" = "清空数据库中的所有日志记录";
+"delete_all_logs_button" = "删除所有日志";
+"delete_all_confirmation_title" = "确认删除所有日志";
+"delete_all_confirmation_message" = "此操作将删除所有日志记录，且不可恢复。";
+"delete_by_session_title" = "按会话删除";
+"delete_by_session_description" = "选择要删除的会话";
+"selected_sessions_count" = "已选中 %d 个会话";
+"select_all" = "全选";
+"empty" = "清空";
+"no_session_records" = "暂无会话记录";
+"delete_selected_sessions_button" = "删除选中的会话 (%d)";
+"delete_sessions_confirmation_title" = "确认删除选中的会话";
+"delete_sessions_confirmation_message" = "将删除 %d 个会话的所有日志，且不可恢复。";
+"delete_session_context_menu" = "删除此会话";
+"delete_session_confirmation_title" = "确认删除会话 %@";
+"delete_session_confirmation_message" = "将删除此会话的 %d 条日志，且不可恢复。";
+"delete_failed_title" = "删除失败";
+"cancel_button" = "取消";
+"delete_button" = "删除";
+"delete_load_sessions_failed" = "加载会话列表失败";
+"delete_no_sessions_selected" = "未选择要删除的会话";
+"delete_operation_failed" = "删除操作失败";
+"delete_session_not_found" = "会话不存在: %@";

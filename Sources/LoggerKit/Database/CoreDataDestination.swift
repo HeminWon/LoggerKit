@@ -13,39 +13,47 @@ import CoreData
 public final class CoreDataDestination: BaseDestination {
 
     private let coreDataStack: CoreDataStack
-    private let batchSize: Int
     private var pendingEvents: [LogEvent] = []
     private let queue = DispatchQueue(label: "com.loggerkit.coredata", qos: .utility)
-    private var flushTimer: Timer?
 
-    // 会话信息
+    // MARK: - 写入策略配置
+
+    /// 批量写入大小
+    private let batchSize: Int
+
+    /// 防抖延迟（秒）
+    private let debounceInterval: TimeInterval
+
+    /// 立即写入的日志级别
+    private let immediateFlushLevels: Set<LogEvent.Level>
+
+    /// 防抖定时器
+    private var debounceTimer: DispatchSourceTimer?
+
+    // MARK: - 会话信息
+
     private let sessionId: String
     private let sessionStartTime: TimeInterval
 
-    public init(sessionId: String, sessionStartTime: TimeInterval, coreDataStack: CoreDataStack = .shared, batchSize: Int = 50) {
+    public init(
+        sessionId: String,
+        sessionStartTime: TimeInterval,
+        coreDataStack: CoreDataStack = .shared,
+        batchSize: Int = 50,
+        debounceInterval: TimeInterval = 2.0,
+        immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]
+    ) {
         self.sessionId = sessionId
         self.sessionStartTime = sessionStartTime
         self.coreDataStack = coreDataStack
         self.batchSize = batchSize
+        self.debounceInterval = debounceInterval
+        self.immediateFlushLevels = immediateFlushLevels
 
         super.init()
 
         // 设置格式 (不需要格式化,直接存储结构化数据)
         self.format = ""
-
-        // 启动定时刷新 (每 5 秒刷新一次)
-        setupFlushTimer()
-    }
-
-    private func setupFlushTimer() {
-        DispatchQueue.main.async { [weak self] in
-            self?.flushTimer = Timer.scheduledTimer(
-                withTimeInterval: 5.0,
-                repeats: true
-            ) { [weak self] _ in
-                self?.flush()
-            }
-        }
     }
 
     override public func send(
@@ -82,10 +90,38 @@ public final class CoreDataDestination: BaseDestination {
     private func addEvent(_ event: LogEvent) {
         pendingEvents.append(event)
 
-        // 达到批量大小时立即写入
+        // 【策略 1】紧急级别触发 - Error/Warning 立即写入
+        if immediateFlushLevels.contains(event.level) {
+            flushPendingEvents()
+            return
+        }
+
+        // 【策略 2】批量大小触发 - 达到批量大小立即写入
         if pendingEvents.count >= batchSize {
             flushPendingEvents()
+            return
         }
+
+        // 【策略 3】防抖触发 - 延迟写入
+        scheduleDebounceFlush()
+    }
+
+    /// 调度防抖刷新
+    private func scheduleDebounceFlush() {
+        // 取消之前的防抖计时器
+        debounceTimer?.cancel()
+
+        // 创建新的防抖计时器
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.setEventHandler { [weak self] in
+            self?.flushPendingEvents()
+        }
+
+        // 延迟执行
+        timer.schedule(deadline: .now() + debounceInterval)
+        timer.resume()
+
+        self.debounceTimer = timer
     }
 
     public func flush() {
@@ -95,6 +131,10 @@ public final class CoreDataDestination: BaseDestination {
     }
 
     private func flushPendingEvents() {
+        // 取消防抖定时器
+        debounceTimer?.cancel()
+        debounceTimer = nil
+
         guard !pendingEvents.isEmpty else { return }
 
         let eventsToWrite = pendingEvents
@@ -123,12 +163,21 @@ public final class CoreDataDestination: BaseDestination {
         case .info: return .info
         case .warning: return .warning
         case .error: return .error
+        case .critical: return .critical
+        case .fault: return .fault
         @unknown default: return .debug
         }
     }
 
     deinit {
-        flushTimer?.invalidate()
-        flush()
+        // 取消防抖定时器
+        debounceTimer?.cancel()
+        debounceTimer = nil
+
+        // 同步刷新，确保数据不丢失
+        // 注意：必须使用 sync 而非 async，避免对象销毁后闭包才执行
+        queue.sync {
+            flushPendingEvents()
+        }
     }
 }

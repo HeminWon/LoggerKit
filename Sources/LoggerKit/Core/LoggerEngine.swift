@@ -16,18 +16,35 @@ public struct LoggerEngineConfiguration: Sendable {
     public let maxDatabaseSize: Int64
     public let maxRetentionDays: Int
 
+    // MARK: - 日志写入策略配置
+
+    /// 批量写入大小（达到此数量立即写入）
+    public let batchSize: Int
+
+    /// 防抖延迟（秒）- 日志停止后延迟写入的时间
+    public let debounceInterval: TimeInterval
+
+    /// 立即写入的日志级别（这些级别的日志会绕过批量和防抖，立即写入）
+    public let immediateFlushLevels: Set<LogEvent.Level>
+
     public init(
         level: LogLevel = .debug,
         enableConsole: Bool = true,
         enableDatabase: Bool = true,
         maxDatabaseSize: Int64 = 100 * 1024 * 1024, // 100MB
-        maxRetentionDays: Int = 30
+        maxRetentionDays: Int = 30,
+        batchSize: Int = 50,
+        debounceInterval: TimeInterval = 2.0,
+        immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]
     ) {
         self.level = level
         self.enableConsole = enableConsole
         self.enableDatabase = enableDatabase
         self.maxDatabaseSize = maxDatabaseSize
         self.maxRetentionDays = maxRetentionDays
+        self.batchSize = batchSize
+        self.debounceInterval = debounceInterval
+        self.immediateFlushLevels = immediateFlushLevels
     }
 
 }
@@ -104,7 +121,13 @@ public final class LoggerEngine: @unchecked Sendable {
         // 配置 CoreData 数据库输出
         guard configuration.enableDatabase else { return }
 
-        let coreDataDest = CoreDataDestination(sessionId: sessionId, sessionStartTime: sessionStartTime)
+        let coreDataDest = CoreDataDestination(
+            sessionId: sessionId,
+            sessionStartTime: sessionStartTime,
+            batchSize: configuration.batchSize,
+            debounceInterval: configuration.debounceInterval,
+            immediateFlushLevels: configuration.immediateFlushLevels
+        )
         coreDataDest.minLevel = configuration.level.swiftyBeaverLevel
         swiftyBeaver.addDestination(coreDataDest)
 
