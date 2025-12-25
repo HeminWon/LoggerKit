@@ -75,7 +75,7 @@ public struct SearchFeature {
 
         // MARK: - Computed Properties
 
-        /// 所有搜索结果（供 UI 展示）
+        /// 所有搜索结果（供 UI 展示，优化: O(N) 合并算法）
         public var allSearchResults: [LogEvent] {
             let result: [LogEvent]
             switch searchPhase {
@@ -86,13 +86,16 @@ public struct SearchFeature {
                 result = previewResults
 
             case .fullSearching, .completed:
-                // 合并 preview 和 full search 结果
+                // 合并 preview 和 full search 结果 (O(N) 双指针合并)
                 result = mergeOrderedResults(previewResults, fullSearchResults)
 
             case .failed, .tooManyResults, .cancelled:
                 result = []
             }
+
+            #if DEBUG
             print("🖼️ [State.allSearchResults] 被访问 - searchPhase: \(searchPhase), 返回数量: \(result.count)")
+            #endif
             return result
         }
 
@@ -122,17 +125,31 @@ public struct SearchFeature {
             return false
         }
 
-        /// 分类搜索结果（用于向后兼容旧 UI）
+        /// 分类搜索结果（用于向后兼容旧 UI，优化: 单次遍历算法）
         public var categorizedResults: CategorizedSearchResults {
+            #if DEBUG
             print("🖼️ [categorizedResults] 被访问")
             print("   - searchText: '\(searchText)'")
             print("   - searchPhase: \(searchPhase)")
             print("   - previewResults.count: \(previewResults.count)")
             print("   - allSearchResults.count: \(allSearchResults.count)")
+            #endif
 
+            let result = computeCategorizedResults(allResults: allSearchResults)
+
+            #if DEBUG
+            print("   → 返回结果 - totalCount: \(result.totalCount)")
+            #endif
+            return result
+        }
+
+        /// 计算分类搜索结果（单次遍历优化）
+        private func computeCategorizedResults(allResults: [LogEvent]) -> CategorizedSearchResults {
             // 如果没有搜索文本或者搜索为空，返回空结果
-            guard !searchText.isEmpty, !allSearchResults.isEmpty else {
+            guard !searchText.isEmpty, !allResults.isEmpty else {
+                #if DEBUG
                 print("   → 返回空结果（searchText 为空或 allSearchResults 为空）")
+                #endif
                 return CategorizedSearchResults()
             }
 
@@ -145,14 +162,14 @@ public struct SearchFeature {
 
             let searchTextLowercased = searchText.lowercased()
 
-            // 统计每个字段的匹配项
+            // 统计每个字段的匹配项（单次遍历）
             var functionCounts: [String: Int] = [:]
             var fileNameCounts: [String: Int] = [:]
             var contextCounts: [String: Int] = [:]
             var threadCounts: [String: Int] = [:]
             var messageCount: Int = 0
 
-            for event in allSearchResults {
+            for event in allResults {
                 if searchFields.contains(.function) && event.function.lowercased().contains(searchTextLowercased) {
                     functionCounts[event.function, default: 0] += 1
                 }
@@ -182,7 +199,7 @@ public struct SearchFeature {
 
             // 消息匹配只显示一个示例
             if messageCount > 0 {
-                if let firstMatch = allSearchResults.first(where: {
+                if let firstMatch = allResults.first(where: {
                     searchFields.contains(.message) && $0.message.lowercased().contains(searchTextLowercased)
                 }) {
                     messageItems = [SearchResultItem(field: .message, value: firstMatch.message, matchCount: messageCount)]
@@ -196,6 +213,7 @@ public struct SearchFeature {
             result.thread = threadItems
             result.message = messageItems
 
+            #if DEBUG
             print("   → 返回分类结果:")
             print("      - function: \(functionItems.count)")
             print("      - fileName: \(fileNameItems.count)")
@@ -203,6 +221,7 @@ public struct SearchFeature {
             print("      - thread: \(threadItems.count)")
             print("      - message: \(messageItems.count)")
             print("      - totalCount: \(result.totalCount)")
+            #endif
 
             return result
         }
@@ -407,18 +426,24 @@ public struct SearchFeature {
 
             case .updateSearchText(let text):
                 let oldText = state.searchText
+                #if DEBUG
                 print("🔍 [SearchFeature] updateSearchText: '\(oldText)' -> '\(text)' (相同: \(oldText == text))")
+                #endif
 
                 // 如果文本没有变化，直接返回
                 guard text != oldText else {
+                    #if DEBUG
                     print("⚠️ [SearchFeature] 文本未变化，忽略此次更新")
+                    #endif
                     return .none
                 }
 
                 state.searchText = text
 
                 if text.isEmpty {
+                    #if DEBUG
                     print("🔍 [SearchFeature] 搜索文本为空，清空搜索")
+                    #endif
                     // 清空搜索
                     state.searchPhase = .idle
                     state.clearSearchResults()
@@ -435,7 +460,9 @@ public struct SearchFeature {
                 }
 
                 // 直接开始搜索（UI 层已经做了防抖）
+                #if DEBUG
                 print("🔍 [SearchFeature] 立即开始 preview search（UI 层已防抖）")
+                #endif
                 state.searchPhase = .previewSearching(sessionCount: state.previewSessionCount)
 
                 // 取消不相关的搜索任务
@@ -483,19 +510,27 @@ public struct SearchFeature {
                 return .none
 
             case .userRequestedFullSearch:
+                #if DEBUG
                 print("🔍 [SearchFeature] userRequestedFullSearch 触发")
+                #endif
                 guard let snapshot = state.searchSnapshot else {
+                    #if DEBUG
                     print("⚠️ [SearchFeature] searchSnapshot 为 nil，无法执行 full search")
+                    #endif
                     return .none
                 }
 
                 guard !snapshot.fullSearchSessions.isEmpty else {
+                    #if DEBUG
                     print("⚠️ [SearchFeature] 没有更多 session 需要搜索")
+                    #endif
                     // 没有更多 session 需要搜索
                     return .none
                 }
 
+                #if DEBUG
                 print("🔍 [SearchFeature] 开始 full search - 需要搜索 \(snapshot.fullSearchSessions.count) 个 sessions")
+                #endif
                 state.searchPhase = .fullSearching(
                     currentSessionIndex: 0,
                     totalSessions: snapshot.fullSearchSessions.count,
@@ -508,7 +543,9 @@ public struct SearchFeature {
             // MARK: - Filter State Sync
 
             case .syncFilterState(let selectedIds, let allIds):
+                #if DEBUG
                 print("🔍 [SearchFeature] syncFilterState - selected: \(selectedIds.count), all: \(allIds.count)")
+                #endif
                 state.selectedSessionIds = selectedIds
                 state.allAvailableSessionIds = allIds
 
@@ -516,7 +553,9 @@ public struct SearchFeature {
                 if state.isSearching {
                     let snapshotIds = state.searchSnapshot?.selectedSessionIds ?? []
                     if snapshotIds != selectedIds {
+                        #if DEBUG
                         print("⚠️ [SearchFeature] Filter 发生变化，取消当前搜索")
+                        #endif
                         return .send(.cancelAllSearches)
                     }
                 }
@@ -526,23 +565,31 @@ public struct SearchFeature {
             // MARK: - Preview Search
 
             case .startPreviewSearch:
+                #if DEBUG
                 print("🔍 [SearchFeature] startPreviewSearch 触发")
+                #endif
                 guard !state.searchText.isEmpty else {
+                    #if DEBUG
                     print("⚠️ [SearchFeature] 搜索文本为空，忽略 startPreviewSearch")
+                    #endif
                     return .none
                 }
 
+                #if DEBUG
                 print("🔍 [SearchFeature] 进入 previewSearching 状态，预览 session 数: \(state.previewSessionCount)")
+                #endif
                 state.searchPhase = .previewSearching(sessionCount: state.previewSessionCount)
 
                 return handlePreviewSearch(state: state)
 
             case .previewSearchCompleted(let snapshot, let matches, let sessions, let hasMore):
+                #if DEBUG
                 print("✅ [SearchFeature] previewSearchCompleted - 匹配数: \(matches.count), 已搜索 sessions: \(sessions), 还有更多: \(hasMore)")
                 print("🔍 [SearchFeature] Snapshot - preview sessions: \(snapshot.previewSessions.count), full search sessions: \(snapshot.fullSearchSessions.count)")
                 print("🔍 [SearchFeature] 当前 searchText: '\(state.searchText)'")
                 print("🔍 [SearchFeature] Snapshot searchText: '\(snapshot.searchText)'")
                 print("🔍 [SearchFeature] matches 详情: \(matches.map { "\($0.message.prefix(50))..." })")
+                #endif
 
                 state.searchSnapshot = snapshot
                 state.previewResults = matches
@@ -551,8 +598,11 @@ public struct SearchFeature {
                     searchedSessions: sessions,
                     hasMoreSessions: hasMore
                 )
+                #if DEBUG
                 print("🔍 [SearchFeature] 更新 searchPhase: \(state.searchPhase) -> \(newPhase)")
+                #endif
                 state.searchPhase = newPhase
+                #if DEBUG
                 print("✅ [SearchFeature] State 更新完成:")
                 print("   - previewResults.count: \(state.previewResults.count)")
                 print("   - searchPhase: \(state.searchPhase)")
@@ -562,11 +612,14 @@ public struct SearchFeature {
                 // 测试：手动调用 categorizedResults 看看会发生什么
                 let testResults = state.categorizedResults
                 print("🧪 [测试] categorizedResults.totalCount: \(testResults.totalCount)")
+                #endif
 
                 return .none
 
             case .previewSearchFailed(let error):
+                #if DEBUG
                 print("❌ [SearchFeature] previewSearchFailed - 错误: \(error.localizedDescription)")
+                #endif
                 state.searchPhase = .failed(message: error.localizedDescription)
                 state.searchSnapshot = nil
                 return .none
@@ -666,6 +719,7 @@ public struct SearchFeature {
             let previewSessionCount = state.previewSessionCount
             let resultsLimit = state.searchResultsLimit
 
+            #if DEBUG
             print("🔍 [SearchFeature] handlePreviewSearch 开始")
             print("🔍 [SearchFeature] - searchText: '\(searchText)'")
             print("🔍 [SearchFeature] - searchFields: \(searchFields)")
@@ -673,14 +727,17 @@ public struct SearchFeature {
             print("🔍 [SearchFeature] - allAvailableSessionIds: \(allAvailableSessionIds.count) 个")
             print("🔍 [SearchFeature] - previewSessionCount: \(previewSessionCount)")
             print("🔍 [SearchFeature] - resultsLimit: \(resultsLimit)")
+            #endif
 
             return .stream(id: CancellationId.previewSearch) { [dataLoader = self.dataLoader] in
                 AsyncStream { continuation in
                     Task { @MainActor in
                         do {
+                            #if DEBUG
                             print("🔍 [SearchFeature] Task 开始执行 (MainActor)")
                             // 1. 创建搜索快照
                             print("🔍 [SearchFeature] 步骤 1: 创建搜索快照...")
+                            #endif
                             let snapshot = try await createSearchSnapshot(
                                 dataLoader: dataLoader,
                                 searchText: searchText,
@@ -689,30 +746,40 @@ public struct SearchFeature {
                                 allAvailableSessionIds: allAvailableSessionIds,
                                 previewSessionCount: previewSessionCount
                             )
+                            #if DEBUG
                             print("✅ [SearchFeature] 快照创建完成 - preview sessions: \(snapshot.previewSessions.count), full search sessions: \(snapshot.fullSearchSessions.count)")
 
                             // 2. 查询 Preview sessions 的所有日志
                             print("🔍 [SearchFeature] 步骤 2: 查询 Preview sessions 的日志...")
+                            #endif
                             let previewSessionIds = Set(snapshot.previewSessions.map { $0.id })
+                            #if DEBUG
                             print("🔍 [SearchFeature] - 查询 session IDs: \(previewSessionIds)")
+                            #endif
                             let matches = try await dataLoader.searchEvents(
                                 sessionIds: previewSessionIds,
                                 searchText: searchText,
                                 searchFields: searchFields,
                                 limit: resultsLimit
                             )
+                            #if DEBUG
                             print("✅ [SearchFeature] 查询完成 - 找到 \(matches.count) 条匹配")
+                            #endif
 
                             // 3. 检查结果数量
                             if matches.count > resultsLimit {
+                                #if DEBUG
                                 print("⚠️ [SearchFeature] 结果超过限制: \(matches.count) > \(resultsLimit)")
+                                #endif
                                 continuation.yield(.searchResultsExceeded(currentCount: matches.count, stage: .preview))
                                 continuation.finish()
                                 return
                             }
 
                             // 4. 完成 Preview
+                            #if DEBUG
                             print("🔍 [SearchFeature] 步骤 4: 发送 previewSearchCompleted")
+                            #endif
                             continuation.yield(.previewSearchCompleted(
                                 snapshot: snapshot,
                                 matches: matches,
@@ -720,10 +787,14 @@ public struct SearchFeature {
                                 hasMoreSessions: !snapshot.fullSearchSessions.isEmpty
                             ))
                             continuation.finish()
+                            #if DEBUG
                             print("✅ [SearchFeature] Preview Search 流程完成")
+                            #endif
 
                         } catch {
+                            #if DEBUG
                             print("❌ [SearchFeature] Preview Search 失败: \(error)")
+                            #endif
                             continuation.yield(.previewSearchFailed(error))
                             continuation.finish()
                         }
@@ -798,29 +869,39 @@ public struct SearchFeature {
             allAvailableSessionIds: Set<String>,
             previewSessionCount: Int
         ) async throws -> SearchSnapshot {
+            #if DEBUG
             print("🔍 [createSearchSnapshot] 开始创建快照")
             print("🔍 [createSearchSnapshot] - selectedSessionIds: \(selectedSessionIds)")
             print("🔍 [createSearchSnapshot] - allAvailableSessionIds: \(allAvailableSessionIds)")
+            #endif
 
             // 确定搜索范围
             let searchSessionIds: Set<String>
             if selectedSessionIds.isEmpty || selectedSessionIds.count == allAvailableSessionIds.count {
                 // 未选或全选 → 搜索所有
                 searchSessionIds = allAvailableSessionIds
+                #if DEBUG
                 print("🔍 [createSearchSnapshot] 使用所有 sessions: \(searchSessionIds.count) 个")
+                #endif
             } else {
                 // 选中特定 session → 只搜索这些
                 searchSessionIds = selectedSessionIds
+                #if DEBUG
                 print("🔍 [createSearchSnapshot] 使用选中的 sessions: \(searchSessionIds.count) 个")
+                #endif
             }
 
             // 获取所有 sessions（按时间倒序）
+            #if DEBUG
             print("🔍 [createSearchSnapshot] 调用 dataLoader.getSessions...")
+            #endif
             let allSessions = try await dataLoader.getSessions(
                 sessionIds: searchSessionIds,
                 sortOrder: .timeDescending
             )
+            #if DEBUG
             print("✅ [createSearchSnapshot] 获取到 \(allSessions.count) 个 sessions")
+            #endif
 
             // Preview 始终只取最新 N 个
             let previewSessions = Array(allSessions.prefix(previewSessionCount))
@@ -838,19 +919,33 @@ public struct SearchFeature {
             )
         }
 
-        /// 按时间倒序插入新结果
+        /// 按时间倒序合并新结果（优化: O(N²) → O(N)）
         private func insertOrderedMatches(
             existing: [LogEvent],
             new: [LogEvent]
         ) -> [LogEvent] {
-            let sorted = new.sorted { $0.timestamp > $1.timestamp }
-            var result = existing
+            // 先对新结果排序
+            let sortedNew = new.sorted { $0.timestamp > $1.timestamp }
 
-            for event in sorted {
-                // 二分插入
-                let index = result.firstIndex { $0.timestamp < event.timestamp } ?? result.count
-                result.insert(event, at: index)
+            // 预分配容量，避免多次重新分配
+            var result: [LogEvent] = []
+            result.reserveCapacity(existing.count + sortedNew.count)
+
+            // 双指针合并（假设 existing 已经按时间倒序排列）
+            var i = 0, j = 0
+            while i < existing.count && j < sortedNew.count {
+                if existing[i].timestamp > sortedNew[j].timestamp {
+                    result.append(existing[i])
+                    i += 1
+                } else {
+                    result.append(sortedNew[j])
+                    j += 1
+                }
             }
+
+            // 添加剩余元素
+            result.append(contentsOf: existing[i...])
+            result.append(contentsOf: sortedNew[j...])
 
             return result
         }
