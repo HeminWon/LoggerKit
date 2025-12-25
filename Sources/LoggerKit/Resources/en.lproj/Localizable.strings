@@ -44,6 +44,30 @@
 "no_match_items" = "No matches";
 "loading_search_data" = "Loading search data...";
 
+// MARK: - Search Status
+"typing_status" = "Typing...";
+"preview_searching_title" = "Preview Searching";
+"preview_searching_sessions" = "Searching the latest %d sessions";
+"preview_completed" = "Preview Completed";
+"search_more" = "Search More";
+"matches_count" = "%d matches";
+"latest_sessions" = "Latest %d sessions";
+"search_more_hint" = "💡 Click 'Search More' to search older logs";
+"full_searching_title" = "Full Searching";
+"cancel" = "Cancel";
+"scanned_logs" = "Scanned %d/%d logs";
+"found_matches" = "Found %d matches";
+"search_completed" = "Search Completed";
+"total_matches" = "%d matches";
+"total_sessions" = "%d sessions";
+"search_cancelled" = "Search Cancelled";
+"search_failed" = "Search Failed";
+"too_many_results" = "Too Many Results";
+"results_limit_exceeded" = "Found %d results (limit: %d)";
+"refine_search_hint" = "💡 Tip: Use more specific keywords to narrow search";
+"unique_messages" = "%d unique";
+"total_matches_count" = "%d total matches";
+
 // MARK: - Collapsible Filter Section
 "search_prompt" = "Search %@...";
 
@@ -51,6 +75,8 @@
 "session_filter_title" = "Session Filter";
 "session_empty_message" = "No sessions available";
 "session_log_count" = "%d logs";
+"session_load_failed" = "Failed to load sessions";
+"retry_button" = "Retry";
 
 // MARK: - Log List Scene
 "clear_all" = "Clear All";
@@ -69,6 +95,7 @@
 "exporting_progress" = "Exporting";
 "export_no_data" = "No data to export";
 "export_cancelled_by_user" = "Export cancelled by user";
+"export_format_log" = "Text (.log)";
 
 // MARK: - Delete Management Sheet
 "delete_management_title" = "Log Delete Management";

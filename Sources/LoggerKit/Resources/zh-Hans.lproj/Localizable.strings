@@ -44,6 +44,30 @@
 "no_match_items" = "无匹配项";
 "loading_search_data" = "正在加载搜索数据...";
 
+// MARK: - Search Status
+"typing_status" = "正在输入...";
+"preview_searching_title" = "预览搜索中";
+"preview_searching_sessions" = "正在搜索最近 %d 个 session";
+"preview_completed" = "预览完成";
+"search_more" = "搜索更多";
+"matches_count" = "%d 条匹配";
+"latest_sessions" = "最新 %d 个 session";
+"search_more_hint" = "💡 点击「搜索更多」可搜索更早的日志";
+"full_searching_title" = "完整搜索中";
+"cancel" = "取消";
+"scanned_logs" = "已扫描 %d/%d 条日志";
+"found_matches" = "找到 %d 条匹配";
+"search_completed" = "搜索完成";
+"total_matches" = "%d 条匹配";
+"total_sessions" = "%d 个 session";
+"search_cancelled" = "搜索已取消";
+"search_failed" = "搜索失败";
+"too_many_results" = "结果过多";
+"results_limit_exceeded" = "已找到 %d 条结果（限制：%d 条）";
+"refine_search_hint" = "💡 建议：使用更具体的关键词来缩小搜索范围";
+"unique_messages" = "%d 条去重";
+"total_matches_count" = "共 %d 条匹配";
+
 // MARK: - Collapsible Filter Section
 "search_prompt" = "搜索%@...";
 
@@ -51,6 +75,8 @@
 "session_filter_title" = "会话筛选";
 "session_empty_message" = "暂无会话记录";
 "session_log_count" = "%d 条日志";
+"session_load_failed" = "加载会话失败";
+"retry_button" = "重试";
 
 // MARK: - Log List Scene
 "clear_all" = "清除全部";
@@ -69,6 +95,7 @@
 "exporting_progress" = "正在导出";
 "export_no_data" = "无数据可导出";
 "export_cancelled_by_user" = "用户取消导出";
+"export_format_log" = "文本文件 (.log)";
 
 // MARK: - Delete Management Sheet
 "delete_management_title" = "日志删除管理";

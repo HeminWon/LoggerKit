@@ -17,7 +17,7 @@ public enum ExportFormat: String, Equatable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .log: return "Text (.log)"
+        case .log: return String(localized: "export_format_log", bundle: .module)
         }
     }
 }

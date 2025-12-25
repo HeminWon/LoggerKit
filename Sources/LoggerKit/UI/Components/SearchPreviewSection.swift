@@ -133,7 +133,7 @@ struct SearchPreviewSection: View {
             HStack {
                 ProgressView()
                     .scaleEffect(0.6)
-                Text("正在输入...")
+                Text(String(localized: "typing_status", bundle: .module))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -144,10 +144,10 @@ struct SearchPreviewSection: View {
                 ProgressView()
                     .scaleEffect(0.8)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("预览搜索中")
+                    Text(String(localized: "preview_searching_title", bundle: .module))
                         .font(.caption)
                         .fontWeight(.medium)
-                    Text("正在搜索最近 \(sessionCount) 个 session")
+                    Text(String(format: String(localized: "preview_searching_sessions", bundle: .module), sessionCount))
                         .font(.caption2)
                         .foregroundColor(.gray)
                 }
@@ -159,7 +159,7 @@ struct SearchPreviewSection: View {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text("预览完成")
+                    Text(String(localized: "preview_completed", bundle: .module))
                         .font(.caption)
                         .fontWeight(.medium)
                     Spacer()
@@ -171,7 +171,7 @@ struct SearchPreviewSection: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.down.circle.fill")
-                                Text("搜索更多")
+                                Text(String(localized: "search_more", bundle: .module))
                             }
                             .font(.caption)
                             .foregroundColor(.white)
@@ -185,14 +185,14 @@ struct SearchPreviewSection: View {
                 }
 
                 HStack(spacing: 12) {
-                    Label("\(matchCount) 条匹配", systemImage: "doc.text.magnifyingglass")
-                    Label("最新 \(searchedSessions) 个 session", systemImage: "folder")
+                    Label(String(format: String(localized: "matches_count", bundle: .module), matchCount), systemImage: "doc.text.magnifyingglass")
+                    Label(String(format: String(localized: "latest_sessions", bundle: .module), searchedSessions), systemImage: "folder")
                 }
                 .font(.caption2)
                 .foregroundColor(.gray)
 
                 if hasMoreSessions {
-                    Text("💡 点击「搜索更多」可搜索更早的日志")
+                    Text(String(localized: "search_more_hint", bundle: .module))
                         .font(.caption2)
                         .foregroundColor(.blue)
                 }
@@ -204,7 +204,7 @@ struct SearchPreviewSection: View {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("完整搜索中")
+                    Text(String(localized: "full_searching_title", bundle: .module))
                         .font(.caption)
                         .fontWeight(.medium)
                     Spacer()
@@ -215,7 +215,7 @@ struct SearchPreviewSection: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark.circle.fill")
-                            Text("取消")
+                            Text(String(localized: "cancel", bundle: .module))
                         }
                         .font(.caption)
                         .foregroundColor(.white)
@@ -249,9 +249,9 @@ struct SearchPreviewSection: View {
 
                     // 状态信息（显示日志数量）
                     HStack(spacing: 12) {
-                        Text("已扫描 \(scannedEvents)/\(totalEstimated) 条日志")
+                        Text(String(format: String(localized: "scanned_logs", bundle: .module), scannedEvents, totalEstimated))
                             .font(.caption2)
-                        Text("找到 \(matchCount) 条匹配")
+                        Text(String(format: String(localized: "found_matches", bundle: .module), matchCount))
                             .font(.caption2)
                     }
                     .foregroundColor(.gray)
@@ -264,12 +264,12 @@ struct SearchPreviewSection: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("搜索完成")
+                    Text(String(localized: "search_completed", bundle: .module))
                         .font(.caption)
                         .fontWeight(.medium)
                     HStack(spacing: 12) {
-                        Label("\(totalMatches) 条匹配", systemImage: "doc.text.magnifyingglass")
-                        Label("\(searchedSessions) 个 session", systemImage: "folder")
+                        Label(String(format: String(localized: "total_matches", bundle: .module), totalMatches), systemImage: "doc.text.magnifyingglass")
+                        Label(String(format: String(localized: "total_sessions", bundle: .module), searchedSessions), systemImage: "folder")
                     }
                     .font(.caption2)
                     .foregroundColor(.gray)
@@ -281,7 +281,7 @@ struct SearchPreviewSection: View {
             HStack {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundColor(.orange)
-                Text("搜索已取消")
+                Text(String(localized: "search_cancelled", bundle: .module))
                     .font(.caption)
                     .foregroundColor(.orange)
             }
@@ -292,7 +292,7 @@ struct SearchPreviewSection: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("搜索失败")
+                    Text(String(localized: "search_failed", bundle: .module))
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.red)
@@ -308,17 +308,17 @@ struct SearchPreviewSection: View {
                 HStack {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundColor(.orange)
-                    Text("结果过多")
+                    Text(String(localized: "too_many_results", bundle: .module))
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.orange)
                 }
 
-                Text("已找到 \(currentCount) 条结果（限制：\(limit) 条）")
+                Text(String(format: String(localized: "results_limit_exceeded", bundle: .module), currentCount, limit))
                     .font(.caption2)
                     .foregroundColor(.gray)
 
-                Text("💡 建议：使用更具体的关键词来缩小搜索范围")
+                Text(String(localized: "refine_search_hint", bundle: .module))
                     .font(.caption2)
                     .foregroundColor(.blue)
             }
@@ -461,13 +461,13 @@ struct SearchPreviewSection: View {
                     .font(.caption2)
 
                 // 显示去重消息数量
-                Text("\(String(localized: "search_field_message", bundle: .module)) (\(items.count) 条去重)")
+                Text("\(String(localized: "search_field_message", bundle: .module)) (\(String(format: String(localized: "unique_messages", bundle: .module), items.count)))")
                     .font(.caption)
                     .fontWeight(.medium)
 
                 // 显示总匹配数（所有消息的 matchCount 总和）
                 let totalMatches = items.map { $0.matchCount }.reduce(0, +)
-                Text("共 \(totalMatches) 条匹配")
+                Text(String(format: String(localized: "total_matches_count", bundle: .module), totalMatches))
                     .font(.caption2)
                     .foregroundColor(.secondary)
 
