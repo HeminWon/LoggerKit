@@ -83,8 +83,7 @@ extension ViewStore where State == LogDetailState, Action == LogDetailAction {
 
     /// 总导出数量
     public var totalExportCount: Int {
-        // ExportFeature 没有 totalExportCount,使用 displayEvents 的数量作为总数
-        state.list.displayEvents.count
+        state.exportFeature.totalCount
     }
 
     /// 显示标题
