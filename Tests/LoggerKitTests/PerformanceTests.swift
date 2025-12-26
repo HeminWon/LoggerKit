@@ -106,7 +106,7 @@ struct PerformanceBenchmarkTests {
         let duration = measure("fetchEvents-filtered") {
             events = try? manager.fetchEvents(
                 levels: [.debug, .info, .error],
-                searchText: "Test",
+                messageKeywords: ["Test"],
                 limit: 500
             )
         }

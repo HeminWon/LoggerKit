@@ -62,6 +62,73 @@ open Examples/iOS/LoggerKitExample/LoggerKitExample.xcodeproj
 
 ## 快速开始
 
+### ⚠️ 重要：配置日志引擎
+
+**在使用 LoggerKit 之前，必须在 App 启动时尽早配置日志引擎。** 未配置时调用日志方法，日志会被静默丢弃。
+
+#### UIKit App
+
+```swift
+import UIKit
+import LoggerKit
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        // ✅ 第一件事：配置日志引擎
+        LoggerKit.configure(
+            level: .debug,
+            enableConsole: true,
+            enableDatabase: true
+        )
+
+        // 之后的所有日志都会被正确记录
+        return true
+    }
+}
+```
+
+#### SwiftUI App
+
+```swift
+import SwiftUI
+import LoggerKit
+
+@main
+struct MyApp: App {
+    init() {
+        // ✅ 在 App 初始化时配置日志引擎
+        LoggerKit.configure(
+            level: .debug,
+            enableConsole: true,
+            enableDatabase: true
+        )
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+```
+
+#### 💡 最佳实践
+
+- ✅ 在 `AppDelegate.application(_:didFinishLaunchingWithOptions:)` 第一行配置
+- ✅ 在 SwiftUI `App.init()` 中配置
+- ❌ 不要在 viewDidLoad 或 view body 中配置
+- ❌ 不要延迟配置（如 DispatchQueue.main.async）
+
+#### ⚠️ 未配置的影响
+
+- 未配置时调用日志方法，日志会被静默丢弃
+- 不会崩溃、不会警告、没有性能开销
+- DEBUG 模式下重复配置会触发 `assertionFailure`
+
 ### 基础使用
 
 ```swift
