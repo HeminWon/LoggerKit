@@ -27,22 +27,18 @@ public final class CoreDataDestination: BaseDestination {
     /// 立即写入的日志级别
     private let immediateFlushLevels: Set<LogEvent.Level>
 
-    /// 防抖定时器
-    private var debounceTimer: DispatchSourceTimer?
+    /// 防抖任务
+    private var debounceWorkItem: DispatchWorkItem?
 
     // MARK: - 会话信息
 
     private let sessionId: String
     private let sessionStartTime: TimeInterval
 
-    public init(
-        sessionId: String,
-        sessionStartTime: TimeInterval,
-        coreDataStack: CoreDataStack? = CoreDataStack.shared,
-        batchSize: Int = 50,
-        debounceInterval: TimeInterval = 2.0,
-        immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]
-    ) {
+    public init(sessionId: String, sessionStartTime: TimeInterval,
+                coreDataStack: CoreDataStack? = CoreDataStack.shared,
+                batchSize: Int = 50, debounceInterval: TimeInterval = 2.0,
+                immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]) {
         self.sessionId = sessionId
         self.sessionStartTime = sessionStartTime
         self.coreDataStack = coreDataStack
@@ -61,15 +57,8 @@ public final class CoreDataDestination: BaseDestination {
         }
     }
 
-    override public func send(
-        _ level: SwiftyBeaver.Level,
-        msg: String,
-        thread: String,
-        file: String,
-        function: String,
-        line: Int,
-        context: Any? = nil
-    ) -> String? {
+    override public func send(_ level: SwiftyBeaver.Level, msg: String, thread: String,
+                              file: String, function: String, line: Int, context: Any? = nil) -> String? {
         // 构造日志事件,包含会话信息
         let logEvent = LogEvent(
             thread: thread,
@@ -113,20 +102,18 @@ public final class CoreDataDestination: BaseDestination {
 
     /// 调度防抖刷新
     private func scheduleDebounceFlush() {
-        // 取消之前的防抖计时器
-        debounceTimer?.cancel()
+        // 取消之前的防抖任务
+        debounceWorkItem?.cancel()
 
-        // 创建新的防抖计时器
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.setEventHandler { [weak self] in
+        // 创建新的防抖任务
+        let workItem = DispatchWorkItem { [weak self] in
             self?.flushPendingEvents()
         }
 
         // 延迟执行
-        timer.schedule(deadline: .now() + debounceInterval)
-        timer.resume()
+        queue.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
 
-        self.debounceTimer = timer
+        self.debounceWorkItem = workItem
     }
 
     public func flush() {
@@ -136,52 +123,28 @@ public final class CoreDataDestination: BaseDestination {
     }
 
     private func flushPendingEvents() {
-        // 取消防抖定时器
-        debounceTimer?.cancel()
-        debounceTimer = nil
+        // 取消防抖任务
+        cancelDebounceTask()
 
-        guard !pendingEvents.isEmpty else { return }
-
-        // 如果 stack 不可用，清空队列但不保存
-        guard let stack = coreDataStack else {
-            print("⚠️ CoreDataDestination: 跳过日志保存（CoreDataStack 不可用），丢弃 \(pendingEvents.count) 条日志")
-            pendingEvents.removeAll(keepingCapacity: true)
+        // 检查是否有待写入的日志
+        guard !pendingEvents.isEmpty, let stack = coreDataStack else {
             return
         }
 
-        // ⚠️ 检查 persistent store 是否可用（避免设备锁定时 crash）
+        // ⚠️ 检查 persistent store 是否可用，避免设备锁定时 crash
         guard stack.isStoreAvailable() else {
             #if DEBUG
-            print("⚠️ CoreDataDestination: Persistent store 不可用（设备可能已锁定），保留 \(pendingEvents.count) 条日志待稍后重试")
+            print("⚠️ Persistent store 不可用，丢弃 \(pendingEvents.count) 条日志")
             #endif
-            // 不清空 pendingEvents，等待下次机会重试
             return
         }
 
         let eventsToWrite = pendingEvents
-        pendingEvents.removeAll(keepingCapacity: true)
+        pendingEvents.removeAll()
 
-        // 后台上下文批量写入
+        // 使用异步保存，避免阻塞和死锁
         let context = stack.newBackgroundContext()
-
-        context.perform {
-            for event in eventsToWrite {
-                _ = LogEventEntity.create(from: event, in: context)
-            }
-
-            do {
-                try context.save()
-            } catch let error as NSError {
-                // 检查是否是 persistent store 不可用错误
-                if error.domain == NSCocoaErrorDomain,
-                   error.code == NSPersistentStoreCoordinatorLockingError ||
-                   error.userInfo.values.contains(where: { "\($0)".contains("device locked") }) {
-                    print("⚠️ CoreDataDestination: 设备锁定导致保存失败，已跳过 \(eventsToWrite.count) 条日志")
-                } else {
-                    print("❌ CoreDataDestination: Failed to save logs: \(error)")
-                }
-            }
-        }
+        performBatchSave(events: eventsToWrite, context: context, debugPrefix: "CoreDataDestination.deinit")
     }
 
     private func mapLevel(_ level: SwiftyBeaver.Level) -> LogEvent.Level {
@@ -197,49 +160,44 @@ public final class CoreDataDestination: BaseDestination {
         }
     }
 
-    deinit {
-        // 取消防抖定时器
-        debounceTimer?.cancel()
-        debounceTimer = nil
+    /// 检查是否是设备锁定导致的错误
+    private func isDeviceLockedError(_ error: NSError) -> Bool {
+        return error.domain == NSCocoaErrorDomain &&
+               (error.code == NSPersistentStoreCoordinatorLockingError ||
+                error.userInfo.values.contains(where: { "\($0)".contains("device locked") }))
+    }
 
-        // 检查是否有待写入的日志
-        guard !pendingEvents.isEmpty, let stack = coreDataStack else {
-            return
-        }
+    /// 取消防抖任务
+    private func cancelDebounceTask() {
+        debounceWorkItem?.cancel()
+        debounceWorkItem = nil
+    }
 
-        // ⚠️ 检查 persistent store 是否可用，避免设备锁定时 crash
-        guard stack.isStoreAvailable() else {
-            #if DEBUG
-            print("⚠️ CoreDataDestination.deinit: Persistent store 不可用，丢弃 \(pendingEvents.count) 条日志")
-            #endif
-            return
-        }
-
-        let eventsToWrite = pendingEvents
-        pendingEvents.removeAll()
-
-        // 使用异步保存，避免阻塞和死锁
-        let context = stack.newBackgroundContext()
+    /// 批量保存日志事件
+    private func performBatchSave(events: [LogEvent], context: NSManagedObjectContext, debugPrefix: String = "") {
         context.perform {
-            for event in eventsToWrite {
+            for event in events {
                 _ = LogEventEntity.create(from: event, in: context)
             }
 
             do {
                 try context.save()
                 #if DEBUG
-                print("✅ CoreDataDestination.deinit: 已保存 \(eventsToWrite.count) 条待写入日志")
+                if !debugPrefix.isEmpty {
+                    print("✅ \(debugPrefix): 已保存 \(events.count) 条待写入日志")
+                }
                 #endif
             } catch let error as NSError {
-                // 检查是否是 persistent store 不可用错误
-                if error.domain == NSCocoaErrorDomain,
-                   error.code == NSPersistentStoreCoordinatorLockingError ||
-                   error.userInfo.values.contains(where: { "\($0)".contains("device locked") }) {
-                    print("⚠️ CoreDataDestination.deinit: 设备锁定导致保存失败")
+                if self.isDeviceLockedError(error) {
+                    print("⚠️ \(debugPrefix): 设备锁定导致保存失败\(debugPrefix.isEmpty ? "" : "，已跳过 \(events.count) 条日志")")
                 } else {
-                    print("❌ CoreDataDestination.deinit: 保存日志失败: \(error)")
+                    print("❌ \(debugPrefix): 保存日志失败: \(error)")
                 }
             }
         }
+    }
+
+    deinit {
+        flushPendingEvents()
     }
 }
