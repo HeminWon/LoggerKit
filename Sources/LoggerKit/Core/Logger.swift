@@ -39,6 +39,10 @@ public struct Logger: LoggerProtocol, Sendable {
     /// - Parameter context: 日志上下文标识。如果不传，则自动从文件路径提取模块名
     public init(context: String? = nil) {
         self.context = context
+        #if DEBUG
+        // 如果未配置日志引擎，则直接 crash
+        assert(LoggerEngine.isConfigured, "Logger initialized without configuring LoggerEngine")
+        #endif
     }
 
     // MARK: - LoggerProtocol

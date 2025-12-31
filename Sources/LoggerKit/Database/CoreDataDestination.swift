@@ -12,7 +12,7 @@ import CoreData
 /// CoreData 日志输出目标
 public final class CoreDataDestination: BaseDestination {
 
-    private let coreDataStack: CoreDataStack
+    private let coreDataStack: CoreDataStack?
     private var pendingEvents: [LogEvent] = []
     private let queue = DispatchQueue(label: "com.loggerkit.coredata", qos: .utility)
 
@@ -38,7 +38,7 @@ public final class CoreDataDestination: BaseDestination {
     public init(
         sessionId: String,
         sessionStartTime: TimeInterval,
-        coreDataStack: CoreDataStack = .shared,
+        coreDataStack: CoreDataStack? = CoreDataStack.shared,
         batchSize: Int = 50,
         debounceInterval: TimeInterval = 2.0,
         immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]
@@ -54,6 +54,11 @@ public final class CoreDataDestination: BaseDestination {
 
         // 设置格式 (不需要格式化,直接存储结构化数据)
         self.format = ""
+
+        // 启动时检查并警告
+        if coreDataStack == nil {
+            print("⚠️ CoreDataDestination: CoreDataStack 不可用，日志将不会持久化")
+        }
     }
 
     override public func send(
@@ -137,11 +142,27 @@ public final class CoreDataDestination: BaseDestination {
 
         guard !pendingEvents.isEmpty else { return }
 
+        // 如果 stack 不可用，清空队列但不保存
+        guard let stack = coreDataStack else {
+            print("⚠️ CoreDataDestination: 跳过日志保存（CoreDataStack 不可用），丢弃 \(pendingEvents.count) 条日志")
+            pendingEvents.removeAll(keepingCapacity: true)
+            return
+        }
+
+        // ⚠️ 检查 persistent store 是否可用（避免设备锁定时 crash）
+        guard stack.isStoreAvailable() else {
+            #if DEBUG
+            print("⚠️ CoreDataDestination: Persistent store 不可用（设备可能已锁定），保留 \(pendingEvents.count) 条日志待稍后重试")
+            #endif
+            // 不清空 pendingEvents，等待下次机会重试
+            return
+        }
+
         let eventsToWrite = pendingEvents
         pendingEvents.removeAll(keepingCapacity: true)
 
         // 后台上下文批量写入
-        let context = coreDataStack.newBackgroundContext()
+        let context = stack.newBackgroundContext()
 
         context.perform {
             for event in eventsToWrite {
@@ -150,8 +171,15 @@ public final class CoreDataDestination: BaseDestination {
 
             do {
                 try context.save()
-            } catch {
-                print("❌ CoreDataDestination: Failed to save logs: \(error)")
+            } catch let error as NSError {
+                // 检查是否是 persistent store 不可用错误
+                if error.domain == NSCocoaErrorDomain,
+                   error.code == NSPersistentStoreCoordinatorLockingError ||
+                   error.userInfo.values.contains(where: { "\($0)".contains("device locked") }) {
+                    print("⚠️ CoreDataDestination: 设备锁定导致保存失败，已跳过 \(eventsToWrite.count) 条日志")
+                } else {
+                    print("❌ CoreDataDestination: Failed to save logs: \(error)")
+                }
             }
         }
     }
@@ -174,10 +202,44 @@ public final class CoreDataDestination: BaseDestination {
         debounceTimer?.cancel()
         debounceTimer = nil
 
-        // 同步刷新，确保数据不丢失
-        // 注意：必须使用 sync 而非 async，避免对象销毁后闭包才执行
-        queue.sync {
-            flushPendingEvents()
+        // 检查是否有待写入的日志
+        guard !pendingEvents.isEmpty, let stack = coreDataStack else {
+            return
+        }
+
+        // ⚠️ 检查 persistent store 是否可用，避免设备锁定时 crash
+        guard stack.isStoreAvailable() else {
+            #if DEBUG
+            print("⚠️ CoreDataDestination.deinit: Persistent store 不可用，丢弃 \(pendingEvents.count) 条日志")
+            #endif
+            return
+        }
+
+        let eventsToWrite = pendingEvents
+        pendingEvents.removeAll()
+
+        // 使用异步保存，避免阻塞和死锁
+        let context = stack.newBackgroundContext()
+        context.perform {
+            for event in eventsToWrite {
+                _ = LogEventEntity.create(from: event, in: context)
+            }
+
+            do {
+                try context.save()
+                #if DEBUG
+                print("✅ CoreDataDestination.deinit: 已保存 \(eventsToWrite.count) 条待写入日志")
+                #endif
+            } catch let error as NSError {
+                // 检查是否是 persistent store 不可用错误
+                if error.domain == NSCocoaErrorDomain,
+                   error.code == NSPersistentStoreCoordinatorLockingError ||
+                   error.userInfo.values.contains(where: { "\($0)".contains("device locked") }) {
+                    print("⚠️ CoreDataDestination.deinit: 设备锁定导致保存失败")
+                } else {
+                    print("❌ CoreDataDestination.deinit: 保存日志失败: \(error)")
+                }
+            }
         }
     }
 }

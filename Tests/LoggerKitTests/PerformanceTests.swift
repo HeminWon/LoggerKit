@@ -27,7 +27,7 @@ struct PerformanceBenchmarkTests {
 
     /// 获取共享的CoreDataStack用于测试
     /// 注意:测试使用共享实例,测试后需要清理数据
-    private func getTestCoreDataStack() -> CoreDataStack {
+    private func getTestCoreDataStack() -> CoreDataStack? {
         return CoreDataStack.shared
     }
 
@@ -106,7 +106,7 @@ struct PerformanceBenchmarkTests {
         let duration = measure("fetchEvents-filtered") {
             events = try? manager.fetchEvents(
                 levels: [.debug, .info, .error],
-                searchText: "Test",
+                messageKeywords: ["Test"],
                 limit: 500
             )
         }

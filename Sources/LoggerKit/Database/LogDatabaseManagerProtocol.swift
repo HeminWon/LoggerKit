@@ -79,19 +79,19 @@ public protocol LogDatabaseManagerProtocol {
     // MARK: - 删除接口
 
     /// 删除所有日志
-    func deleteAllLogs() throws
+    func deleteAllLogs() async throws
 
     /// 删除指定日期的日志
-    func deleteLogs(forDate date: String) throws
+    func deleteLogs(forDate date: String) async throws
 
     /// 删除指定时间之前的日志
-    func deleteLogs(before date: Date) throws
+    func deleteLogs(before date: Date) async throws
 
     /// 删除指定会话的所有日志
-    func deleteLogs(forSession sessionId: String) throws
+    func deleteLogs(forSession sessionId: String) async throws
 
     /// 删除多个会话的日志
-    func deleteLogs(forSessions sessionIds: Set<String>) throws
+    func deleteLogs(forSessions sessionIds: Set<String>) async throws
 
     // MARK: - 辅助接口
 

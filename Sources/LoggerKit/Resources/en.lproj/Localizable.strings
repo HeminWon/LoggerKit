@@ -123,3 +123,4 @@
 "delete_no_sessions_selected" = "No sessions selected for deletion";
 "delete_operation_failed" = "Delete operation failed";
 "delete_session_not_found" = "Session not found: %@";
+"no_sessions_selected" = "Please select sessions to delete";

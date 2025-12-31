@@ -14,6 +14,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        setupLogger()
         return true
     }
 
@@ -34,3 +35,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 }
 
+extension AppDelegate {
+    private func setupLogger() {
+        // 配置 LoggerKit (使用 CoreData 存储)
+        LoggerKit.configure(
+            level: .verbose,
+            enableConsole: true,
+            enableDatabase: true,
+            maxDatabaseSize: 50 * 1024 * 1024,  // 50MB
+            maxRetentionDays: 7                  // 保留 7 天
+        )
+    }
+
+}

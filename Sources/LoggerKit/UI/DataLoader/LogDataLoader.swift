@@ -23,6 +23,21 @@ public class LogDataLoader: LogDataLoaderProtocol {
         self.databaseManager = databaseManager
     }
 
+    // MARK: - Private Helpers
+
+    /// 获取 CoreDataStack 的 persistentContainer
+    /// - Throws: 如果 CoreDataStack 不可用则抛出错误
+    private func getPersistentContainer() throws -> NSPersistentContainer {
+        guard let stack = CoreDataStack.shared else {
+            throw NSError(
+                domain: "LogDataLoader",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "CoreDataStack 不可用，日志功能无法使用"]
+            )
+        }
+        return stack.persistentContainer
+    }
+
     // MARK: - LogDataLoaderProtocol
 
     public func loadEvents(
@@ -46,8 +61,9 @@ public class LogDataLoader: LogDataLoaderProtocol {
         let finalSessionIds: Set<String> = selectedSessionIds.isEmpty ? sessionIds : selectedSessionIds
 
         // 使用 performBackgroundTask 确保线程安全
+        let container = try getPersistentContainer()
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     // 在后台 context 中执行查询
                     let events = try dbManager.fetchEvents(
@@ -74,9 +90,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func loadStatistics() async throws -> LogStatistics {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     // fetchStatistics()内部使用自己的viewContext,这里只需要在后台线程调用
                     let stats = try dbManager.fetchStatistics()
@@ -106,8 +123,9 @@ public class LogDataLoader: LogDataLoaderProtocol {
         let finalSessionIds: Set<String> = selectedSessionIds.isEmpty ? sessionIds : selectedSessionIds
 
         // 使用 performBackgroundTask 确保线程安全
+        let container = try getPersistentContainer()
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     // 在后台 context 中执行 COUNT 查询
                     let count = try dbManager.countEvents(
@@ -147,8 +165,9 @@ public class LogDataLoader: LogDataLoaderProtocol {
         let finalSessionIds: Set<String> = selectedSessionIds.isEmpty ? sessionIds : selectedSessionIds
 
         // 使用 performBackgroundTask 确保线程安全
+        let container = try getPersistentContainer()
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     // 在后台 context 中执行全量查询(使用大数值作为 limit)
                     let events = try dbManager.fetchEvents(
@@ -178,10 +197,11 @@ public class LogDataLoader: LogDataLoaderProtocol {
         limit: Int
     ) async throws -> [LogEvent] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         // 使用 performBackgroundTask 确保线程安全
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     // 在后台 context 中执行全量查询
                     let events = try dbManager.fetchAllEventsForSearchPreview(
@@ -207,9 +227,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func getAvailableFunctions() async throws -> [String] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     let functions = try dbManager.fetchAvailableFunctions()
                     continuation.resume(returning: functions)
@@ -222,9 +243,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func getAvailableFileNames() async throws -> [String] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     let fileNames = try dbManager.fetchAvailableFileNames()
                     continuation.resume(returning: fileNames)
@@ -237,9 +259,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func getAvailableContexts() async throws -> [String] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     let contexts = try dbManager.fetchAvailableContexts()
                     continuation.resume(returning: contexts)
@@ -252,9 +275,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
 
     public func getAvailableThreads() async throws -> [String] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     let threads = try dbManager.fetchAvailableThreads()
                     continuation.resume(returning: threads)
@@ -272,9 +296,10 @@ public class LogDataLoader: LogDataLoaderProtocol {
         sortOrder: LogDatabaseManager.SessionSortOrder
     ) async throws -> [SessionInfo] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     let sessions = try dbManager.getSessions(
                         in: context,
@@ -296,6 +321,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
         limit: Int
     ) async throws -> [LogEvent] {
         let dbManager = self.databaseManager
+        let container = try getPersistentContainer()
 
         // 将 SearchField 转换为字段名字符串数组
         let fieldNames = searchFields.map { field in
@@ -309,7 +335,7 @@ public class LogDataLoader: LogDataLoaderProtocol {
         }
 
         return try await withCheckedThrowingContinuation { continuation in
-            CoreDataStack.shared.persistentContainer.performBackgroundTask { context in
+            container.performBackgroundTask { context in
                 do {
                     let events = try dbManager.searchEvents(
                         in: context,

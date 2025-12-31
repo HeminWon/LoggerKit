@@ -60,8 +60,10 @@ public final class LoggerEngine: @unchecked Sendable {
     private var databaseManager: LogDatabaseManager?
     private var rotationManager: LogDatabaseRotationManager?
     private let moduleCache: ConcurrentCache<String, String>
-    private var isConfigured = false
-    private let lock = NSLock()
+
+    // 配置状态管理（静态）
+    private static let configureLock = NSLock()
+    private static var _isConfigured = false
 
     // 会话管理
     public let sessionId: String
@@ -75,35 +77,32 @@ public final class LoggerEngine: @unchecked Sendable {
         self.sessionStartTime = Date().timeIntervalSince1970
     }
 
+    /// 检查是否已配置
+    public static var isConfigured: Bool {
+        configureLock.lock()
+        defer { configureLock.unlock() }
+        return _isConfigured
+    }
+
     /// 配置日志引擎（应在 App 启动时调用一次）
     /// - Parameter configuration: 引擎配置
     public static func configure(_ configuration: LoggerEngineConfiguration = LoggerEngineConfiguration()) {
-        shared.configure(configuration)
-    }
+        configureLock.lock()
+        defer { configureLock.unlock() }
 
-    /// 配置日志引擎
-    private func configure(_ configuration: LoggerEngineConfiguration) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard !isConfigured else {
+        guard !_isConfigured else {
+            #if DEBUG
             assertionFailure("LoggerEngine 已配置，不能重复配置")
+            #endif
             return
         }
 
-        setupDestinations(configuration)
-        isConfigured = true
-    }
+        shared.setupDestinations(configuration)
+        _isConfigured = true
 
-    /// 确保引擎已配置（延迟初始化）
-    private func ensureConfigured() {
-        lock.lock()
-        let configured = isConfigured
-        lock.unlock()
-
-        if !configured {
-            configure(LoggerEngineConfiguration())
-        }
+        #if DEBUG
+        print("✅ LoggerKit 配置完成 (level: \(configuration.level), session: \(shared.sessionId))")
+        #endif
     }
 
     private func setupDestinations(_ configuration: LoggerEngineConfiguration) {
@@ -120,6 +119,9 @@ public final class LoggerEngine: @unchecked Sendable {
 
         // 配置 CoreData 数据库输出
         guard configuration.enableDatabase else { return }
+
+        // 初始化 CoreDataStack
+        CoreDataStack.initialize()
 
         let coreDataDest = CoreDataDestination(
             sessionId: sessionId,
@@ -144,38 +146,37 @@ public final class LoggerEngine: @unchecked Sendable {
             maxRetentionDays: configuration.maxRetentionDays
         )
 
-        // 启动时执行一次清理
-        rotationManager?.performRotationIfNeeded()
+        // 启动时执行一次清理（后台异步执行）
+        if let rotationManager = rotationManager {
+            Task.detached(priority: .utility) {
+                await rotationManager.performRotationIfNeeded()
+            }
+        }
     }
 
     // MARK: - 日志方法
 
     func verbose(_ message: String, file: String, function: String, line: Int, context: String?) {
-        ensureConfigured()
         let ctx = context ?? moduleName(for: file)
         swiftyBeaver.verbose(message, file: file, function: function, line: line, context: ctx)
     }
 
     func debug(_ message: String, file: String, function: String, line: Int, context: String?) {
-        ensureConfigured()
         let ctx = context ?? moduleName(for: file)
         swiftyBeaver.debug(message, file: file, function: function, line: line, context: ctx)
     }
 
     func info(_ message: String, file: String, function: String, line: Int, context: String?) {
-        ensureConfigured()
         let ctx = context ?? moduleName(for: file)
         swiftyBeaver.info(message, file: file, function: function, line: line, context: ctx)
     }
 
     func warning(_ message: String, file: String, function: String, line: Int, context: String?) {
-        ensureConfigured()
         let ctx = context ?? moduleName(for: file)
         swiftyBeaver.warning(message, file: file, function: function, line: line, context: ctx)
     }
 
     func error(_ message: String, file: String, function: String, line: Int, context: String?) {
-        ensureConfigured()
         let ctx = context ?? moduleName(for: file)
         swiftyBeaver.error(message, file: file, function: function, line: line, context: ctx)
     }
@@ -230,18 +231,36 @@ public final class LoggerEngine: @unchecked Sendable {
         return databaseManager
     }
 
-    /// 执行数据库轮转
+    /// 执行数据库轮转（后台异步执行）
     public func performDatabaseRotation() {
-        rotationManager?.performRotationIfNeeded()
+        guard let rotationManager = rotationManager else { return }
+        Task.detached(priority: .utility) {
+            await rotationManager.performRotationIfNeeded()
+        }
     }
 
-    /// 清理过期日志
+    /// 清理过期日志（后台异步执行）
     public func cleanupExpiredLogs() {
-        rotationManager?.cleanupExpiredLogs()
+        guard let rotationManager = rotationManager else { return }
+        Task.detached(priority: .utility) {
+            await rotationManager.cleanupExpiredLogs()
+        }
     }
 
     /// 获取会话信息
     public func getSessionInfo() -> (sessionId: String, sessionStartTime: TimeInterval) {
         return (sessionId, sessionStartTime)
     }
+
+    #if DEBUG
+    /// 重置配置状态 (仅用于测试)
+    /// - Warning: 此方法仅在 DEBUG 模式下可用，不应在生产代码中使用
+    public static func resetForTesting() {
+        configureLock.lock()
+        defer { configureLock.unlock() }
+
+        _isConfigured = false
+        shared.swiftyBeaver.removeAllDestinations()
+    }
+    #endif
 }

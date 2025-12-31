@@ -18,9 +18,8 @@ class ViewController: UIViewController {
 
         title = "LoggerKit Example"
         view.backgroundColor = .systemBackground
-
+        log.debug("未使用")
         setupUI()
-        setupLogger()
 
         // 打印一些初始日志
         printInitialLogs()
@@ -90,17 +89,6 @@ class ViewController: UIViewController {
         separator.backgroundColor = .separator
         separator.heightAnchor.constraint(equalToConstant: 1).isActive = true
         stackView.addArrangedSubview(separator)
-    }
-
-    private func setupLogger() {
-        // 配置 LoggerKit (使用 CoreData 存储)
-        LoggerKit.configure(
-            level: .verbose,
-            enableConsole: true,
-            enableDatabase: true,
-            maxDatabaseSize: 50 * 1024 * 1024,  // 50MB
-            maxRetentionDays: 7                  // 保留 7 天
-        )
     }
 
     private func printInitialLogs() {

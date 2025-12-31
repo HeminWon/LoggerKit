@@ -75,64 +75,13 @@ public struct LogDetailScene: View {
                 }
                 Spacer()
             } else {
-                // 1️⃣ 筛选结果统计
-                HStack {
-                    if viewStore.totalCount > 0 {
-                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), viewStore.displayEvents.count, viewStore.totalCount))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text(String(format: totalCountFormat, viewStore.displayEvents.count))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    if viewStore.activeFilterCount > 0 {
-                        Text(String(format: filterCountFormat, viewStore.activeFilterCount))
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    Spacer()
-
-                    // 导出进度显示
-                    if viewStore.isExporting {
-                        HStack(spacing: 4) {
-                            // 圆环进度
-                            if viewStore.totalExportCount > 0 {
-                                ZStack {
-                                    Circle()
-                                        .stroke(Color.gray.opacity(0.2), lineWidth: 2)
-                                        .frame(width: 16, height: 16)
-                                    Circle()
-                                        .trim(from: 0, to: viewStore.exportProgress)
-                                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                        .frame(width: 16, height: 16)
-                                        .rotationEffect(.degrees(-90))
-                                        .animation(.linear(duration: 0.1), value: viewStore.exportProgress)
-                                }
-                            } else {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .frame(width: 16, height: 16)
-                            }
-
-                            // 进度文字
-                            Text(String(localized: "exporting_progress", bundle: .module))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            if viewStore.totalExportCount > 0 {
-                                Text("\(viewStore.exportedCount)/\(viewStore.totalExportCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-
+                // 导出进度显示
+                logInfoBar
+                    .padding(.horizontal)
+                    
                 Divider()
 
-                // 2️⃣ 日志列表 - 使用List实现真正的虚拟化
+                // 2️⃣ 日志列表 - 使用 List 实现真正的虚拟化
                 List {
                     ForEach(viewStore.displayEvents) { viewModel in
                         if #available(iOS 15.0, macOS 13.0, *) {
@@ -268,6 +217,67 @@ public struct LogDetailScene: View {
         #endif
     }
     
+    // MARK: - Log Info Bar
+    /// 显示日志统计信息和导出进度
+    @ViewBuilder
+    private var logInfoBar: some View {
+        Group {
+            if viewStore.isExporting {
+                HStack(alignment: .center, spacing: 4) {
+                    // 圆环进度
+                    if viewStore.totalExportCount > 0 {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 2)
+                                .frame(width: 16, height: 16)
+                            Circle()
+                                .trim(from: 0, to: viewStore.exportProgress)
+                                .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .frame(width: 16, height: 16)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 0.1), value: viewStore.exportProgress)
+                        }
+                    } else {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 16, height: 16)
+                    }
+                    
+                    // 进度文字
+                    Text(String(localized: "exporting_progress", bundle: .module))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if viewStore.totalExportCount > 0 {
+                        Text("\(viewStore.exportedCount)/\(viewStore.totalExportCount)")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                // 1️⃣ 筛选结果统计
+                HStack(alignment: .center) {
+                    if viewStore.totalCount > 0 {
+                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), viewStore.displayEvents.count, viewStore.totalCount))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(String(format: totalCountFormat, viewStore.displayEvents.count))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    if viewStore.activeFilterCount > 0 {
+                        Text(String(format: filterCountFormat, viewStore.activeFilterCount))
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(height: 16) // 固定高度，避免状态切换时闪动
+    }
+    
     // MARK: - Subviews
     private var shareButton: some View {
         Button {
@@ -298,7 +308,7 @@ public struct LogDetailScene: View {
                                 .foregroundColor(.blue)
                         }
                     } else {
-                        // 初始化阶段,显示不定进度的圆环
+                        // 初始化阶段，显示不定进度的圆环
                         ProgressView()
                             .frame(width: 24, height: 24)
                     }
@@ -308,7 +318,7 @@ public struct LogDetailScene: View {
                         .font(.system(size: 17))
                 }
             }
-            .frame(width: 32, height: 32) // 固定尺寸,避免布局变化
+            .frame(width: 32, height: 32) // 固定尺寸，避免布局变化
         }
         .disabled(viewStore.isExporting || hasNoLogs)
         .alert(String(localized: "export_failed", bundle: .module), isPresented: viewStore.exportErrorPresentedBinding) {
@@ -332,7 +342,7 @@ public struct LogDetailScene: View {
 }
 
 // MARK: - LogRowViewModel
-/// LogRowView 的专用数据模型,封装了显示所需的 event、index 和预计算的颜色
+/// LogRowView 的专用数据模型，封装了显示所需的 event、index 和预计算的颜色
 public struct LogRowViewModel: Identifiable {
     public let id: UUID              // 使用 event.id 作为唯一标识
     public let event: LogEvent       // 原始日志数据
@@ -348,13 +358,13 @@ public struct LogRowViewModel: Identifiable {
 
     // 根据 sessionId 生成一致的柔和随机颜色
     private static func sessionColor(for sessionId: String) -> Color {
-        // 使用稳定的 hash 算法,确保同一 sessionId 总是生成相同的颜色
+        // 使用稳定的 hash 算法，确保同一 sessionId 总是生成相同的颜色
         let hash = sessionId.utf8.reduce(0) {
             ($0 &* 31 &+ Int($1)) & 0xFFFFFFFF
         }
 
         // 从 hash 生成 HSB 颜色参数
-        // Hue(色相): 0-360度,使用 hash 确保每个会话有不同的颜色
+        // Hue(色相): 0-360 度，使用 hash 确保每个会话有不同的颜色
         let hue = Double(abs(hash) % 360) / 360.0
 
         // Saturation(饱和度): 40%-60%,中等饱和度让前景色更鲜明
@@ -363,7 +373,7 @@ public struct LogRowViewModel: Identifiable {
         // Brightness(亮度): 50%-70%,中等亮度确保与背景有足够对比度
         let brightness = 0.50 + Double((abs(hash) >> 16) % 21) / 100.0
 
-        // 返回柔和的颜色,前景色使用完全不透明
+        // 返回柔和的颜色，前景色使用完全不透明
         return Color(hue: hue, saturation: saturation, brightness: brightness, opacity: 1.0)
     }
 }

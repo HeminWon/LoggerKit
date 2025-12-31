@@ -25,7 +25,7 @@ public final class LogDatabaseRotationManager {
     }
 
     /// 执行轮转检查
-    public func performRotationIfNeeded() {
+    public func performRotationIfNeeded() async {
         let currentSize = databaseManager.databaseSize()
 
         if currentSize > maxDatabaseSize {
@@ -37,7 +37,7 @@ public final class LogDatabaseRotationManager {
             )!
 
             do {
-                try databaseManager.deleteLogs(before: cutoffDate)
+                try await databaseManager.deleteLogs(before: cutoffDate)
                 print("✅ Database rotation completed. Size: \(currentSize / 1024)KB -> \(databaseManager.databaseSize() / 1024)KB")
             } catch {
                 print("❌ Database rotation failed: \(error)")
@@ -46,7 +46,7 @@ public final class LogDatabaseRotationManager {
     }
 
     /// 清理过期日志
-    public func cleanupExpiredLogs() {
+    public func cleanupExpiredLogs() async {
         let cutoffDate = Calendar.current.date(
             byAdding: .day,
             value: -maxRetentionDays,
@@ -54,7 +54,7 @@ public final class LogDatabaseRotationManager {
         )!
 
         do {
-            try databaseManager.deleteLogs(before: cutoffDate)
+            try await databaseManager.deleteLogs(before: cutoffDate)
             print("✅ Expired logs cleaned up (before \(cutoffDate))")
         } catch {
             print("❌ Cleanup failed: \(error)")

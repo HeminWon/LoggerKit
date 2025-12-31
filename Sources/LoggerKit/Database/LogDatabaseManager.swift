@@ -30,13 +30,43 @@ public struct LogStatistics {
 
 public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
-    private let coreDataStack: CoreDataStack
+    private let coreDataStack: CoreDataStack?
 
-    public init(coreDataStack: CoreDataStack = .shared) {
+    public init(coreDataStack: CoreDataStack? = CoreDataStack.shared) {
         self.coreDataStack = coreDataStack
     }
 
     // MARK: - 私有辅助方法
+
+    /// 获取 CoreDataStack，如果不可用则抛出错误
+    private func getStack() throws -> CoreDataStack {
+        guard let stack = coreDataStack else {
+            throw NSError(
+                domain: "LogDatabaseManager",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "CoreDataStack 不可用"]
+            )
+        }
+        return stack
+    }
+
+    /// 在后台线程执行 CoreData 操作，避免阻塞主线程
+    /// - Parameter block: 在后台上下文中执行的操作
+    /// - Note: 此方法为异步操作，不会阻塞调用线程
+    private func performBackgroundOperation(_ block: @escaping (NSManagedObjectContext) throws -> Void) async throws {
+        let context = try getStack().newBackgroundContext()
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            context.perform {
+                do {
+                    try block(context)
+                    continuation.resume(returning: ())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 
     /// 构建查询谓词（复用逻辑，消除 fetchEvents 和 countEvents 的重复代码）
     private func buildPredicates(
@@ -105,7 +135,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         limit: Int = 10000,
         offset: Int = 0
     ) throws -> [LogEvent] {
-        let context = coreDataStack.viewContext
+        let context = try getStack().viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 构建谓词
@@ -156,7 +186,12 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         offset: Int = 0
     ) throws -> [LogEvent] {
 
-        let targetContext = context ?? coreDataStack.viewContext
+        let targetContext: NSManagedObjectContext
+        if let ctx = context {
+            targetContext = ctx
+        } else {
+            targetContext = try getStack().viewContext
+        }
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 使用共用方法构建谓词
@@ -202,7 +237,12 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         sessionIds: Set<String> = [],
         limit: Int = 3000
     ) throws -> [LogEvent] {
-        let targetContext = context ?? coreDataStack.viewContext
+        let targetContext: NSManagedObjectContext
+        if let ctx = context {
+            targetContext = ctx
+        } else {
+            targetContext = try getStack().viewContext
+        }
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 只应用会话筛选(如果有)
@@ -225,7 +265,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
     /// 统计信息
     /// 优化版本:使用2次查询代替原来的9次查询(1次总数 + 7次级别统计 + 1次热门函数)
     public func fetchStatistics() throws -> LogStatistics {
-        let context = coreDataStack.viewContext
+        let context = try getStack().viewContext
 
         // === 优化 1/2: 单次分组查询获取所有级别统计 ===
         let levelRequest = LogEventEntity.fetchRequest()
@@ -305,7 +345,12 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         sessionIds: Set<String> = [],
         messageKeywords: Set<String> = []
     ) throws -> Int {
-        let targetContext = context ?? coreDataStack.viewContext
+        let targetContext: NSManagedObjectContext
+        if let ctx = context {
+            targetContext = ctx
+        } else {
+            targetContext = try getStack().viewContext
+        }
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 使用共用方法构建谓词
@@ -330,7 +375,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
     /// 获取唯一值列表
     public func fetchUniqueValues(for keyPath: String) throws -> [String] {
-        let context = coreDataStack.viewContext
+        let context = try getStack().viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
         fetchRequest.propertiesToFetch = [keyPath]
@@ -344,7 +389,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
     /// 获取所有唯一的日期列表（按日期倒序排列）
     public func fetchUniqueDates() throws -> [String] {
-        let context = coreDataStack.viewContext
+        let context = try getStack().viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
         fetchRequest.propertiesToFetch = ["date"]
@@ -358,7 +403,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
     /// 获取所有会话列表（按启动时间倒序排列）
     public func fetchAllSessions() throws -> [SessionInfo] {
-        let context = coreDataStack.viewContext
+        let context = try getStack().viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 配置 GROUP BY 查询
@@ -419,45 +464,41 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
 
     /// 查询指定日期的日志数量
     public func fetchEventCount(for date: String) throws -> Int {
-        let context = coreDataStack.viewContext
+        let context = try getStack().viewContext
         let fetchRequest = LogEventEntity.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "date == %@", date)
         return try context.count(for: fetchRequest)
     }
 
     /// 删除指定日期的日志
-    public func deleteLogs(forDate date: String) throws {
-        let context = coreDataStack.newBackgroundContext()
+    public func deleteLogs(forDate date: String) async throws {
+        let stack = try getStack()
 
-        context.performAndWait {
+        try await performBackgroundOperation { context in
             let fetchRequest = LogEventEntity.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "date == %@", date)
 
             let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
             deleteRequest.resultType = .resultTypeObjectIDs
 
-            do {
-                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
-                let objectIDs = result.result as! [NSManagedObjectID]
+            let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+            let objectIDs = result.result as! [NSManagedObjectID]
 
-                // 合并更改到主上下文
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
-                    into: [coreDataStack.viewContext]
-                )
+            // 合并更改到主上下文
+            NSManagedObjectContext.mergeChanges(
+                fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                into: [stack.viewContext]
+            )
 
-                print("✅ Deleted \(objectIDs.count) logs for date \(date)")
-            } catch {
-                print("❌ Failed to delete logs: \(error)")
-            }
+            print("✅ Deleted \(objectIDs.count) logs for date \(date)")
         }
     }
 
     /// 删除指定日期之前的日志
-    public func deleteLogs(before date: Date) throws {
-        let context = coreDataStack.newBackgroundContext()
+    public func deleteLogs(before date: Date) async throws {
+        let stack = try getStack()
 
-        context.performAndWait {
+        try await performBackgroundOperation { context in
             let fetchRequest = LogEventEntity.fetchRequest()
             fetchRequest.predicate = NSPredicate(
                 format: "timestamp < %f",
@@ -467,123 +508,96 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
             deleteRequest.resultType = .resultTypeObjectIDs
 
-            do {
-                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
-                let objectIDs = result.result as! [NSManagedObjectID]
+            let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+            let objectIDs = result.result as! [NSManagedObjectID]
 
-                // 合并更改到主上下文
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
-                    into: [coreDataStack.viewContext]
-                )
+            // 合并更改到主上下文
+            NSManagedObjectContext.mergeChanges(
+                fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                into: [stack.viewContext]
+            )
 
-                print("✅ Deleted \(objectIDs.count) logs before \(date)")
-            } catch {
-                print("❌ Failed to delete logs: \(error)")
-            }
+            print("✅ Deleted \(objectIDs.count) logs before \(date)")
         }
     }
 
     /// 删除所有日志
-    public func deleteAllLogs() throws {
-        let context = coreDataStack.newBackgroundContext()
+    public func deleteAllLogs() async throws {
+        let stack = try getStack()
 
-        context.performAndWait {
+        try await performBackgroundOperation { context in
             let fetchRequest = LogEventEntity.fetchRequest()
 
             let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
             deleteRequest.resultType = .resultTypeObjectIDs
 
-            do {
-                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
-                let objectIDs = result.result as! [NSManagedObjectID]
+            let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+            let objectIDs = result.result as! [NSManagedObjectID]
 
-                // 合并更改到主上下文
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
-                    into: [coreDataStack.viewContext]
-                )
+            // 合并更改到主上下文
+            NSManagedObjectContext.mergeChanges(
+                fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                into: [stack.viewContext]
+            )
 
-                print("✅ Deleted all \(objectIDs.count) logs")
-            } catch {
-                print("❌ Failed to delete all logs: \(error)")
-            }
+            print("✅ Deleted all \(objectIDs.count) logs")
         }
     }
 
     /// 删除指定会话的所有日志
-    public func deleteLogs(forSession sessionId: String) throws {
-        let context = coreDataStack.newBackgroundContext()
-        var thrownError: Error?
+    public func deleteLogs(forSession sessionId: String) async throws {
+        let stack = try getStack()
 
-        context.performAndWait {
+        try await performBackgroundOperation { context in
             let fetchRequest = LogEventEntity.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "sessionId == %@", sessionId)
 
             let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
             deleteRequest.resultType = .resultTypeObjectIDs
 
-            do {
-                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
-                let objectIDs = result.result as! [NSManagedObjectID]
+            let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+            let objectIDs = result.result as! [NSManagedObjectID]
 
-                // 合并更改到主上下文
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
-                    into: [coreDataStack.viewContext]
-                )
+            // 合并更改到主上下文
+            NSManagedObjectContext.mergeChanges(
+                fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                into: [stack.viewContext]
+            )
 
-                print("✅ Deleted \(objectIDs.count) logs for session \(sessionId)")
-            } catch {
-                print("❌ Failed to delete logs for session \(sessionId): \(error)")
-                thrownError = error
-            }
-        }
-
-        if let error = thrownError {
-            throw error
+            print("✅ Deleted \(objectIDs.count) logs for session \(sessionId)")
         }
     }
 
     /// 删除多个会话的日志
-    public func deleteLogs(forSessions sessionIds: Set<String>) throws {
+    public func deleteLogs(forSessions sessionIds: Set<String>) async throws {
         guard !sessionIds.isEmpty else { return }
 
-        let context = coreDataStack.newBackgroundContext()
-        var thrownError: Error?
+        let stack = try getStack()
 
-        context.performAndWait {
+        try await performBackgroundOperation { context in
             let fetchRequest = LogEventEntity.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "sessionId IN %@", Array(sessionIds))
 
             let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
             deleteRequest.resultType = .resultTypeObjectIDs
 
-            do {
-                let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
-                let objectIDs = result.result as! [NSManagedObjectID]
+            let result = try context.execute(deleteRequest) as! NSBatchDeleteResult
+            let objectIDs = result.result as! [NSManagedObjectID]
 
-                // 合并更改到主上下文
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
-                    into: [coreDataStack.viewContext]
-                )
+            // 合并更改到主上下文
+            NSManagedObjectContext.mergeChanges(
+                fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                into: [stack.viewContext]
+            )
 
-                print("✅ Deleted \(objectIDs.count) logs for \(sessionIds.count) sessions")
-            } catch {
-                print("❌ Failed to delete logs for sessions: \(error)")
-                thrownError = error
-            }
-        }
-
-        if let error = thrownError {
-            throw error
+            print("✅ Deleted \(objectIDs.count) logs for \(sessionIds.count) sessions")
         }
     }
 
     /// 数据库大小
     public func databaseSize() -> Int64 {
-        guard let storeURL = coreDataStack.persistentContainer.persistentStoreCoordinator.persistentStores.first?.url else {
+        guard let stack = coreDataStack,
+              let storeURL = stack.persistentContainer.persistentStoreCoordinator.persistentStores.first?.url else {
             return 0
         }
 
@@ -591,7 +605,7 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
             return 0
         }
 
-        return attributes[.size] as? Int64 ?? 0
+        return attributes[FileAttributeKey.size] as? Int64 ?? 0
     }
 
     // MARK: - Deep Search Support
@@ -613,7 +627,12 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         sessionIds: Set<String>,
         sortOrder: SessionSortOrder = .timeDescending
     ) throws -> [SessionInfo] {
-        let targetContext = context ?? coreDataStack.viewContext
+        let targetContext: NSManagedObjectContext
+        if let ctx = context {
+            targetContext = ctx
+        } else {
+            targetContext = try getStack().viewContext
+        }
         let fetchRequest = LogEventEntity.fetchRequest()
 
         // 配置 GROUP BY 查询
@@ -673,7 +692,12 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
         searchFields: [String],
         limit: Int
     ) throws -> [LogEvent] {
-        let targetContext = context ?? coreDataStack.viewContext
+        let targetContext: NSManagedObjectContext
+        if let ctx = context {
+            targetContext = ctx
+        } else {
+            targetContext = try getStack().viewContext
+        }
         let fetchRequest = LogEventEntity.fetchRequest()
 
         var predicates: [NSPredicate] = []
