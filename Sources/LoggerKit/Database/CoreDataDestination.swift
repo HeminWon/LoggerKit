@@ -59,19 +59,18 @@ public final class CoreDataDestination: BaseDestination {
 
     override public func send(_ level: SwiftyBeaver.Level, msg: String, thread: String,
                               file: String, function: String, line: Int, context: Any? = nil) -> String? {
+        guard let stack = coreDataStack else { return nil }
         // 构造日志事件,包含会话信息
-        let logEvent = LogEvent(
-            thread: thread,
-            function: function,
-            line: line,
-            file: file,
-            timestamp: Date().timeIntervalSince1970,
-            level: mapLevel(level),
-            message: msg,
-            context: (context as? String) ?? "",
-            sessionId: sessionId,
-            sessionStartTime: sessionStartTime
-        )
+        let logEvent = LogEvent(thread: thread,
+                                function: function,
+                                line: line,
+                                file: file,
+                                timestamp: Date().timeIntervalSince1970,
+                                level: mapLevel(level),
+                                message: msg,
+                                context: (context as? String) ?? "",
+                                sessionId: sessionId,
+                                sessionStartTime: sessionStartTime)
 
         // 添加到待写入队列
         queue.async { [weak self] in
