@@ -22,7 +22,7 @@
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/HeminWon/LoggerKit.git", from: "0.1.0")
+    .package(url: "https://github.com/HeminWon/LoggerKit.git", from: "0.2.1")
 ]
 ```
 
@@ -33,6 +33,14 @@ dependencies: [
     name: "YourTarget",
     dependencies: ["LoggerKit"]
 )
+```
+
+### CocoaPods
+
+在 `Podfile` 中添加：
+
+```ruby
+pod 'HMLoggerKit', '~> 0.2.1'
 ```
 
 ## 示例应用
