@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
   s.name             = "HMLoggerKit"
   s.module_name      = "LoggerKit"
-  s.version          = "0.2.1"
+  s.version          = "0.2.2"
   s.summary          = "High-performance logging framework based on SwiftyBeaver."
   s.description      = <<-DESC
 LoggerKit is a high-performance, multi-platform logging framework based on SwiftyBeaver.
