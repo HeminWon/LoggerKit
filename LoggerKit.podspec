@@ -16,9 +16,7 @@ JSON log files, SwiftUI Environment integration, and a built-in log viewer UI.
   s.swift_version    = "5.9"
   s.platforms        = {
     :ios => "15.0",
-    :osx => "12.0",
-    :watchos => "8.0",
-    :tvos => "15.0"
+    :osx => "12.0"
   }
 
   s.source_files     = "Sources/LoggerKit/**/*.{swift}"
