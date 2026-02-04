@@ -18,9 +18,9 @@ public enum FilterError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .loadingOptionsFailed:
-            return String(localized: "filter_load_options_failed", bundle: .module)
+            return String(localized: "filter_load_options_failed", bundle: .loggerKit)
         case .emptyFilterResult:
-            return String(localized: "filter_empty_result", bundle: .module)
+            return String(localized: "filter_empty_result", bundle: .loggerKit)
         }
     }
 }

@@ -23,15 +23,15 @@ public enum SearchField: String, CaseIterable, Identifiable, Sendable {
     public var localizedName: String {
         switch self {
         case .message:
-            return String(localized: "search_field_message", bundle: .module)
+            return String(localized: "search_field_message", bundle: .loggerKit)
         case .fileName:
-            return String(localized: "search_field_file", bundle: .module)
+            return String(localized: "search_field_file", bundle: .loggerKit)
         case .function:
-            return String(localized: "search_field_function", bundle: .module)
+            return String(localized: "search_field_function", bundle: .loggerKit)
         case .context:
-            return String(localized: "search_field_context", bundle: .module)
+            return String(localized: "search_field_context", bundle: .loggerKit)
         case .thread:
-            return String(localized: "search_field_thread", bundle: .module)
+            return String(localized: "search_field_thread", bundle: .loggerKit)
         }
     }
 

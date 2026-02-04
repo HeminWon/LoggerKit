@@ -17,7 +17,7 @@ public enum ExportFormat: String, Equatable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .log: return String(localized: "export_format_log", bundle: .module)
+        case .log: return String(localized: "export_format_log", bundle: .loggerKit)
         }
     }
 }
@@ -33,11 +33,11 @@ public enum ExportFeatureError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .emptyData:
-            return String(localized: "export_no_data", bundle: .module)
+            return String(localized: "export_no_data", bundle: .loggerKit)
         case .exportError(let error):
             return error.errorDescription
         case .cancelled:
-            return String(localized: "export_cancelled_by_user", bundle: .module)
+            return String(localized: "export_cancelled_by_user", bundle: .loggerKit)
         }
     }
 }

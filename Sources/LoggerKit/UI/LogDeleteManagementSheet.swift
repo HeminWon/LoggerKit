@@ -31,13 +31,13 @@ struct LogDeleteManagementSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle(String(localized: "delete_management_title", bundle: .module))
+            .navigationTitle(String(localized: "delete_management_title", bundle: .loggerKit))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "done_button", bundle: .module)) {
+                    Button(String(localized: "done_button", bundle: .loggerKit)) {
                         dismiss()
                     }
                 }
@@ -47,39 +47,39 @@ struct LogDeleteManagementSheet: View {
             viewStore.send(.delete(.loadSessions))
         }
         // 删除所有日志确认对话框
-        .alert(String(localized: "delete_all_confirmation_title", bundle: .module), isPresented: viewStore.binding(
+        .alert(String(localized: "delete_all_confirmation_title", bundle: .loggerKit), isPresented: viewStore.binding(
             get: { $0.deleteFeature.showDeleteAllConfirmation },
             send: { _ in .delete(.dismissConfirmationDialog) }
         )) {
-            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) {
+            Button(String(localized: "cancel_button", bundle: .loggerKit), role: .cancel) {
                 viewStore.send(.delete(.dismissConfirmationDialog))
             }
-            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
+            Button(String(localized: "delete_button", bundle: .loggerKit), role: .destructive) {
                 viewStore.send(.delete(.confirmDeleteAll))
             }
         } message: {
-            Text(String(localized: "delete_all_confirmation_message", bundle: .module))
+            Text(String(localized: "delete_all_confirmation_message", bundle: .loggerKit))
         }
         // 删除选中 Session 确认对话框
-        .alert(String(localized: "delete_sessions_confirmation_title", bundle: .module), isPresented: viewStore.binding(
+        .alert(String(localized: "delete_sessions_confirmation_title", bundle: .loggerKit), isPresented: viewStore.binding(
             get: { $0.deleteFeature.showDeleteSessionsConfirmation },
             send: { _ in .delete(.dismissConfirmationDialog) }
         )) {
-            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) {
+            Button(String(localized: "cancel_button", bundle: .loggerKit), role: .cancel) {
                 viewStore.send(.delete(.dismissConfirmationDialog))
             }
-            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
+            Button(String(localized: "delete_button", bundle: .loggerKit), role: .destructive) {
                 viewStore.send(.delete(.confirmDelete))
             }
         } message: {
-            Text(String(format: String(localized: "delete_sessions_confirmation_message", bundle: .module), viewStore.state.deleteFeature.selectedSessionCount))
+            Text(String(format: String(localized: "delete_sessions_confirmation_message", bundle: .loggerKit), viewStore.state.deleteFeature.selectedSessionCount))
         }
         // 错误提示
-        .alert(String(localized: "delete_failed_title", bundle: .module), isPresented: viewStore.binding(
+        .alert(String(localized: "delete_failed_title", bundle: .loggerKit), isPresented: viewStore.binding(
             get: { $0.deleteFeature.showError },
             send: { _ in .delete(.dismissConfirmationDialog) }
         )) {
-            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) {
+            Button(String(localized: "confirm_button", bundle: .loggerKit), role: .cancel) {
                 viewStore.send(.delete(.dismissConfirmationDialog))
             }
         } message: {
@@ -94,9 +94,9 @@ struct LogDeleteManagementSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "delete_all_logs_title", bundle: .module))
+                    Text(String(localized: "delete_all_logs_title", bundle: .loggerKit))
                         .font(.headline)
-                    Text(String(localized: "delete_all_logs_description", bundle: .module))
+                    Text(String(localized: "delete_all_logs_description", bundle: .loggerKit))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -108,7 +108,7 @@ struct LogDeleteManagementSheet: View {
             } label: {
                 HStack {
                     Image(systemName: "trash.fill")
-                    Text(String(localized: "delete_all_logs_button", bundle: .module))
+                    Text(String(localized: "delete_all_logs_button", bundle: .loggerKit))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -131,14 +131,14 @@ struct LogDeleteManagementSheet: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "delete_by_session_title", bundle: .module))
+                    Text(String(localized: "delete_by_session_title", bundle: .loggerKit))
                         .font(.headline)
                     if !deleteState.selectedSessionIds.isEmpty {
-                        Text(String(format: String(localized: "selected_sessions_count", bundle: .module), deleteState.selectedSessionCount))
+                        Text(String(format: String(localized: "selected_sessions_count", bundle: .loggerKit), deleteState.selectedSessionCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     } else {
-                        Text(String(localized: "delete_by_session_description", bundle: .module))
+                        Text(String(localized: "delete_by_session_description", bundle: .loggerKit))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -148,13 +148,13 @@ struct LogDeleteManagementSheet: View {
                 // 全选/清空按钮
                 if !deleteState.availableSessions.isEmpty {
                     if deleteState.selectedSessionIds.isEmpty {
-                        Button(String(localized: "select_all", bundle: .module)) {
+                        Button(String(localized: "select_all", bundle: .loggerKit)) {
                             viewStore.send(.delete(.selectAllSessions))
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
                     } else {
-                        Button(String(localized: "empty", bundle: .module)) {
+                        Button(String(localized: "empty", bundle: .loggerKit)) {
                             viewStore.send(.delete(.deselectAllSessions))
                         }
                         .font(.caption)
@@ -169,7 +169,7 @@ struct LogDeleteManagementSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding()
             } else if deleteState.availableSessions.isEmpty {
-                Text(String(localized: "no_session_records", bundle: .module))
+                Text(String(localized: "no_session_records", bundle: .loggerKit))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
@@ -185,7 +185,7 @@ struct LogDeleteManagementSheet: View {
                 } label: {
                     HStack {
                         Image(systemName: "trash.fill")
-                        Text(String(format: String(localized: "delete_selected_sessions_button", bundle: .module), deleteState.selectedSessionCount))
+                        Text(String(format: String(localized: "delete_selected_sessions_button", bundle: .loggerKit), deleteState.selectedSessionCount))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)

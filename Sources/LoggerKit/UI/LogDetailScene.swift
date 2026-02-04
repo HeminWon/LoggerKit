@@ -23,27 +23,27 @@ public struct LogDetailScene: View {
 
     // MARK: - Localized Strings
     private var loadingText: String {
-        String(localized: "loading_logs", bundle: .module)
+        String(localized: "loading_logs", bundle: .loggerKit)
     }
 
     private var errorPrefix: String {
-        String(localized: "error_prefix", bundle: .module)
+        String(localized: "error_prefix", bundle: .loggerKit)
     }
 
     private var totalCountFormat: String {
-        String(localized: "total_count", bundle: .module)
+        String(localized: "total_count", bundle: .loggerKit)
     }
 
     private var filterCountFormat: String {
-        String(localized: "filter_count", bundle: .module)
+        String(localized: "filter_count", bundle: .loggerKit)
     }
 
     private var filterButtonText: String {
-        String(localized: "filter_button", bundle: .module)
+        String(localized: "filter_button", bundle: .loggerKit)
     }
 
     private var shareLogText: String {
-        String(localized: "share_log", bundle: .module)
+        String(localized: "share_log", bundle: .loggerKit)
     }
 
     /// 是否没有日志（根据 totalCount 和 loadingState 判断）
@@ -191,7 +191,7 @@ public struct LogDetailScene: View {
                     Button {
                         viewStore.startExport(format: .log)
                     } label: {
-                        Label(String(localized: "export_logs", bundle: .module), systemImage: "square.and.arrow.up")
+                        Label(String(localized: "export_logs", bundle: .loggerKit), systemImage: "square.and.arrow.up")
                     }
 
                     Divider()
@@ -200,7 +200,7 @@ public struct LogDetailScene: View {
                     Button(role: .destructive) {
                         viewStore.send(.setDeleteManagementPresented(true))
                     } label: {
-                        Label(String(localized: "delete_management", bundle: .module), systemImage: "trash.circle")
+                        Label(String(localized: "delete_management", bundle: .loggerKit), systemImage: "trash.circle")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -244,7 +244,7 @@ public struct LogDetailScene: View {
                     }
                     
                     // 进度文字
-                    Text(String(localized: "exporting_progress", bundle: .module))
+                    Text(String(localized: "exporting_progress", bundle: .loggerKit))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if viewStore.totalExportCount > 0 {
@@ -258,7 +258,7 @@ public struct LogDetailScene: View {
                 // 1️⃣ 筛选结果统计
                 HStack(alignment: .center) {
                     if viewStore.totalCount > 0 {
-                        Text(String(format: String(localized: "loaded_total_count", bundle: .module), viewStore.displayEvents.count, viewStore.totalCount))
+                        Text(String(format: String(localized: "loaded_total_count", bundle: .loggerKit), viewStore.displayEvents.count, viewStore.totalCount))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
@@ -321,8 +321,8 @@ public struct LogDetailScene: View {
             .frame(width: 32, height: 32) // 固定尺寸，避免布局变化
         }
         .disabled(viewStore.isExporting || hasNoLogs)
-        .alert(String(localized: "export_failed", bundle: .module), isPresented: viewStore.exportErrorPresentedBinding) {
-            Button(String(localized: "confirm_button", bundle: .module), role: .cancel) { }
+        .alert(String(localized: "export_failed", bundle: .loggerKit), isPresented: viewStore.exportErrorPresentedBinding) {
+            Button(String(localized: "confirm_button", bundle: .loggerKit), role: .cancel) { }
         } message: {
             if let error = viewStore.error {
                 Text(error.localizedDescription)
@@ -409,7 +409,7 @@ struct LogRowView: View {
         // 长按弹出复制菜单
         .contextMenu {
             Button(action: { copyLog() }) {
-                Label(String(localized: "copy_log", bundle: .module), systemImage: "doc.on.doc")
+                Label(String(localized: "copy_log", bundle: .loggerKit), systemImage: "doc.on.doc")
             }
         }
     }

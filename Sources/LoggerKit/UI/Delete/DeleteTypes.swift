@@ -85,13 +85,13 @@ public enum DeleteError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .loadingSessionsFailed:
-            return String(localized: "delete_load_sessions_failed", bundle: .module)
+            return String(localized: "delete_load_sessions_failed", bundle: .loggerKit)
         case .noSessionsSelected:
-            return String(localized: "delete_no_sessions_selected", bundle: .module)
+            return String(localized: "delete_no_sessions_selected", bundle: .loggerKit)
         case .deletionFailed:
-            return String(localized: "delete_operation_failed", bundle: .module)
+            return String(localized: "delete_operation_failed", bundle: .loggerKit)
         case .sessionNotFound(let sessionId):
-            return String(localized: "delete_session_not_found", bundle: .module).replacingOccurrences(of: "%@", with: sessionId)
+            return String(localized: "delete_session_not_found", bundle: .loggerKit).replacingOccurrences(of: "%@", with: sessionId)
         }
     }
 }

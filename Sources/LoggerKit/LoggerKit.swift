@@ -246,7 +246,7 @@ public enum LoggerKit {
         let view = makeView(configuration: configuration)
         let hostingController = UIHostingController(rootView: view)
         hostingController.title = NSLocalizedString("log_viewer_title",
-                                                    bundle: .module,
+                                                    bundle: .loggerKit,
                                                     comment: "Log Viewer")
         return hostingController
     }
@@ -271,7 +271,7 @@ public enum LoggerKit {
         let view = LogDetailScene(viewStore: viewStore)
         let hostingController = UIHostingController(rootView: view)
         hostingController.title = NSLocalizedString("log_viewer_title",
-                                                    bundle: .module,
+                                                    bundle: .loggerKit,
                                                     comment: "Log Viewer")
         return hostingController
     }

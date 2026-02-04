@@ -50,7 +50,7 @@ struct LogFilterSheet: View {
                         // 模块筛选（折叠式）
                         if !viewStore.availableContexts.isEmpty {
                             CollapsibleFilterSection(
-                                title: String(localized: "search_field_context", bundle: .module),
+                                title: String(localized: "search_field_context", bundle: .loggerKit),
                                 options: viewStore.availableContexts,
                                 selectedOptions: viewStore.selectedContexts,
                                 onToggle: { viewStore.send(.filter(.updateFilter(.context, .toggle($0)))) },
@@ -63,7 +63,7 @@ struct LogFilterSheet: View {
                         // 文件筛选（折叠式）
                         if !viewStore.availableFileNames.isEmpty {
                             CollapsibleFilterSection(
-                                title: String(localized: "search_field_file", bundle: .module),
+                                title: String(localized: "search_field_file", bundle: .loggerKit),
                                 options: viewStore.availableFileNames,
                                 selectedOptions: viewStore.selectedFileNames,
                                 onToggle: { viewStore.send(.filter(.updateFilter(.fileName, .toggle($0)))) },
@@ -76,7 +76,7 @@ struct LogFilterSheet: View {
                         // 函数筛选（折叠式）
                         if !viewStore.availableFunctions.isEmpty {
                             CollapsibleFilterSection(
-                                title: String(localized: "search_field_function", bundle: .module),
+                                title: String(localized: "search_field_function", bundle: .loggerKit),
                                 options: viewStore.availableFunctions,
                                 selectedOptions: viewStore.selectedFunctions,
                                 onToggle: { viewStore.send(.filter(.updateFilter(.function, .toggle($0)))) },
@@ -93,7 +93,7 @@ struct LogFilterSheet: View {
                         // 线程筛选（折叠式）
                         if !viewStore.availableThreads.isEmpty {
                             CollapsibleFilterSection(
-                                title: String(localized: "search_field_thread", bundle: .module),
+                                title: String(localized: "search_field_thread", bundle: .loggerKit),
                                 options: viewStore.availableThreads,
                                 selectedOptions: viewStore.selectedThreads,
                                 onToggle: { viewStore.send(.filter(.updateFilter(.thread, .toggle($0)))) },
@@ -105,28 +105,28 @@ struct LogFilterSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle(String(localized: "filter_title", bundle: .module))
+            .navigationTitle(String(localized: "filter_title", bundle: .loggerKit))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
-                        Text(String(localized: "filter_title", bundle: .module))
+                        Text(String(localized: "filter_title", bundle: .loggerKit))
                             .font(.headline)
-                        Text(String(format: String(localized: "match_count", bundle: .module), viewStore.totalCount))
+                        Text(String(format: String(localized: "match_count", bundle: .loggerKit), viewStore.totalCount))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "reset_button", bundle: .module)) {
+                    Button(String(localized: "reset_button", bundle: .loggerKit)) {
                         viewStore.resetFilters()
                     }
                     .foregroundColor(.red)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "done_button", bundle: .module)) {
+                    Button(String(localized: "done_button", bundle: .loggerKit)) {
                         dismiss()
                     }
                 }
@@ -142,14 +142,14 @@ struct LogFilterSheet: View {
     private var messageKeywordsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(String(localized: "message_keywords", bundle: .module))
+                Text(String(localized: "message_keywords", bundle: .loggerKit))
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Text("(\(viewStore.state.filterFeature.selectedMessageKeywords.count))")
                     .font(.caption)
                     .foregroundColor(.blue)
                 Spacer()
-                Button(String(localized: "clear_button", bundle: .module)) {
+                Button(String(localized: "clear_button", bundle: .loggerKit)) {
                     // 逐个移除所有关键词
                     viewStore.selectedMessageKeywords.forEach { keyword in
                         viewStore.send(.filter(.updateFilter(.messageKeyword, .toggle(keyword))))
@@ -192,11 +192,11 @@ struct LogFilterSheet: View {
     private var levelSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(String(localized: "log_level", bundle: .module))
+                Text(String(localized: "log_level", bundle: .loggerKit))
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                Button(viewStore.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .module) : String(localized: "select_all_button", bundle: .module)) {
+                Button(viewStore.selectedLevels.count == 5 ? String(localized: "clear_button", bundle: .loggerKit) : String(localized: "select_all_button", bundle: .loggerKit)) {
                     if viewStore.selectedLevels.count == 5 {
                         // 清除所有:逐个toggle
                         [LogEvent.Level.verbose, .debug, .info, .warning, .error].forEach { level in
@@ -241,7 +241,7 @@ struct SessionFilterSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(String(localized: "session_filter_title", bundle: .module))
+                Text(String(localized: "session_filter_title", bundle: .loggerKit))
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Text("(\(viewStore.selectedSessionIds.count))")
@@ -250,7 +250,7 @@ struct SessionFilterSection: View {
                 Spacer()
 
                 if !viewStore.selectedSessionIds.isEmpty {
-                    Button(String(localized: "clear_button", bundle: .module)) {
+                    Button(String(localized: "clear_button", bundle: .loggerKit)) {
                         viewStore.send(.filter(.clearSessionIds))
                     }
                     .font(.caption)
@@ -266,13 +266,13 @@ struct SessionFilterSection: View {
             } else if let errorMessage = viewStore.sessionLoadingError {
                 // 错误展示
                 VStack(spacing: 4) {
-                    Text(String(localized: "session_load_failed", bundle: .module))
+                    Text(String(localized: "session_load_failed", bundle: .loggerKit))
                         .font(.caption)
                         .foregroundColor(.red)
                     Text(errorMessage)
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    Button(String(localized: "retry_button", bundle: .module)) {
+                    Button(String(localized: "retry_button", bundle: .loggerKit)) {
                         viewStore.send(.filter(.loadSessions))
                     }
                     .font(.caption)
@@ -281,7 +281,7 @@ struct SessionFilterSection: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             } else if viewStore.availableSessions.isEmpty {
-                Text(String(localized: "session_empty_message", bundle: .module))
+                Text(String(localized: "session_empty_message", bundle: .loggerKit))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -352,7 +352,7 @@ struct SessionChip: View {
                                 .font(.caption)
                                 .foregroundColor(isSelected ? .white.opacity(0.6) : .secondary)
 
-                            Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                            Text(String(format: String(localized: "session_log_count", bundle: .loggerKit), session.logCount))
                                 .font(.caption)
                                 .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
                         }
@@ -394,7 +394,7 @@ struct SessionChip: View {
                         .font(.caption2)
                         .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
 
-                    Text(String(format: String(localized: "session_log_count", bundle: .module), session.logCount))
+                    Text(String(format: String(localized: "session_log_count", bundle: .loggerKit), session.logCount))
                         .font(.caption2)
                         .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
                 }
@@ -416,18 +416,18 @@ struct SessionChip: View {
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
-                    Label(String(localized: "delete_session_context_menu", bundle: .module), systemImage: "trash")
+                    Label(String(localized: "delete_session_context_menu", bundle: .loggerKit), systemImage: "trash")
                 }
             }
         }
         // 删除确认对话框（仅在删除模式下显示）
-        .alert(String(format: String(localized: "delete_session_confirmation_title", bundle: .module), session.id), isPresented: $showDeleteConfirmation) {
-            Button(String(localized: "cancel_button", bundle: .module), role: .cancel) { }
-            Button(String(localized: "delete_button", bundle: .module), role: .destructive) {
+        .alert(String(format: String(localized: "delete_session_confirmation_title", bundle: .loggerKit), session.id), isPresented: $showDeleteConfirmation) {
+            Button(String(localized: "cancel_button", bundle: .loggerKit), role: .cancel) { }
+            Button(String(localized: "delete_button", bundle: .loggerKit), role: .destructive) {
                 onDelete?(session.id)
             }
         } message: {
-            Text(String(format: String(localized: "delete_session_confirmation_message", bundle: .module), session.logCount))
+            Text(String(format: String(localized: "delete_session_confirmation_message", bundle: .loggerKit), session.logCount))
         }
     }
 

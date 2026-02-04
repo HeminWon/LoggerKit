@@ -60,14 +60,14 @@ public final class CoreDataStack {
 
         // 遍历候选路径查找模型文件
         for (resource, ext) in candidatePaths {
-            if let url = Bundle.module.url(forResource: resource, withExtension: ext) {
+            if let url = Bundle.loggerKit.url(forResource: resource, withExtension: ext) {
                 return url
             }
         }
 
         // 如果都找不到,打印调试信息
-        print("❌ Bundle.module resourcePath: \(Bundle.module.resourcePath ?? "nil")")
-        if let resourcePath = Bundle.module.resourcePath {
+        print("❌ Bundle.loggerKit resourcePath: \(Bundle.loggerKit.resourcePath ?? "nil")")
+        if let resourcePath = Bundle.loggerKit.resourcePath {
             do {
                 let contents = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
                 print("❌ Bundle contents: \(contents)")

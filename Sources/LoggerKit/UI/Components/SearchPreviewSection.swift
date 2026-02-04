@@ -75,14 +75,14 @@ struct SearchPreviewSection: View {
     // MARK: - 搜索框
     private var searchBox: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "keyword_search", bundle: .module))
+            Text(String(localized: "keyword_search", bundle: .loggerKit))
                 .font(.subheadline)
                 .fontWeight(.medium)
 
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
-                TextField(String(localized: "search_placeholder", bundle: .module), text: $localSearchText)
+                TextField(String(localized: "search_placeholder", bundle: .loggerKit), text: $localSearchText)
                     .autocorrectionDisabled()
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
@@ -133,7 +133,7 @@ struct SearchPreviewSection: View {
             HStack {
                 ProgressView()
                     .scaleEffect(0.6)
-                Text(String(localized: "typing_status", bundle: .module))
+                Text(String(localized: "typing_status", bundle: .loggerKit))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -144,10 +144,10 @@ struct SearchPreviewSection: View {
                 ProgressView()
                     .scaleEffect(0.8)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "preview_searching_title", bundle: .module))
+                    Text(String(localized: "preview_searching_title", bundle: .loggerKit))
                         .font(.caption)
                         .fontWeight(.medium)
-                    Text(String(format: String(localized: "preview_searching_sessions", bundle: .module), sessionCount))
+                    Text(String(format: String(localized: "preview_searching_sessions", bundle: .loggerKit), sessionCount))
                         .font(.caption2)
                         .foregroundColor(.gray)
                 }
@@ -159,7 +159,7 @@ struct SearchPreviewSection: View {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text(String(localized: "preview_completed", bundle: .module))
+                    Text(String(localized: "preview_completed", bundle: .loggerKit))
                         .font(.caption)
                         .fontWeight(.medium)
                     Spacer()
@@ -171,7 +171,7 @@ struct SearchPreviewSection: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.down.circle.fill")
-                                Text(String(localized: "search_more", bundle: .module))
+                                Text(String(localized: "search_more", bundle: .loggerKit))
                             }
                             .font(.caption)
                             .foregroundColor(.white)
@@ -185,14 +185,14 @@ struct SearchPreviewSection: View {
                 }
 
                 HStack(spacing: 12) {
-                    Label(String(format: String(localized: "matches_count", bundle: .module), matchCount), systemImage: "doc.text.magnifyingglass")
-                    Label(String(format: String(localized: "latest_sessions", bundle: .module), searchedSessions), systemImage: "folder")
+                    Label(String(format: String(localized: "matches_count", bundle: .loggerKit), matchCount), systemImage: "doc.text.magnifyingglass")
+                    Label(String(format: String(localized: "latest_sessions", bundle: .loggerKit), searchedSessions), systemImage: "folder")
                 }
                 .font(.caption2)
                 .foregroundColor(.gray)
 
                 if hasMoreSessions {
-                    Text(String(localized: "search_more_hint", bundle: .module))
+                    Text(String(localized: "search_more_hint", bundle: .loggerKit))
                         .font(.caption2)
                         .foregroundColor(.blue)
                 }
@@ -204,7 +204,7 @@ struct SearchPreviewSection: View {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text(String(localized: "full_searching_title", bundle: .module))
+                    Text(String(localized: "full_searching_title", bundle: .loggerKit))
                         .font(.caption)
                         .fontWeight(.medium)
                     Spacer()
@@ -215,7 +215,7 @@ struct SearchPreviewSection: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark.circle.fill")
-                            Text(String(localized: "cancel", bundle: .module))
+                            Text(String(localized: "cancel", bundle: .loggerKit))
                         }
                         .font(.caption)
                         .foregroundColor(.white)
@@ -249,9 +249,9 @@ struct SearchPreviewSection: View {
 
                     // 状态信息（显示日志数量）
                     HStack(spacing: 12) {
-                        Text(String(format: String(localized: "scanned_logs", bundle: .module), scannedEvents, totalEstimated))
+                        Text(String(format: String(localized: "scanned_logs", bundle: .loggerKit), scannedEvents, totalEstimated))
                             .font(.caption2)
-                        Text(String(format: String(localized: "found_matches", bundle: .module), matchCount))
+                        Text(String(format: String(localized: "found_matches", bundle: .loggerKit), matchCount))
                             .font(.caption2)
                     }
                     .foregroundColor(.gray)
@@ -264,12 +264,12 @@ struct SearchPreviewSection: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "search_completed", bundle: .module))
+                    Text(String(localized: "search_completed", bundle: .loggerKit))
                         .font(.caption)
                         .fontWeight(.medium)
                     HStack(spacing: 12) {
-                        Label(String(format: String(localized: "total_matches", bundle: .module), totalMatches), systemImage: "doc.text.magnifyingglass")
-                        Label(String(format: String(localized: "total_sessions", bundle: .module), searchedSessions), systemImage: "folder")
+                        Label(String(format: String(localized: "total_matches", bundle: .loggerKit), totalMatches), systemImage: "doc.text.magnifyingglass")
+                        Label(String(format: String(localized: "total_sessions", bundle: .loggerKit), searchedSessions), systemImage: "folder")
                     }
                     .font(.caption2)
                     .foregroundColor(.gray)
@@ -281,7 +281,7 @@ struct SearchPreviewSection: View {
             HStack {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundColor(.orange)
-                Text(String(localized: "search_cancelled", bundle: .module))
+                Text(String(localized: "search_cancelled", bundle: .loggerKit))
                     .font(.caption)
                     .foregroundColor(.orange)
             }
@@ -292,7 +292,7 @@ struct SearchPreviewSection: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "search_failed", bundle: .module))
+                    Text(String(localized: "search_failed", bundle: .loggerKit))
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.red)
@@ -308,17 +308,17 @@ struct SearchPreviewSection: View {
                 HStack {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundColor(.orange)
-                    Text(String(localized: "too_many_results", bundle: .module))
+                    Text(String(localized: "too_many_results", bundle: .loggerKit))
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.orange)
                 }
 
-                Text(String(format: String(localized: "results_limit_exceeded", bundle: .module), currentCount, limit))
+                Text(String(format: String(localized: "results_limit_exceeded", bundle: .loggerKit), currentCount, limit))
                     .font(.caption2)
                     .foregroundColor(.gray)
 
-                Text(String(localized: "refine_search_hint", bundle: .module))
+                Text(String(localized: "refine_search_hint", bundle: .loggerKit))
                     .font(.caption2)
                     .foregroundColor(.blue)
             }
@@ -329,7 +329,7 @@ struct SearchPreviewSection: View {
     // MARK: - 搜索范围选择器
     private var searchFieldsSelector: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "search_scope", bundle: .module))
+            Text(String(localized: "search_scope", bundle: .loggerKit))
                 .font(.caption)
                 .foregroundColor(.gray)
 
@@ -379,19 +379,19 @@ struct SearchPreviewSection: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(String(localized: "match_preview", bundle: .module))
+                Text(String(localized: "match_preview", bundle: .loggerKit))
                     .font(.caption)
                     .foregroundColor(.gray)
                 Spacer()
                 if !results.isEmpty {
-                    Text(String(format: String(localized: "items_count", bundle: .module), results.totalCount))
+                    Text(String(format: String(localized: "items_count", bundle: .loggerKit), results.totalCount))
                         .font(.caption)
                         .foregroundColor(.blue)
                 }
             }
 
             if results.isEmpty {
-                Text(String(localized: "no_match", bundle: .module))
+                Text(String(localized: "no_match", bundle: .loggerKit))
                     .font(.caption)
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity)
@@ -408,7 +408,7 @@ struct SearchPreviewSection: View {
                     // 文件匹配
                     if !results.fileName.isEmpty {
                         resultCategory(
-                            title: String(localized: "search_field_file", bundle: .module),
+                            title: String(localized: "search_field_file", bundle: .loggerKit),
                             icon: "doc",
                             items: results.fileName
                         )
@@ -417,7 +417,7 @@ struct SearchPreviewSection: View {
                     // 函数匹配
                     if !results.function.isEmpty {
                         resultCategory(
-                            title: String(localized: "search_field_function", bundle: .module),
+                            title: String(localized: "search_field_function", bundle: .loggerKit),
                             icon: "function",
                             items: results.function
                         )
@@ -426,7 +426,7 @@ struct SearchPreviewSection: View {
                     // 模块匹配
                     if !results.context.isEmpty {
                         resultCategory(
-                            title: String(localized: "search_field_context", bundle: .module),
+                            title: String(localized: "search_field_context", bundle: .loggerKit),
                             icon: "square.stack.3d.up",
                             items: results.context
                         )
@@ -435,7 +435,7 @@ struct SearchPreviewSection: View {
                     // 线程匹配
                     if !results.thread.isEmpty {
                         resultCategory(
-                            title: String(localized: "search_field_thread", bundle: .module),
+                            title: String(localized: "search_field_thread", bundle: .loggerKit),
                             icon: "arrow.triangle.branch",
                             items: results.thread
                         )
@@ -461,13 +461,13 @@ struct SearchPreviewSection: View {
                     .font(.caption2)
 
                 // 显示去重消息数量
-                Text("\(String(localized: "search_field_message", bundle: .module)) (\(String(format: String(localized: "unique_messages", bundle: .module), items.count)))")
+                Text("\(String(localized: "search_field_message", bundle: .loggerKit)) (\(String(format: String(localized: "unique_messages", bundle: .loggerKit), items.count)))")
                     .font(.caption)
                     .fontWeight(.medium)
 
                 // 显示总匹配数（所有消息的 matchCount 总和）
                 let totalMatches = items.map { $0.matchCount }.reduce(0, +)
-                Text(String(format: String(localized: "total_matches_count", bundle: .module), totalMatches))
+                Text(String(format: String(localized: "total_matches_count", bundle: .loggerKit), totalMatches))
                     .font(.caption2)
                     .foregroundColor(.secondary)
 
@@ -483,7 +483,7 @@ struct SearchPreviewSection: View {
                 }) {
                     HStack(spacing: 2) {
                         Image(systemName: isKeywordSelected ? "minus.circle" : "plus.circle")
-                        Text(isKeywordSelected ? String(localized: "remove_keyword", bundle: .module) : String(localized: "add_keyword", bundle: .module))
+                        Text(isKeywordSelected ? String(localized: "remove_keyword", bundle: .loggerKit) : String(localized: "add_keyword", bundle: .loggerKit))
                     }
                     .font(.caption2)
                     .foregroundColor(isKeywordSelected ? .red : .blue)

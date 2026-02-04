@@ -307,7 +307,7 @@ extension DeleteFeature {
 
             case .showDeleteSessionsConfirmation:
                 guard !state.selectedSessionIds.isEmpty else {
-                    state.confirmationDialog = .error(String(localized: "no_sessions_selected", bundle: .module))
+                    state.confirmationDialog = .error(String(localized: "no_sessions_selected", bundle: .loggerKit))
                     return .none
                 }
                 state.confirmationDialog = .deleteSelectedSessions

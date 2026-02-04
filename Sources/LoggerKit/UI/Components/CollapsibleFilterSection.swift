@@ -41,14 +41,14 @@ struct CollapsibleFilterSection: View {
 
                 if selectedOptions.isEmpty {
                     // 没有选中时显示全选按钮
-                    Button(String(localized: "select_all_button", bundle: .module)) {
+                    Button(String(localized: "select_all_button", bundle: .loggerKit)) {
                         onSelectAll()
                     }
                     .font(.caption)
                     .foregroundColor(.blue)
                 } else {
                     // 有选中时显示清除按钮
-                    Button(String(localized: "clear_button", bundle: .module)) {
+                    Button(String(localized: "clear_button", bundle: .loggerKit)) {
                         onClear()
                     }
                     .font(.caption)
