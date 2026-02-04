@@ -1,5 +1,10 @@
 # LoggerKit
 
+[![CI](https://github.com/HeminWon/LoggerKit/actions/workflows/swift.yml/badge.svg)](https://github.com/HeminWon/LoggerKit/actions/workflows/swift.yml)
+[![CocoaPods](https://img.shields.io/cocoapods/v/HMLoggerKit.svg)](https://cocoapods.org/pods/HMLoggerKit)
+[![Swift Versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FHeminWon%2FLoggerKit%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/HeminWon/LoggerKit)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FHeminWon%2FLoggerKit%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/HeminWon/LoggerKit)
+
 High-performance logging framework for Apple platforms built on SwiftyBeaver. Lightweight `Logger` instances share a single engine, with CoreData-backed persistence and a built-in SwiftUI log viewer.
 
 ## Features
