@@ -11,7 +11,7 @@ JSON log files, SwiftUI Environment integration, and a built-in log viewer UI.
 
   s.homepage         = "https://github.com/HeminWon/LoggerKit"
   s.license          = { :type => "MIT", :file => "LICENSE" }
-  s.author           = { "HeminWon" => "heminwon@gmail.com" }
+  s.author           = { "HeminWon" => "heminwmh@gmail.com" }
   s.source           = { :git => "https://github.com/HeminWon/LoggerKit.git", :tag => s.version.to_s }
 
   s.swift_version    = "5.9"
