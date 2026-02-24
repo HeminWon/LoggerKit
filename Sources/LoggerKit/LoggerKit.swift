@@ -16,7 +16,7 @@ import UIKit
 @_exported import SwiftyBeaver
 
 /// LoggerKit 命名空间
-public enum LoggerKit {
+public enum LK {
     /// UI 配置
     public struct Configuration: Sendable {
         /// 会话 ID 过滤

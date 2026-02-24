@@ -441,5 +441,5 @@ struct SessionChip: View {
 
 // MARK: - FilterSectionWrapper (临时包装器,简化 ViewStore 使用)
 #Preview {
-    LogFilterSheet(viewStore: LoggerKit.makeViewStore())
+    LogFilterSheet(viewStore: LK.makeViewStore())
 }
