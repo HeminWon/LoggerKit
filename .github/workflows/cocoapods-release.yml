@@ -53,6 +53,10 @@ jobs:
             exit 1
           fi
 
+      - name: Validate README contains release tag/version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: sh Scripts/release-check.sh --tag "${GITHUB_REF_NAME}"
+
       - name: Lint podspec
         run: pod spec lint HMLoggerKit.podspec --allow-warnings --verbose
 
