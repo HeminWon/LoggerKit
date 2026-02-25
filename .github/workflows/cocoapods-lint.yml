@@ -46,32 +46,6 @@ jobs:
           xcodebuild -showsdks
           xcrun simctl list runtimes
 
-      - name: Resolve available platforms
-        id: platforms
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          platforms="ios,osx"
-
-          if xcrun simctl list devices available | grep -q "Apple Watch"; then
-            platforms="${platforms},watchos"
-          else
-            echo "watchOS simulator not available, skipping watchOS lint"
-          fi
-
-          if xcrun simctl list devices available | grep -q "Apple TV"; then
-            platforms="${platforms},tvos"
-          else
-            echo "tvOS simulator not available, skipping tvOS lint"
-          fi
-
-          echo "platforms=${platforms}" >> "${GITHUB_OUTPUT}"
-          echo "Lint platforms: ${platforms}"
-
       - name: Lint podspec
-        run: |
-          pod lib lint HMLoggerKit.podspec \
-            --allow-warnings \
-            --verbose \
-            --platforms="${{ steps.platforms.outputs.platforms }}"
+        shell: bash
+        run: ./Scripts/pod-lib-lint.sh
