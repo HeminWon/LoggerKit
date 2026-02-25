@@ -13,14 +13,22 @@ EXTRA_ARGS=("$@")
 
 run_build() {
   echo "==> swift build -v"
-  swift build -v "${EXTRA_ARGS[@]}"
+  if ((${#EXTRA_ARGS[@]})); then
+    swift build -v "${EXTRA_ARGS[@]}"
+  else
+    swift build -v
+  fi
 }
 
 run_test() {
   local skip_database_tests="${LOGGERKIT_SKIP_DATABASE_TESTS:-1}"
   echo "==> swift test -v"
   echo "==> LOGGERKIT_SKIP_DATABASE_TESTS=${skip_database_tests}"
-  LOGGERKIT_SKIP_DATABASE_TESTS="${skip_database_tests}" swift test -v "${EXTRA_ARGS[@]}"
+  if ((${#EXTRA_ARGS[@]})); then
+    LOGGERKIT_SKIP_DATABASE_TESTS="${skip_database_tests}" swift test -v "${EXTRA_ARGS[@]}"
+  else
+    LOGGERKIT_SKIP_DATABASE_TESTS="${skip_database_tests}" swift test -v
+  fi
 }
 
 case "${MODE}" in
