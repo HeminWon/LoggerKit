@@ -1,53 +1,53 @@
-这是LoggerKit 的核心功能说明, 以下规则是做为重构后功能检查可用的准则
+This document describes LoggerKit core capabilities and provides a post-refactor functional validation checklist.
 
-### 列表展示
-- 分页加载:支持 offset/limit 的线程安全分页查询
-- 实时统计:后台计算统计信息(等级、函数、文件、上下文、线程、会话)
-- 智能缓存:优先使用统计数据和搜索预览数据,减少重复查询
+### List Rendering
+- Pagination: thread-safe offset/limit queries
+- Real-time stats: background aggregation for level, function, file, context, thread, and session
+- Smart cache: prefer aggregated stats and search preview data to reduce repeated queries
 
-### 搜索
-- **数据来源**:从数据库加载最多 10000 条全量数据作为搜索预览缓存,不依赖已加载的列表数据
-- **多字段搜索**:支持消息、文件名、函数、上下文、线程 5 个维度,至少保留 1 个搜索字段
-- **实时防抖**:100ms 防抖机制保持响应流畅
-- **后台计算**:异步搜索在后台线程执行,避免主线程阻塞
-- **结果分类**:返回 5 个维度的分类搜索结果并去重计数
-- **智能限制**:消息字段限制前 5 个结果,其他字段返回全部匹配项
+### Search
+- **Data source**: load up to 10,000 records from database for preview cache, independent from currently loaded list items
+- **Multi-field search**: message, file name, function, context, and thread; keep at least one active field
+- **Realtime debounce**: 100ms debounce for responsive interactions
+- **Background execution**: asynchronous search runs off the main thread
+- **Categorized results**: return grouped results in 5 dimensions with de-duplicated counts
+- **Smart limits**: message dimension returns top 5; other dimensions return all matches
 
-### 筛选
-- **7 维度筛选**:
-  - **等级** (`selectedLevels`): 精确匹配日志级别,支持多选 (verbose/debug/info/warning/error),默认全选
-  - **函数** (`selectedFunctions`): 精确匹配函数名,支持多选,使用 `IN` 操作符
-  - **文件名** (`selectedFileNames`): 精确匹配文件名,支持多选,使用 `IN` 操作符
-  - **上下文** (`selectedContexts`): 精确匹配上下文标识,支持多选,使用 `IN` 操作符
-  - **线程** (`selectedThreads`): 精确匹配线程名/ID,支持多选,使用 `IN` 操作符
-  - **消息关键词** (`selectedMessageKeywords`): 模糊匹配消息内容,支持多关键词,使用 `CONTAINS[cd]` (大小写不敏感),OR 逻辑(任一匹配即可)
-  - **会话** (`selectedSessionIds`): 精确匹配会话 ID,支持多选,使用 `IN` 操作符,默认为空(表示全选所有会话),至少有一个会话被选择
-- **集合操作**:支持 Add/Remove/Toggle 筛选条件
-- **活跃计数**:显示当前激活的筛选器数量
-- **快速重置**:一键清空所有筛选条件,等级恢复默认全选
-- **防抖回调**:100ms 防抖触发 `onFilterChanged` 回调,避免频繁查询
+### Filtering
+- **7-dimension filtering**:
+  - **Level** (`selectedLevels`): exact match, multi-select, default all selected (verbose/debug/info/warning/error)
+  - **Function** (`selectedFunctions`): exact match, multi-select, `IN` predicate
+  - **File name** (`selectedFileNames`): exact match, multi-select, `IN` predicate
+  - **Context** (`selectedContexts`): exact match, multi-select, `IN` predicate
+  - **Thread** (`selectedThreads`): exact match, multi-select, `IN` predicate
+  - **Message keywords** (`selectedMessageKeywords`): fuzzy match via `CONTAINS[cd]`, multi-keyword OR logic
+  - **Session** (`selectedSessionIds`): exact match, multi-select, `IN` predicate; empty means all sessions, and at least one session must be selected when filtering by session
+- **Set operations**: add/remove/toggle filter values
+- **Active count**: show number of active filters
+- **Quick reset**: one-click clear all filters; levels reset to default all-selected
+- **Debounced callback**: trigger `onFilterChanged` with 100ms debounce to avoid frequent queries
 
-### 导出
-- **流式导出**:采用分批查询和追加写入,每批 1000 条,内存峰值 < 10MB,支持百万级日志导出
-- **LOG 格式**:
-  - **无线程**: `{日期时间} [{会话ID前8位}] [{等级}] - ({函数} at {文件名}:{行号}) - {消息}`
-  - **有线程**: `{日期时间} [{会话ID前8位}] [{等级}] <{上下文}> {线程} - ({函数} at {文件名}:{行号}) - {消息}`
-  - 日期时间格式:由 `DateFormatters.displayFormatter` 决定
-  - 编码:UTF-8,扩展名:`.log`
-- **智能文件名**:`logs_{会话标识}_{日期}.log` 格式 (例: `logs_all_20251217.log` 或 `logs_abc12345_20251217.log`)
-- **数据来源策略**:根据已加载数据量和筛选条件,自动选择最优数据源进行导出
-- **进度回调**:实时监控导出进度,返回已写入条数和总条数
+### Export
+- **Streaming export**: batched query + append write, 1,000 records per batch, peak memory < 10MB, supports million-scale exports
+- **LOG format**:
+  - **Without thread**: `{datetime} [{first8SessionId}] [{level}] - ({function} at {file}:{line}) - {message}`
+  - **With thread**: `{datetime} [{first8SessionId}] [{level}] <{context}> {thread} - ({function} at {file}:{line}) - {message}`
+  - Datetime format: from `DateFormatters.displayFormatter`
+  - Encoding: UTF-8, extension: `.log`
+- **Smart filename**: `logs_{session}_{date}.log` (for example `logs_all_20251217.log` or `logs_abc12345_20251217.log`)
+- **Data source strategy**: choose optimal source based on loaded data volume and active filters
+- **Progress callback**: report written count and total count in real time
 
-### 删除
-- **双层删除策略**:
-  - **全量删除**:一键删除所有日志
-  - **会话删除**:支持单选/全选删除指定会话
-- **会话/多会话删除**:支持删除单个或多个会话的日志,`deleteLogs(forSession:)` 和 `deleteLogs(forSessions:)`
-- **确认机制**:双重确认对话框防止误删
-- **后台执行**:使用后台 Context 避免 UI 卡顿
+### Deletion
+- **Two-level deletion strategy**:
+  - **Delete all**: remove all logs in one action
+  - **Delete by session**: remove selected sessions (single/multi-select)
+- **Single/multi-session deletion**: support `deleteLogs(forSession:)` and `deleteLogs(forSessions:)`
+- **Confirmation flow**: double confirmation to prevent accidental deletion
+- **Background execution**: run on background context to keep UI responsive
 
-### 性能优化
-- 谓词复用:统一构建查询条件,消除重复代码
-- 查询优化:统计查询从 9 次优化为 2 次(分组查询+热门函数查询)
-- 线程安全:所有数据库操作使用后台 Context
-- 任务取消:支持取消正在执行的搜索和加载任务
+### Performance Optimizations
+- Predicate reuse: centralize query predicate building to remove duplication
+- Query optimization: reduce stats queries from 9 to 2 (grouped query + popular function query)
+- Thread safety: all database operations use background context
+- Task cancellation: allow cancellation for running search/load tasks

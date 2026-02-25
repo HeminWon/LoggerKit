@@ -1,70 +1,66 @@
-# HMLoggerKit CocoaPods 发布指南（维护者）
+# HMLoggerKit CocoaPods Release Guide (Maintainers)
 
-本文档用于维护者执行 `HMLoggerKit` 的标准发布流程。
+This document defines the standard release workflow for `HMLoggerKit`.
 
-## 1. 适用范围
+## 1. Scope
 
-- 仓库：`https://github.com/HeminWon/LoggerKit`
-- Pod：`HMLoggerKit`
-- Podspec 文件：`HMLoggerKit.podspec`
-- 发布通道：CocoaPods Trunk
+- Repository: `https://github.com/HeminWon/LoggerKit`
+- Pod: `HMLoggerKit`
+- Podspec: `HMLoggerKit.podspec`
+- Release channel: CocoaPods Trunk
 
-## 2. 发布前检查
+## 2. Pre-release Checklist
 
-发布前请确认：
+Before releasing, confirm:
 
-- 当前分支为待发布分支（通常是 `main`）
-- 工作区无未提交变更（建议）
-- `HMLoggerKit.podspec` 中字段正确：
+- You are on the intended release branch (usually `main`)
+- The working tree has no uncommitted changes (recommended)
+- `HMLoggerKit.podspec` fields are correct:
   - `s.name`
   - `s.version`
-  - `s.source`（tag 与 version 一致）
+  - `s.source` (tag must match version)
   - `s.swift_version`
   - `s.platforms`
-- 本地工具可用：`pod`、`git`
+- Required tools are available locally: `pod`, `git`
 
-建议先执行一次本地 lint：
+Run local lint first:
 
 ```bash
 sh Scripts/pod-lib-lint.sh
 ```
 
-## 3. 首次发布前的一次性配置
+## 3. One-time Setup (First Release on a Machine)
 
-如果是首次在当前机器发布：
-
-1. 注册 trunk 账号（邮箱需可用）
+1. Register your trunk account:
 
 ```bash
 pod trunk register heminwon@gmail.com "HeminWon"
 ```
 
-2. 打开邮箱确认链接
-3. 验证会话
+2. Confirm via the email link.
+3. Verify session:
 
 ```bash
 pod trunk me
 ```
 
-## 4. 标准发布步骤
+## 4. Standard Release Steps
 
-以下示例以版本 `0.2.3` 为例。
+Example version: `0.2.3`.
 
-1. 更新 podspec 版本
-
-修改 `HMLoggerKit.podspec`：
+1. Update podspec version:
 
 ```ruby
 s.version = "0.2.3"
 ```
 
-2. 再次执行 lint
+2. Run lint again:
 
 ```bash
 sh Scripts/pod-lib-lint.sh
 ```
 
-3. 提交代码并打 tag（tag 必须与版本号完全一致）
+3. Commit and tag (tag must exactly match version):
 
 ```bash
 git add HMLoggerKit.podspec
@@ -73,72 +69,69 @@ git tag 0.2.3
 git push origin main --tags
 ```
 
-4. 推送到 CocoaPods
+4. Publish to CocoaPods:
 
 ```bash
 pod trunk push HMLoggerKit.podspec --allow-warnings
 ```
 
-5. 验证发布结果
+5. Verify release:
 
 ```bash
 pod trunk info HMLoggerKit
 ```
 
-或在网页确认新版本：
+Or check the website:
 
 - `https://cocoapods.org/pods/HMLoggerKit`
 
-## 5. 常见问题
+## 5. Common Issues
 
 ### 5.1 `No podspec exists at path ...`
 
-原因：脚本或命令引用了错误的 podspec 文件名。
+Cause: Wrong podspec filename/path in script or command.
 
-处理：确保使用 `HMLoggerKit.podspec`，并从仓库根目录执行命令。
+Fix: Ensure you use `HMLoggerKit.podspec` and run from repository root.
 
-### 5.2 `Unable to find a specification for ...` / 依赖解析失败
+### 5.2 `Unable to find a specification for ...` / dependency resolution failure
 
-原因：spec repo 未更新或网络异常。
+Cause: Spec repo is stale or network issue.
 
-处理：
+Fix:
 
 ```bash
 pod repo update
 ```
 
-然后重新执行 lint / push。
+Then rerun lint/push.
 
 ### 5.3 `The version should be incremented`
 
-原因：要发布的 `s.version` 已存在。
+Cause: `s.version` already exists on trunk.
 
-处理：递增版本号，重新打新 tag 并发布。
+Fix: Bump version, create a new matching tag, and release again.
 
-### 5.4 tag 与 podspec 版本不一致
+### 5.4 Tag does not match podspec version
 
-原因：`s.source[:tag]` 解析到的 tag 与 `s.version` 不匹配。
+Cause: Parsed `s.source[:tag]` does not match `s.version`.
 
-处理：保证 `s.version`、git tag、推送的 tag 三者一致。
+Fix: Keep `s.version`, git tag, and pushed tag identical.
 
-## 6. 回滚与修复策略
+## 6. Rollback and Hotfix Strategy
 
-CocoaPods Trunk 不建议删除已发布版本。推荐策略：
+CocoaPods Trunk does not recommend deleting published versions. Preferred approach:
 
-- 保留错误版本
-- 尽快发布修复版本（例如 `0.2.3` -> `0.2.4`）
-- 在 Release Notes 说明问题和修复点
+- Keep the incorrect version
+- Release a fix version quickly (for example `0.2.3` -> `0.2.4`)
+- Explain issue and fix in release notes
 
-如果必须处理严重问题，请先评估依赖方影响，再谨慎使用 trunk 的删除/废弃能力。
+If a severe issue requires stronger action, evaluate downstream impact before using trunk delete/deprecate capabilities.
 
-## 7. 建议的发布检查清单
+## 7. Suggested Release Checklist
 
-每次发布可按以下顺序打勾：
-
-- [ ] 更新 `HMLoggerKit.podspec` 版本号
-- [ ] 本地 `pod lib lint` 通过
-- [ ] 提交版本变更
-- [ ] 创建并推送同名 tag
-- [ ] `pod trunk push` 成功
-- [ ] `pod trunk info` 和 cocoapods.org 页面可见新版本
-
+- [ ] Update `HMLoggerKit.podspec` version
+- [ ] Pass local `pod lib lint`
+- [ ] Commit version change
+- [ ] Create and push matching git tag
+- [ ] `pod trunk push` succeeds
+- [ ] New version is visible in `pod trunk info` and cocoapods.org
