@@ -20,6 +20,19 @@ if [[ -z "${SPEC_VERSION}" ]]; then
   exit 1
 fi
 
+contains_release_ref() {
+  local version="$1"
+  local tag="$2"
+  local pattern="(from: \"${version}\"|~> ${version}|${tag})"
+
+  if command -v rg >/dev/null 2>&1; then
+    rg -q "${pattern}" README.md
+    return $?
+  fi
+
+  grep -Eq "${pattern}" README.md
+}
+
 if [[ -n "${TAG_NAME}" ]]; then
   if ! git rev-parse -q --verify "refs/tags/${TAG_NAME}" >/dev/null; then
     echo "Tag does not exist locally: ${TAG_NAME}" >&2
@@ -32,7 +45,7 @@ if [[ -n "${TAG_NAME}" ]]; then
     exit 1
   fi
 
-  if ! rg -q "(from: \"${NORMALIZED_TAG}\"|~> ${NORMALIZED_TAG}|${TAG_NAME})" README.md; then
+  if ! contains_release_ref "${NORMALIZED_TAG}" "${TAG_NAME}"; then
     echo "README.md does not contain release tag/version: ${TAG_NAME} (${NORMALIZED_TAG})" >&2
     exit 1
   fi
@@ -41,7 +54,7 @@ if [[ -n "${TAG_NAME}" ]]; then
   exit 0
 fi
 
-if ! rg -q "(from: \"${SPEC_VERSION}\"|~> ${SPEC_VERSION}|v${SPEC_VERSION})" README.md; then
+if ! contains_release_ref "${SPEC_VERSION}" "v${SPEC_VERSION}"; then
   echo "README.md does not contain podspec version: ${SPEC_VERSION}" >&2
   exit 1
 fi
