@@ -46,7 +46,7 @@ A high-performance logging framework for Apple platforms built on SwiftyBeaver. 
 | Package Manager | Supported Platforms |
 | --- | --- |
 | Swift Package Manager | iOS / macOS / watchOS / tvOS |
-| CocoaPods (`HMLoggerKit`) | iOS / macOS |
+| CocoaPods (`HMLoggerKit`) | iOS / macOS / watchOS / tvOS |
 
 ### Swift Package Manager
 
@@ -71,7 +71,7 @@ pod 'HMLoggerKit', '~> 0.2.4'
 
 ## Quick Start
 
-> Important: call `LK.configure(...)` early during app launch. In DEBUG builds, initializing `Logger()` before engine configuration triggers an assertion.
+> Important: call `LK.configure(...)` early during app launch.
 
 ### SwiftUI
 

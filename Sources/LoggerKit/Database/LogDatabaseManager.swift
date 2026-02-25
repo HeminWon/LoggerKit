@@ -33,7 +33,13 @@ public final class LogDatabaseManager: LogDatabaseManagerProtocol {
     private let coreDataStack: CoreDataStack?
 
     public init(coreDataStack: CoreDataStack? = CoreDataStack.shared) {
-        self.coreDataStack = coreDataStack
+        if let coreDataStack {
+            self.coreDataStack = coreDataStack
+            return
+        }
+
+        CoreDataStack.initialize()
+        self.coreDataStack = CoreDataStack.shared
     }
 
     // MARK: - 私有辅助方法

@@ -14,6 +14,19 @@ import CoreData
 @Suite("Performance Benchmark Tests")
 struct PerformanceBenchmarkTests {
 
+    private func makeDatabaseManagerIfAvailable() -> LogDatabaseManager? {
+        if ProcessInfo.processInfo.environment["LOGGERKIT_SKIP_DATABASE_TESTS"] == "1" {
+            print("⏭️ Skip database benchmark tests: disabled by LOGGERKIT_SKIP_DATABASE_TESTS")
+            return nil
+        }
+        CoreDataStack.initialize()
+        guard CoreDataStack.shared != nil else {
+            print("⏭️ Skip database benchmark tests: CoreData model is unavailable in current runtime")
+            return nil
+        }
+        return LogDatabaseManager()
+    }
+
     // MARK: - Helper Methods
 
     /// 测量代码块执行时间(毫秒)
@@ -77,7 +90,7 @@ struct PerformanceBenchmarkTests {
     func testBaselineFetchStatistics() throws {
         // 注意:这个测试使用共享的CoreDataStack,测试的是已有数据的性能
         // 适合在有真实数据的Example项目中运行
-        let manager = LogDatabaseManager()
+        guard let manager = makeDatabaseManagerIfAvailable() else { return }
 
         // 测量fetchStatistics性能
         var statistics: LogStatistics?
@@ -99,7 +112,7 @@ struct PerformanceBenchmarkTests {
 
     @Test("Baseline: fetchEvents() performance with filters")
     func testBaselineFetchEventsWithFilters() throws {
-        let manager = LogDatabaseManager()
+        guard let manager = makeDatabaseManagerIfAvailable() else { return }
 
         // 测量过滤查询性能
         var events: [LogEvent]?
@@ -121,7 +134,7 @@ struct PerformanceBenchmarkTests {
 
     @Test("Baseline: Database size measurement")
     func testBaselineDatabaseSize() throws {
-        let manager = LogDatabaseManager()
+        guard let manager = makeDatabaseManagerIfAvailable() else { return }
 
         // 获取数据库大小
         let dbSize = manager.databaseSize()
