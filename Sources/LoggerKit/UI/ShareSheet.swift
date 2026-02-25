@@ -7,10 +7,10 @@
 
 import SwiftUI
 
-#if canImport(UIKit)
+#if os(iOS)
 import UIKit
 
-/// SwiftUI 封装 UIActivityViewController（仅 iOS/tvOS）
+/// SwiftUI 封装 UIActivityViewController（仅 iOS）
 public struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
     let applicationActivities: [UIActivity]? = nil

@@ -110,6 +110,7 @@ struct LogFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if !os(watchOS)
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
                         Text(String(localized: "filter_title", bundle: .loggerKit))
@@ -119,6 +120,7 @@ struct LogFilterSheet: View {
                             .foregroundColor(.blue)
                     }
                 }
+                #endif
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "reset_button", bundle: .loggerKit)) {
                         viewStore.resetFilters()

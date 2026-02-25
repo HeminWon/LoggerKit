@@ -49,3 +49,10 @@ jobs:
       - name: Lint podspec
         shell: bash
         run: ./Scripts/pod-lib-lint.sh
+      - name: Upload CocoaPods lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cocoapods-lint-report
+          path: ci-reports/cocoapods-lint-report.md
+          if-no-files-found: ignore

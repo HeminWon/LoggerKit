@@ -87,7 +87,6 @@ public struct LogDetailScene: View {
                         if #available(iOS 15.0, macOS 13.0, *) {
                             LogRowView(viewModel: viewModel)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
-                                .listRowSeparator(.hidden)
                                 .onAppear {
                                     // 滚动到底部时加载更多
                                     if viewModel.id == viewStore.displayEvents.last?.id {
@@ -116,7 +115,6 @@ public struct LogDetailScene: View {
                                 Spacer()
                             }
                             .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
                         } else {
                             HStack {
                                 Spacer()
@@ -135,7 +133,7 @@ public struct LogDetailScene: View {
             await viewStore.loadLogFileAsync()
         }
         .sheet(isPresented: viewStore.filterPresentedBinding) {
-            if #available(iOS 16.0, macOS 13.0, *) {
+            if #available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *) {
                 LogFilterSheet(viewStore: viewStore)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
@@ -144,7 +142,7 @@ public struct LogDetailScene: View {
             }
         }
         .sheet(isPresented: viewStore.deleteManagementPresentedBinding) {
-            if #available(iOS 16.0, macOS 13.0, *) {
+            if #available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *) {
                 LogDeleteManagementSheet(viewStore: viewStore)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
@@ -152,7 +150,7 @@ public struct LogDetailScene: View {
                 LogDeleteManagementSheet(viewStore: viewStore)
             }
         }
-        #if canImport(UIKit)
+        #if os(iOS)
         .sheet(isPresented: viewStore.sharePresentedBinding) {
             if let url = viewStore.exportedFileURL {
                 let shareSheet = ShareSheet(activityItems: [url]) {
@@ -169,7 +167,7 @@ public struct LogDetailScene: View {
         }
         #endif
         .navigationTitle(viewStore.displayTitle)
-        #if os(iOS) || os(tvOS)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -204,6 +202,35 @@ public struct LogDetailScene: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                }
+                .disabled(hasNoLogs)
+            }
+        }
+        #elseif os(tvOS)
+        .toolbar {
+            ToolbarItemGroup(placement: .automatic) {
+                Button {
+                    viewStore.send(.setFilterPresented(true))
+                } label: {
+                    if viewStore.activeFilterCount > 0 {
+                        Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle.fill")
+                    } else {
+                        Label(filterButtonText, systemImage: "line.3.horizontal.decrease.circle")
+                    }
+                }
+                .disabled(hasNoLogs)
+
+                Button {
+                    viewStore.startExport(format: .log)
+                } label: {
+                    Label(String(localized: "export_logs", bundle: .loggerKit), systemImage: "square.and.arrow.up")
+                }
+                .disabled(hasNoLogs)
+
+                Button(role: .destructive) {
+                    viewStore.send(.setDeleteManagementPresented(true))
+                } label: {
+                    Label(String(localized: "delete_management", bundle: .loggerKit), systemImage: "trash.circle")
                 }
                 .disabled(hasNoLogs)
             }
@@ -331,7 +358,7 @@ public struct LogDetailScene: View {
     }
 
     private func copyToClipboard(text: String) {
-        #if canImport(UIKit)
+        #if os(iOS)
         UIPasteboard.general.string = text
         #elseif canImport(AppKit)
         NSPasteboard.general.clearContents()
@@ -415,7 +442,7 @@ struct LogRowView: View {
     }
 
     private func copyLog() {
-        #if canImport(UIKit)
+        #if os(iOS)
         let pasteboard = UIPasteboard.general
         // 复制完整日志内容：前缀 + message
         pasteboard.string = "\(viewModel.event.prefix) - \(viewModel.event.message)"

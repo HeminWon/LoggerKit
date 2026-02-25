@@ -218,7 +218,7 @@ public enum LK {
         return makeView(viewStore: viewStore)
     }
 
-    #if canImport(UIKit)
+    #if os(iOS) || os(tvOS)
     /// 创建日志查看 UIViewController（UIKit 应用使用）
     ///
     /// 使用示例：
