@@ -38,12 +38,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 extension AppDelegate {
     private func setupLogger() {
         // 配置 LoggerKit (使用 CoreData 存储)
-        LoggerKit.configure(
-            level: .verbose,
-            enableConsole: true,
-            enableDatabase: true,
-            maxDatabaseSize: 50 * 1024 * 1024,  // 50MB
-            maxRetentionDays: 7                  // 保留 7 天
+        LK.configure(level: .verbose, enableConsole: true, enableDatabase: true,
+                     maxDatabaseSize: 50 * 1024 * 1024,  // 50MB
+                     maxRetentionDays: 7                  // 保留 7 天
         )
     }
 

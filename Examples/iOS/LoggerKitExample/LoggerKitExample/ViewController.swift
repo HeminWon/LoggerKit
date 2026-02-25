@@ -230,7 +230,7 @@ class ViewController: UIViewController {
 
     @objc private func showLogList() {
         // 使用 UIKit 静态方法创建 ViewController
-        let logVC = LoggerKit.makeViewController()
+        let logVC = LK.makeViewController()
         navigationController?.pushViewController(logVC, animated: true)
     }
 

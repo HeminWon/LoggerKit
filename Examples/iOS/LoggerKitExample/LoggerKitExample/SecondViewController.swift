@@ -373,7 +373,7 @@ class SecondViewController: UIViewController {
     }
 
     @objc private func showLogList() {
-        let logVC = LoggerKit.makeViewController()
+        let logVC = LK.makeViewController()
         navigationController?.pushViewController(logVC, animated: true)
     }
 
