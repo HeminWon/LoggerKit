@@ -12,7 +12,7 @@ This project follows a Keep a Changelog-style format.
 
 ### Changed
 
-- Reworked `Scripts/carthage-build-binary.sh` to build XCFramework via per-platform `pod gen` + `xcodebuild archive` + `xcodebuild -create-xcframework`.
+- Reworked `Scripts/build-xcframework.sh` to build XCFramework via per-platform `pod gen` + `xcodebuild archive` + `xcodebuild -create-xcframework`.
 - Updated release examples in `README.md` and bumped CocoaPods/SPM version references to `0.2.5`.
 
 ### Fixed

@@ -39,7 +39,7 @@ jobs:
 
       - name: Build XCFramework
         shell: bash
-        run: sh Scripts/carthage-build-binary.sh
+        run: sh Scripts/build-xcframework.sh
 
       - name: Package XCFramework
         id: package
