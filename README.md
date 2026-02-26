@@ -10,6 +10,7 @@ A high-performance logging framework for Apple platforms built on SwiftyBeaver. 
 ## Table of Contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Compatibility and Installation](#compatibility-and-installation)
 - [Quick Start](#quick-start)
 - [Advanced Configuration](#advanced-configuration)
@@ -17,7 +18,6 @@ A high-performance logging framework for Apple platforms built on SwiftyBeaver. 
 - [SwiftUI Environment](#swiftui-environment)
 - [Testing](#testing)
 - [Example App](#example-app)
-- [Screenshots](#screenshots)
 - [FAQ](#faq)
 - [Open Source Collaboration](#open-source-collaboration)
 - [License](#license)
@@ -31,6 +31,16 @@ A high-performance logging framework for Apple platforms built on SwiftyBeaver. 
 - Automatic context extraction (module name) or custom context
 - SwiftUI `Environment` integration
 - Built-in log viewer with filtering, search, and export
+
+## Screenshots
+
+<p align="left">
+  <img src="./docs/screenshots/preview.gif" alt="LoggerKit Preview" width="19%" />
+  <img src="./docs/screenshots/1.png" alt="LoggerKit Screenshot 1" width="19%" />
+  <img src="./docs/screenshots/2.png" alt="LoggerKit Screenshot 2" width="19%" />
+  <img src="./docs/screenshots/3.png" alt="LoggerKit Screenshot 3" width="19%" />
+  <img src="./docs/screenshots/4.png" alt="LoggerKit Screenshot 4" width="19%" />
+</p>
 
 ## Compatibility and Installation
 
@@ -194,16 +204,6 @@ struct MyView: View {
 ## Example App
 
 See `Examples/iOS/LoggerKitExample` for a full demo.
-
-## Screenshots
-
-<p align="left">
-  <img src="./docs/screenshots/preview.gif" alt="LoggerKit Preview" width="19%" />
-  <img src="./docs/screenshots/1.png" alt="LoggerKit Screenshot 1" width="19%" />
-  <img src="./docs/screenshots/2.png" alt="LoggerKit Screenshot 2" width="19%" />
-  <img src="./docs/screenshots/3.png" alt="LoggerKit Screenshot 3" width="19%" />
-  <img src="./docs/screenshots/4.png" alt="LoggerKit Screenshot 4" width="19%" />
-</p>
 
 ## FAQ
 
