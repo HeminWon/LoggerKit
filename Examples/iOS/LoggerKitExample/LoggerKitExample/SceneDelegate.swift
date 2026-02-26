@@ -12,9 +12,9 @@ import UIKit
 ///
 /// 使用示例：
 /// ```swift
-/// log.info("应用启动")
-/// log.debug("调试信息")
-/// log.error("发生错误")
+/// log.info("App launched")
+/// log.debug("Debug information")
+/// log.error("An error occurred")
 /// ```
 public let log = Logger()
 
@@ -66,4 +66,3 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 
 }
-

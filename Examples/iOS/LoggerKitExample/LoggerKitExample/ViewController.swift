@@ -18,7 +18,7 @@ class ViewController: UIViewController {
 
         title = "LoggerKit Example"
         view.backgroundColor = .systemBackground
-        log.debug("未使用")
+        log.debug("unused")
         setupUI()
 
         // 打印一些初始日志
@@ -92,63 +92,63 @@ class ViewController: UIViewController {
     }
 
     private func printInitialLogs() {
-        log.info("应用启动完成 - LoggerKitExample v1.0.0")
+        log.info("App launch completed - LoggerKitExample v1.0.0")
     }
 
     // MARK: - Log Actions
 
     @objc private func logVerbose() {
-        log.verbose("这是一条 Verbose 级别的日志，用于详细的调试信息")
+        log.verbose("This is a Verbose level log for detailed debugging information")
         showToast("已打印 Verbose 日志")
     }
 
     @objc private func logDebug() {
-        log.debug("这是一条 Debug 级别的日志，用于开发调试")
+        log.debug("This is a Debug level log for development debugging")
         showToast("已打印 Debug 日志")
     }
 
     @objc private func logInfo() {
-        log.info("这是一条 Info 级别的日志，用于一般信息记录")
+        log.info("This is an Info level log for general information")
         showToast("已打印 Info 日志")
     }
 
     @objc private func logWarning() {
-        log.warning("这是一条 Warning 级别的日志，用于警告信息")
+        log.warning("This is a Warning level log for warning information")
         showToast("已打印 Warning 日志")
     }
 
     @objc private func logError() {
-        log.error("这是一条 Error 级别的日志，用于错误信息")
+        log.error("This is an Error level log for error information")
         showToast("已打印 Error 日志")
     }
 
     @objc private func logAllLevels() {
-        log.verbose("Verbose: 最详细的日志信息")
-        log.debug("Debug: 调试信息")
-        log.info("Info: 普通信息")
-        log.warning("Warning: 警告信息")
-        log.error("Error: 错误信息")
+        log.verbose("Verbose: Most detailed log information")
+        log.debug("Debug: Debug information")
+        log.info("Info: General information")
+        log.warning("Warning: Warning information")
+        log.error("Error: Error information")
         showToast("已打印所有级别日志")
     }
 
     @objc private func logStructuredData() {
-        log.info("用户登录成功 - 用户ID: 12345, 用户名: 张三, 邮箱: zhangsan@example.com")
-        log.debug("用户角色: admin, user")
-        log.debug("用户设置: 深色主题, 通知已开启")
+        log.info("User login succeeded - User ID: 12345, Username: Zhang San, Email: zhangsan@example.com")
+        log.debug("User roles: admin, user")
+        log.debug("User settings: dark theme, notifications enabled")
         showToast("已打印结构化数据")
     }
 
     @objc private func logNetworkRequest() {
-        log.debug("发起网络请求 -> POST https://api.example.com/users")
-        log.debug("请求头: Content-Type=application/json, Authorization=Bearer ***")
-        log.debug("请求体: username=testuser")
-        log.info("网络请求成功 <- 状态码: 201, 响应时间: 245ms")
+        log.debug("Send network request -> POST https://api.example.com/users")
+        log.debug("Request headers: Content-Type=application/json, Authorization=Bearer ***")
+        log.debug("Request body: username=testuser")
+        log.info("Network request succeeded <- Status code: 201, Response time: 245ms")
         showToast("已打印网络请求日志")
     }
 
     @objc private func logUserAction() {
-        log.info("用户操作: 点击按钮 [查看日志] 在页面 [ViewController]")
-        log.debug("会话ID: \(UUID().uuidString)")
+        log.info("User action: tapped button [View Logs] on page [ViewController]")
+        log.debug("Session ID: \(UUID().uuidString)")
         showToast("已打印用户行为日志")
     }
 
@@ -173,18 +173,18 @@ class ViewController: UIViewController {
 
                 // 变化的动作
                 let actions = [
-                    "启动", "点击", "请求", "响应", "处理", "完成",
-                    "失败", "重试", "验证", "更新", "保存", "加载"
+                    "Start", "Tap", "Request", "Response", "Process", "Complete",
+                    "Fail", "Retry", "Validate", "Update", "Save", "Load"
                 ]
 
                 // 变化的详细信息
                 let details = [
-                    "用户ID: \(1000 + i)",
-                    "耗时: \(arc4random_uniform(500))ms",
-                    "状态码: \(200 + Int(arc4random_uniform(5)) * 100)",
-                    "数据大小: \(arc4random_uniform(1000))KB",
-                    "重试次数: \(arc4random_uniform(4))",
-                    "线程: Thread-\(arc4random_uniform(10))"
+                    "User ID: \(1000 + i)",
+                    "Duration: \(arc4random_uniform(500))ms",
+                    "Status code: \(200 + Int(arc4random_uniform(5)) * 100)",
+                    "Payload size: \(arc4random_uniform(1000))KB",
+                    "Retry count: \(arc4random_uniform(4))",
+                    "Thread: Thread-\(arc4random_uniform(10))"
                 ]
 
                 let function = functions[i % functions.count]
@@ -196,19 +196,19 @@ class ViewController: UIViewController {
                 let levelRandom = arc4random_uniform(100)
                 if levelRandom < 10 {
                     // 10% Verbose
-                    log.verbose("[\(context)] \(action) - 详细信息 #\(i) | \(detail) | \(function)")
+                    log.verbose("[\(context)] \(action) - Detailed info #\(i) | \(detail) | \(function)")
                 } else if levelRandom < 30 {
                     // 20% Debug
-                    log.debug("[\(context)] \(action) - 调试信息 #\(i) | \(detail) | \(function)")
+                    log.debug("[\(context)] \(action) - Debug info #\(i) | \(detail) | \(function)")
                 } else if levelRandom < 70 {
                     // 40% Info
-                    log.info("[\(context)] \(action) - 常规信息 #\(i) | \(detail) | \(function)")
+                    log.info("[\(context)] \(action) - General info #\(i) | \(detail) | \(function)")
                 } else if levelRandom < 90 {
                     // 20% Warning
-                    log.warning("[\(context)] \(action) - 警告信息 #\(i) | \(detail) | \(function)")
+                    log.warning("[\(context)] \(action) - Warning info #\(i) | \(detail) | \(function)")
                 } else {
                     // 10% Error
-                    log.error("[\(context)] \(action) - 错误信息 #\(i) | \(detail) | \(function)")
+                    log.error("[\(context)] \(action) - Error info #\(i) | \(detail) | \(function)")
                 }
 
                 // 每50条日志暂停一下,避免过快
@@ -245,4 +245,3 @@ class ViewController: UIViewController {
         }
     }
 }
-

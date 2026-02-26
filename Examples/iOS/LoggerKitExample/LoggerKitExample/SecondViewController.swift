@@ -22,8 +22,8 @@ class SecondViewController: UIViewController {
         setupUI()
 
         // 在第二个页面启动时打印日志
-        log.info("进入第二个页面 - SecondViewController")
-        log.debug("当前会话: \(UUID().uuidString)")
+        log.info("Enter second page - SecondViewController")
+        log.debug("Current session: \(UUID().uuidString)")
     }
 
     private func setupUI() {
@@ -111,49 +111,49 @@ class SecondViewController: UIViewController {
         let productName = ["iPhone 15 Pro", "MacBook Pro", "AirPods Pro", "iPad Air", "Apple Watch"][Int.random(in: 0...4)]
         let price = Double.random(in: 999...19999)
 
-        log.info("用户浏览商品 - ID: \(productId), 名称: \(productName)")
-        log.debug("商品详情 - 价格: ¥\(String(format: "%.2f", price)), 库存: \(Int.random(in: 0...100))")
-        log.verbose("页面性能 - 加载时间: \(Int.random(in: 100...500))ms, 图片数量: \(Int.random(in: 1...10))")
+        log.info("User viewed product - ID: \(productId), Name: \(productName)")
+        log.debug("Product details - Price: ¥\(String(format: "%.2f", price)), Stock: \(Int.random(in: 0...100))")
+        log.verbose("Page performance - Load time: \(Int.random(in: 100...500))ms, Image count: \(Int.random(in: 1...10))")
 
         showToast("已记录商品浏览日志")
     }
 
     @objc private func logCartAction() {
-        let actions = ["添加到购物车", "从购物车移除", "修改数量", "清空购物车"]
+        let actions = ["Add to cart", "Remove from cart", "Change quantity", "Clear cart"]
         let action = actions[Int.random(in: 0...3)]
         let itemCount = Int.random(in: 1...5)
 
-        log.info("购物车操作 - \(action)")
-        log.debug("购物车状态 - 商品数量: \(itemCount), 总金额: ¥\(String(format: "%.2f", Double.random(in: 100...5000)))")
+        log.info("Cart action - \(action)")
+        log.debug("Cart status - Item count: \(itemCount), Total amount: ¥\(String(format: "%.2f", Double.random(in: 100...5000)))")
 
         showToast("已记录购物车操作日志")
     }
 
     @objc private func logOrderAction() {
         let orderId = UUID().uuidString.prefix(8)
-        let status = ["待支付", "已支付", "配送中", "已完成", "已取消"][Int.random(in: 0...4)]
+        let status = ["Pending payment", "Paid", "Shipping", "Completed", "Cancelled"][Int.random(in: 0...4)]
 
-        log.info("订单操作 - 订单号: \(orderId)")
-        log.debug("订单状态 - \(status), 金额: ¥\(String(format: "%.2f", Double.random(in: 100...10000)))")
-        log.verbose("订单详情 - 收货地址: 北京市朝阳区xxx街道, 联系电话: 138****\(Int.random(in: 1000...9999))")
+        log.info("Order action - Order ID: \(orderId)")
+        log.debug("Order status - \(status), Amount: ¥\(String(format: "%.2f", Double.random(in: 100...10000)))")
+        log.verbose("Order details - Shipping address: No. 1 Example Street, Chaoyang District, Beijing, Phone: 138****\(Int.random(in: 1000...9999))")
 
         showToast("已记录订单日志")
     }
 
     @objc private func logPaymentAction() {
-        let paymentMethods = ["支付宝", "微信支付", "Apple Pay", "银行卡"]
+        let paymentMethods = ["Alipay", "WeChat Pay", "Apple Pay", "Bank Card"]
         let method = paymentMethods[Int.random(in: 0...3)]
         let amount = Double.random(in: 100...10000)
 
-        log.info("发起支付 - 支付方式: \(method), 金额: ¥\(String(format: "%.2f", amount))")
+        log.info("Initiate payment - Method: \(method), Amount: ¥\(String(format: "%.2f", amount))")
 
         // 模拟支付过程
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let success = Bool.random()
             if success {
-                log.info("支付成功 - 交易号: \(UUID().uuidString.prefix(12))")
+                log.info("Payment succeeded - Transaction ID: \(UUID().uuidString.prefix(12))")
             } else {
-                log.warning("支付失败 - 原因: 余额不足/网络超时")
+                log.warning("Payment failed - Reason: insufficient balance/network timeout")
             }
         }
 
@@ -161,10 +161,10 @@ class SecondViewController: UIViewController {
     }
 
     @objc private func logErrors() {
-        log.error("网络请求失败 - 错误码: \(Int.random(in: 400...599))")
-        log.error("数据解析异常 - JSON格式不正确")
-        log.warning("缓存即将过期 - 剩余时间: \(Int.random(in: 1...60))秒")
-        log.error("支付失败 - 银行系统维护中")
+        log.error("Network request failed - Error code: \(Int.random(in: 400...599))")
+        log.error("Data parsing exception - Invalid JSON format")
+        log.warning("Cache about to expire - Remaining time: \(Int.random(in: 1...60))s")
+        log.error("Payment failed - Bank system under maintenance")
 
         showToast("已记录4条异常日志")
     }
@@ -179,8 +179,8 @@ class SecondViewController: UIViewController {
             ]
 
             let operations = [
-                "加载商品列表", "更新购物车", "创建订单", "处理支付",
-                "获取用户信息", "下载图片", "读取缓存", "发送请求"
+                "Load product list", "Update cart", "Create order", "Process payment",
+                "Fetch user profile", "Download image", "Read cache", "Send request"
             ]
 
             for i in 1...100 {
@@ -189,15 +189,15 @@ class SecondViewController: UIViewController {
 
                 let levelRandom = arc4random_uniform(100)
                 if levelRandom < 15 {
-                    log.verbose("[\(context)] \(operation) - 详细信息 #\(i)")
+                    log.verbose("[\(context)] \(operation) - Detailed info #\(i)")
                 } else if levelRandom < 35 {
-                    log.debug("[\(context)] \(operation) - 调试信息 #\(i)")
+                    log.debug("[\(context)] \(operation) - Debug info #\(i)")
                 } else if levelRandom < 70 {
-                    log.info("[\(context)] \(operation) - 常规信息 #\(i)")
+                    log.info("[\(context)] \(operation) - General info #\(i)")
                 } else if levelRandom < 90 {
-                    log.warning("[\(context)] \(operation) - 警告 #\(i)")
+                    log.warning("[\(context)] \(operation) - Warning #\(i)")
                 } else {
-                    log.error("[\(context)] \(operation) - 错误 #\(i)")
+                    log.error("[\(context)] \(operation) - Error #\(i)")
                 }
 
                 if i % 25 == 0 {
@@ -216,7 +216,7 @@ class SecondViewController: UIViewController {
     @objc private func simulateMultithreadedDownload() {
         showToast("开始多线程下载任务...")
 
-        log.info("[主线程] 准备启动多个下载任务")
+        log.info("[Main thread] Preparing to start multiple download tasks")
 
         // 创建不同的队列模拟不同场景
         let downloadQueue = DispatchQueue(label: "com.example.download", attributes: .concurrent)
@@ -225,62 +225,62 @@ class SecondViewController: UIViewController {
 
         // 任务1: 高优先级下载
         DispatchQueue.global(qos: .userInitiated).async {
-            log.info("[高优先级线程] 开始下载关键资源")
+            log.info("[High-priority thread] Start downloading critical resources")
             Thread.sleep(forTimeInterval: 0.1)
-            log.debug("[高优先级线程] 下载进度: 50%")
+            log.debug("[High-priority thread] Download progress: 50%")
             Thread.sleep(forTimeInterval: 0.1)
-            log.info("[高优先级线程] 下载完成，耗时: 200ms")
+            log.info("[High-priority thread] Download completed, duration: 200ms")
         }
 
         // 任务2: 普通下载任务
         downloadQueue.async {
-            log.info("[下载队列] 开始下载图片资源")
+            log.info("[Download queue] Start downloading image resources")
             Thread.sleep(forTimeInterval: 0.15)
-            log.debug("[下载队列] 图片下载完成: image_001.jpg")
+            log.debug("[Download queue] Image download completed: image_001.jpg")
         }
 
         downloadQueue.async {
-            log.info("[下载队列] 开始下载视频资源")
+            log.info("[Download queue] Start downloading video resources")
             Thread.sleep(forTimeInterval: 0.2)
-            log.debug("[下载队列] 视频下载完成: video_001.mp4")
+            log.debug("[Download queue] Video download completed: video_001.mp4")
         }
 
         // 任务3: 图片处理
         imageQueue.async {
-            log.info("[图片处理队列] 开始处理图片")
+            log.info("[Image processing queue] Start processing images")
             Thread.sleep(forTimeInterval: 0.12)
-            log.debug("[图片处理队列] 图片压缩完成，大小: 2.3MB -> 450KB")
+            log.debug("[Image processing queue] Image compression completed, size: 2.3MB -> 450KB")
             Thread.sleep(forTimeInterval: 0.08)
-            log.verbose("[图片处理队列] 应用滤镜效果")
-            log.info("[图片处理队列] 图片处理完成")
+            log.verbose("[Image processing queue] Applying filter effects")
+            log.info("[Image processing queue] Image processing completed")
         }
 
         // 任务4: 数据处理
         dataQueue.async {
-            log.info("[数据处理队列] 开始解析数据")
+            log.info("[Data processing queue] Start parsing data")
             Thread.sleep(forTimeInterval: 0.1)
-            log.debug("[数据处理队列] JSON解析完成，条目数: 128")
-            log.verbose("[数据处理队列] 数据验证通过")
-            log.info("[数据处理队列] 数据入库完成")
+            log.debug("[Data processing queue] JSON parsing completed, record count: 128")
+            log.verbose("[Data processing queue] Data validation passed")
+            log.info("[Data processing queue] Data persisted to storage")
         }
 
         // 任务5: 低优先级后台任务
         DispatchQueue.global(qos: .background).async {
-            log.debug("[后台线程] 开始清理缓存")
+            log.debug("[Background thread] Start clearing cache")
             Thread.sleep(forTimeInterval: 0.3)
-            log.info("[后台线程] 缓存清理完成，释放空间: 125MB")
+            log.info("[Background thread] Cache cleanup completed, freed space: 125MB")
         }
 
         // 回到主线程更新UI
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            log.info("[主线程] 所有下载任务已完成，准备刷新UI")
+            log.info("[Main thread] All download tasks completed, preparing to refresh UI")
         }
     }
 
     @objc private func simulateBackgroundProcessing() {
         showToast("启动后台数据处理...")
 
-        log.info("[主线程] 触发后台数据同步")
+        log.info("[Main thread] Trigger background data sync")
 
         // 创建自定义队列
         let syncQueue = DispatchQueue(label: "com.example.sync")
@@ -288,71 +288,71 @@ class SecondViewController: UIViewController {
 
         // 数据同步任务
         syncQueue.async {
-            log.info("[同步队列] 开始同步用户数据")
+            log.info("[Sync queue] Start syncing user data")
 
             for i in 1...5 {
                 Thread.sleep(forTimeInterval: 0.05)
-                log.debug("[同步队列] 同步批次 \(i)/5: 已上传 \(i * 20)条记录")
+                log.debug("[Sync queue] Sync batch \(i)/5: uploaded \(i * 20) records")
             }
 
-            log.info("[同步队列] 用户数据同步完成，总计: 100条")
+            log.info("[Sync queue] User data sync completed, total: 100 records")
 
             // 嵌套任务：同步后的验证
             DispatchQueue.global(qos: .default).async {
-                log.verbose("[验证线程] 开始验证同步数据完整性")
+                log.verbose("[Validation thread] Start validating synced data integrity")
                 Thread.sleep(forTimeInterval: 0.1)
-                log.info("[验证线程] 数据验证通过，一致性: 100%")
+                log.info("[Validation thread] Data validation passed, consistency: 100%")
             }
         }
 
         // 统计分析任务
         analyticsQueue.async {
-            log.info("[分析队列] 开始计算用户行为统计")
+            log.info("[Analytics queue] Start calculating user behavior metrics")
             Thread.sleep(forTimeInterval: 0.15)
-            log.debug("[分析队列] 活跃用户: 1,234, 新增用户: 89")
+            log.debug("[Analytics queue] Active users: 1,234, New users: 89")
             Thread.sleep(forTimeInterval: 0.1)
-            log.debug("[分析队列] 平均停留时长: 5分32秒")
-            log.info("[分析队列] 统计分析完成，报告已生成")
+            log.debug("[Analytics queue] Average session duration: 5m32s")
+            log.info("[Analytics queue] Analytics completed, report generated")
         }
 
         // 并发执行多个任务
         DispatchQueue.concurrentPerform(iterations: 3) { index in
-            log.debug("[并发线程-\(index)] 处理数据块 #\(index)")
+            log.debug("[Concurrent thread-\(index)] Processing data chunk #\(index)")
             Thread.sleep(forTimeInterval: 0.08)
-            log.verbose("[并发线程-\(index)] 数据块 #\(index) 处理完成")
+            log.verbose("[Concurrent thread-\(index)] Data chunk #\(index) processed")
         }
     }
 
     @objc private func simulateConcurrentRequests() {
         showToast("发起并发网络请求...")
 
-        log.info("[主线程] 开始批量API请求")
+        log.info("[Main thread] Start batch API requests")
 
         let requestQueue = DispatchQueue(label: "com.example.network", attributes: .concurrent)
         let group = DispatchGroup()
 
         // 模拟多个API请求
         let apis = [
-            ("用户信息API", "https://api.example.com/user", 0.1),
-            ("订单列表API", "https://api.example.com/orders", 0.15),
-            ("商品详情API", "https://api.example.com/products", 0.12),
-            ("推荐系统API", "https://api.example.com/recommendations", 0.18),
-            ("消息通知API", "https://api.example.com/notifications", 0.08)
+            ("User Profile API", "https://api.example.com/user", 0.1),
+            ("Order List API", "https://api.example.com/orders", 0.15),
+            ("Product Detail API", "https://api.example.com/products", 0.12),
+            ("Recommendation API", "https://api.example.com/recommendations", 0.18),
+            ("Notification API", "https://api.example.com/notifications", 0.08)
         ]
 
         for (name, url, delay) in apis {
             group.enter()
             requestQueue.async {
-                log.info("[网络请求线程] 发起请求: \(name)")
-                log.debug("[网络请求线程] URL: \(url)")
+                log.info("[Network request thread] Send request: \(name)")
+                log.debug("[Network request thread] URL: \(url)")
 
                 Thread.sleep(forTimeInterval: delay)
 
                 let success = Bool.random()
                 if success {
-                    log.info("[网络请求线程] ✅ \(name) 成功 - 耗时: \(Int(delay * 1000))ms")
+                    log.info("[Network request thread] ✅ \(name) succeeded - duration: \(Int(delay * 1000))ms")
                 } else {
-                    log.warning("[网络请求线程] ⚠️ \(name) 失败 - 状态码: \(Int.random(in: 400...599))")
+                    log.warning("[Network request thread] ⚠️ \(name) failed - status code: \(Int.random(in: 400...599))")
                 }
 
                 group.leave()
@@ -361,13 +361,13 @@ class SecondViewController: UIViewController {
 
         // 等待所有请求完成
         group.notify(queue: .main) {
-            log.info("[主线程] 所有API请求已完成")
+            log.info("[Main thread] All API requests completed")
 
             // 后续处理
             DispatchQueue.global(qos: .utility).async {
-                log.debug("[处理线程] 开始合并响应数据")
+                log.debug("[Processing thread] Start merging response data")
                 Thread.sleep(forTimeInterval: 0.1)
-                log.info("[处理线程] 数据合并完成，缓存已更新")
+                log.info("[Processing thread] Data merge completed, cache updated")
             }
         }
     }
@@ -389,6 +389,6 @@ class SecondViewController: UIViewController {
     }
 
     deinit {
-        log.info("离开第二个页面 - SecondViewController")
+        log.info("Leave second page - SecondViewController")
     }
 }
