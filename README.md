@@ -201,6 +201,22 @@ struct MyView: View {
 
 `MockLogger` is available in `Sources/LoggerKit/Testing` for unit tests and logging behavior assertions.
 
+## Build Binary XCFramework (SPM)
+
+Use the Package.swift-based build script to archive and package a distributable XCFramework:
+
+```bash
+sh Scripts/build-xcframework-from-package.sh
+```
+
+Optional arguments:
+
+- `--scheme LoggerKit`
+- `--platforms ios,macos,tvos,watchos`
+- `--output ./artifacts/spm`
+- `--keep-archives`
+- `--verify-swiftinterface` (默认跳过严格校验以避免部分依赖构建失败)
+
 ## Example App
 
 See `Examples/iOS/LoggerKitExample` for a full demo.
