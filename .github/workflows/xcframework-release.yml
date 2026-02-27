@@ -120,15 +120,48 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "${XCFRAMEWORK_PATH}" "${ZIP_PATH}"
           CHECKSUM="$(swift package compute-checksum "${ZIP_PATH}")"
           CHECKSUM_FILE="${ARTIFACT_DIR}/${XCFRAMEWORK_NAME}.checksum.txt"
+          TAG_INPUT="${{ github.event.inputs.tag }}"
+          if [[ -n "${TAG_INPUT}" ]]; then
+            TAG_NAME="${TAG_INPUT}"
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${TAG_NAME#v}"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${XCFRAMEWORK_NAME}.zip"
+          PODSPEC_TEMPLATE="Specs/Binary/HMLoggerKit.podspec"
+          BINARY_PODSPEC_FILE="${ARTIFACT_DIR}/HMLoggerKit.binary.podspec"
+
+          if [[ ! -f "${PODSPEC_TEMPLATE}" ]]; then
+            echo "Binary podspec template not found: ${PODSPEC_TEMPLATE}" >&2
+            exit 1
+          fi
 
           {
             echo "File: ${XCFRAMEWORK_NAME}.zip"
             echo "SHA-256: ${CHECKSUM}"
           } > "${CHECKSUM_FILE}"
 
+          ruby - "${PODSPEC_TEMPLATE}" "${BINARY_PODSPEC_FILE}" "${VERSION}" "${CHECKSUM}" <<'RUBY'
+          template_path, output_path, version, checksum = ARGV
+          content = File.read(template_path)
+
+          unless content.match?(/s\.version\s*=\s*"[^"]+"/)
+            abort("Failed to find s.version in #{template_path}")
+          end
+          unless content.match?(/:sha256\s*=>\s*"[^"]+"/)
+            abort("Failed to find :sha256 in #{template_path}")
+          end
+
+          updated = content.gsub(/s\.version\s*=\s*"[^"]+"/, %(s.version          = "#{version}"))
+          updated = updated.gsub(/:sha256\s*=>\s*"[^"]+"/, %(:sha256 => "#{checksum}"))
+
+          File.write(output_path, updated)
+          RUBY
+
           echo "xcframework_name=${XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
           echo "zip_path=${ZIP_PATH}" >> "$GITHUB_OUTPUT"
           echo "checksum_path=${CHECKSUM_FILE}" >> "$GITHUB_OUTPUT"
+          echo "binary_podspec_path=${BINARY_PODSPEC_FILE}" >> "$GITHUB_OUTPUT"
           echo "checksum=${CHECKSUM}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve tag name
@@ -150,77 +183,6 @@ jobs:
           fi
           echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Sync binary podspec and commit
-        id: sync_binary_podspec
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          PODSPEC_PATH="Specs/Binary/HMLoggerKit.podspec"
-          if [[ ! -f "${PODSPEC_PATH}" ]]; then
-            echo "Binary podspec not found: ${PODSPEC_PATH}" >&2
-            exit 1
-          fi
-
-          TAG_NAME="${{ steps.meta.outputs.tag }}"
-          VERSION="${TAG_NAME#v}"
-          CHECKSUM="${{ steps.package.outputs.checksum }}"
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-
-          if [[ -z "${TAG_NAME}" || -z "${VERSION}" || -z "${CHECKSUM}" || -z "${DEFAULT_BRANCH}" ]]; then
-            echo "Missing required metadata to sync binary podspec." >&2
-            exit 1
-          fi
-
-          git fetch origin "${DEFAULT_BRANCH}"
-          git checkout -B "ci/sync-binary-podspec" "origin/${DEFAULT_BRANCH}"
-
-          ruby - "${PODSPEC_PATH}" "${VERSION}" "${CHECKSUM}" <<'RUBY'
-          path, version, checksum = ARGV
-          content = File.read(path)
-
-          version_replaced = content.gsub(/s\.version\s*=\s*"[^"]+"/, %(s.version          = "#{version}"))
-          if version_replaced == content
-            abort("Failed to update s.version in #{path}")
-          end
-
-          checksum_replaced = version_replaced.gsub(/:sha256\s*=>\s*"[^"]+"/, %(:sha256 => "#{checksum}"))
-          if checksum_replaced == version_replaced
-            abort("Failed to update :sha256 in #{path}")
-          end
-
-          File.write(path, checksum_replaced)
-          RUBY
-
-          if git diff --quiet -- "${PODSPEC_PATH}"; then
-            echo "No binary podspec changes to commit."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add "${PODSPEC_PATH}"
-          git commit -m "chore(specs): sync binary podspec for ${TAG_NAME}"
-
-          for attempt in 1 2 3; do
-            if git push origin HEAD:"${DEFAULT_BRANCH}"; then
-              break
-            fi
-
-            if [[ "${attempt}" -eq 3 ]]; then
-              echo "Failed to push podspec sync commit after ${attempt} attempts." >&2
-              exit 1
-            fi
-
-            git fetch origin "${DEFAULT_BRANCH}"
-            git rebase "origin/${DEFAULT_BRANCH}"
-          done
-
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
@@ -228,11 +190,13 @@ jobs:
           files: |
             ${{ steps.package.outputs.zip_path }}
             ${{ steps.package.outputs.checksum_path }}
+            ${{ steps.package.outputs.binary_podspec_path }}
           body: |
             ## XCFramework Assets
 
             - `${{ steps.package.outputs.xcframework_name }}.zip`
             - `${{ steps.package.outputs.xcframework_name }}.checksum.txt`
+            - `HMLoggerKit.binary.podspec`
 
             SwiftPM checksum:
             `${{ steps.package.outputs.checksum }}`
@@ -246,8 +210,7 @@ jobs:
             echo "- Artifact: \`${{ steps.package.outputs.xcframework_name }}.zip\`"
             echo "- Checksum: \`${{ steps.package.outputs.checksum }}\`"
             echo "- Checksum File: \`${{ steps.package.outputs.xcframework_name }}.checksum.txt\`"
-            echo "- Binary Podspec Synced: \`${{ steps.sync_binary_podspec.outputs.changed || 'false' }}\`"
-            echo "- Binary Podspec Commit: \`${{ steps.sync_binary_podspec.outputs.commit_sha || 'N/A' }}\`"
+            echo "- Binary Podspec: \`HMLoggerKit.binary.podspec\`"
             echo "- Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}"
             echo "- Workflow Logs: [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } >> "$GITHUB_STEP_SUMMARY"
