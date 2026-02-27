@@ -28,14 +28,15 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.2"
+          bundler-cache: true
 
       - name: Setup Swift
         uses: swift-actions/setup-swift@v2
 
-      - name: Install CocoaPods and plugin
+      - name: Install Ruby gems
         run: |
-          gem install cocoapods cocoapods-generate
-          pod --version
+          bundle install --jobs 4 --retry 3
+          bundle exec pod --version
 
       - name: Build XCFramework
         id: build
