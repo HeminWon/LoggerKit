@@ -7,12 +7,11 @@ help:
 # Build XCFramework from Package.swift (logs enabled by default)
 spm-xcframework platforms="ios,macos,tvos,watchos" output="./artifacts/spm":
     mkdir -p {{output}}
-    sh Scripts/build-xcframework-from-package.sh --platforms {{platforms}} --output {{output}} 2>&1 | tee "{{output}}/build-$(date +%Y%m%d-%H%M%S).log"
+    sh Scripts/build-xcframework-from-package.sh --platforms {{platforms}} --output {{output}}
 
 # Build XCFramework via CocoaPods (logs enabled by default)
 cocoapods-xcframework podspec="HMLoggerKit.podspec" keep_temp="0":
-    mkdir -p ./gen/logs
-    KEEP_TEMP_ARTIFACTS={{keep_temp}} sh Scripts/build-xcframework.sh {{podspec}} 2>&1 | tee "./gen/logs/cocoapods-build-$(date +%Y%m%d-%H%M%S).log"
+    KEEP_TEMP_ARTIFACTS={{keep_temp}} sh Scripts/build-xcframework-from-podspec.sh {{podspec}}
 
 # CocoaPods lint
 pod-lint *args:

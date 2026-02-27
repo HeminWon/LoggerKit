@@ -63,7 +63,7 @@ A high-performance logging framework for Apple platforms built on SwiftyBeaver. 
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/HeminWon/LoggerKit.git", from: "0.2.6")
+    .package(url: "https://github.com/HeminWon/LoggerKit.git", from: "0.2.7")
 ]
 ```
 
@@ -77,7 +77,7 @@ dependencies: [
 ### CocoaPods
 
 ```ruby
-pod 'HMLoggerKit', '~> 0.2.6'
+pod 'HMLoggerKit', '~> 0.2.7'
 ```
 
 ## Quick Start

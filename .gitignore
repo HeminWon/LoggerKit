@@ -11,6 +11,9 @@ Package.resolved
 # Xcode build outputs
 build/
 *.build/
+gen/
+artifacts/
+ci-reports/
 
 # OpenSpec archived changes
 Examples/iOS/LoggerKitExample/openspec/changes/archive/

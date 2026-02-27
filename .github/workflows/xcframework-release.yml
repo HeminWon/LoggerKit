@@ -38,15 +38,32 @@ jobs:
           pod --version
 
       - name: Build XCFramework
+        id: build
         shell: bash
-        run: sh Scripts/build-xcframework.sh
+        run: |
+          set -euo pipefail
+          sh Scripts/build-xcframework-from-podspec.sh
+
+          LOG_PATH="$(ls -t gen/HMLoggerKit/logs/*-xcfw-podspec-*.log | head -n 1 || true)"
+          if [[ -z "${LOG_PATH}" || ! -f "${LOG_PATH}" ]]; then
+            echo "Build log not found under gen/HMLoggerKit/logs" >&2
+            exit 1
+          fi
+          echo "log_path=${LOG_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcframework-build-log
+          path: ${{ steps.build.outputs.log_path }}
+          if-no-files-found: error
 
       - name: Package XCFramework
         id: package
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_DIR="gen/HMLoggerKit/Carthage/Build"
+          ARTIFACT_DIR="gen/HMLoggerKit/Build"
           XCFRAMEWORK_PATH="${ARTIFACT_DIR}/LoggerKit.xcframework"
           ZIP_PATH="${ARTIFACT_DIR}/LoggerKit.xcframework.zip"
 
@@ -112,4 +129,6 @@ jobs:
             echo "- Tag: \`${{ steps.meta.outputs.tag }}\`"
             echo "- ZIP: \`${{ steps.package.outputs.zip_path }}\`"
             echo "- Checksum: \`${{ steps.package.outputs.checksum }}\`"
+            echo "- Build Log Artifact: \`xcframework-build-log\`"
+            echo "- Workflow Logs: [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } >> "$GITHUB_STEP_SUMMARY"
