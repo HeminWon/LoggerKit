@@ -12,8 +12,7 @@ import SwiftUI
 import UIKit
 #endif
 
-// Re-export all public APIs
-@_exported import SwiftyBeaver
+import SwiftyBeaver
 
 /// LoggerKit 命名空间
 public enum LK {

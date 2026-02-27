@@ -9,8 +9,8 @@ import Foundation
 import SwiftyBeaver
 import CoreData
 
-/// CoreData 日志输出目标
-public final class CoreDataDestination: BaseDestination {
+/// CoreData 日志输出目标（模块内部使用，不暴露到公共 API）
+final class CoreDataDestination: BaseDestination {
 
     private let coreDataStack: CoreDataStack?
     private var pendingEvents: [LogEvent] = []
@@ -35,10 +35,10 @@ public final class CoreDataDestination: BaseDestination {
     private let sessionId: String
     private let sessionStartTime: TimeInterval
 
-    public init(sessionId: String, sessionStartTime: TimeInterval,
-                coreDataStack: CoreDataStack? = CoreDataStack.shared,
-                batchSize: Int = 50, debounceInterval: TimeInterval = 2.0,
-                immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]) {
+    init(sessionId: String, sessionStartTime: TimeInterval,
+         coreDataStack: CoreDataStack? = CoreDataStack.shared,
+         batchSize: Int = 50, debounceInterval: TimeInterval = 2.0,
+         immediateFlushLevels: Set<LogEvent.Level> = [.error, .warning]) {
         self.sessionId = sessionId
         self.sessionStartTime = sessionStartTime
         self.coreDataStack = coreDataStack
@@ -57,8 +57,8 @@ public final class CoreDataDestination: BaseDestination {
         }
     }
 
-    override public func send(_ level: SwiftyBeaver.Level, msg: String, thread: String,
-                              file: String, function: String, line: Int, context: Any? = nil) -> String? {
+    override func send(_ level: SwiftyBeaver.Level, msg: String, thread: String,
+                       file: String, function: String, line: Int, context: Any? = nil) -> String? {
         guard let stack = coreDataStack else { return nil }
         // 构造日志事件,包含会话信息
         let logEvent = LogEvent(thread: thread,
@@ -115,7 +115,7 @@ public final class CoreDataDestination: BaseDestination {
         self.debounceWorkItem = workItem
     }
 
-    public func flush() {
+    func flush() {
         queue.async { [weak self] in
             self?.flushPendingEvents()
         }
