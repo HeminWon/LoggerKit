@@ -46,7 +46,6 @@ if [[ -z "${DEFAULT_SCHEME}" ]]; then
   echo "No library product found in Package.swift." >&2
   exit 1
 fi
-
 if [[ -z "${DEFAULT_PLATFORMS}" ]]; then
   DEFAULT_PLATFORMS="ios,macos,tvos,watchos"
 fi
@@ -641,5 +640,9 @@ else
     -output "${XCFRAMEWORK_OUTPUT}"
 fi
 
+METADATA_OUTPUT="${OUTPUT_DIR}/package.json"
+printf '%s\n' "${PACKAGE_JSON}" > "${METADATA_OUTPUT}"
+
 echo "Build output: ${XCFRAMEWORK_OUTPUT}"
 echo "Build log: ${RUN_LOG}"
+echo "Metadata output: ${METADATA_OUTPUT}"

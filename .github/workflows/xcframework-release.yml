@@ -43,46 +43,68 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sh Scripts/build-xcframework-from-podspec.sh
+          OUTPUTS_FILE="$(mktemp)"
+          bash Scripts/build-xcframework-from-podspec.sh --outputs-file "${OUTPUTS_FILE}"
 
-          LOG_PATH="$(ls -t gen/HMLoggerKit/logs/*-xcfw-podspec-*.log | head -n 1 || true)"
-          if [[ -z "${LOG_PATH}" || ! -f "${LOG_PATH}" ]]; then
-            echo "Build log not found under gen/HMLoggerKit/logs" >&2
+          XCFRAMEWORK_PATH=""
+          ARTIFACT_DIR=""
+          XCFRAMEWORK_NAME=""
+
+          while IFS='=' read -r key value; do
+            case "${key}" in
+              xcframework_path) XCFRAMEWORK_PATH="${value}" ;;
+              artifact_dir) ARTIFACT_DIR="${value}" ;;
+              xcframework_name) XCFRAMEWORK_NAME="${value}" ;;
+            esac
+          done < "${OUTPUTS_FILE}"
+
+          if [[ -z "${XCFRAMEWORK_PATH}" || ! -d "${XCFRAMEWORK_PATH}" ]]; then
+            echo "XCFramework not found: ${XCFRAMEWORK_PATH}" >&2
             exit 1
           fi
-          echo "log_path=${LOG_PATH}" >> "$GITHUB_OUTPUT"
+          if [[ -z "${ARTIFACT_DIR}" || ! -d "${ARTIFACT_DIR}" ]]; then
+            ARTIFACT_DIR="$(cd "$(dirname "${XCFRAMEWORK_PATH}")" && pwd)"
+          fi
+          if [[ -z "${XCFRAMEWORK_NAME}" ]]; then
+            XCFRAMEWORK_NAME="$(basename "${XCFRAMEWORK_PATH}")"
+          fi
 
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: xcframework-build-log
-          path: ${{ steps.build.outputs.log_path }}
-          if-no-files-found: error
+          echo "xcframework_path=${XCFRAMEWORK_PATH}" >> "$GITHUB_OUTPUT"
+          echo "artifact_dir=${ARTIFACT_DIR}" >> "$GITHUB_OUTPUT"
+          echo "xcframework_name=${XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Package XCFramework
         id: package
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_DIR="gen/HMLoggerKit/Build"
-          XCFRAMEWORK_PATH="${ARTIFACT_DIR}/LoggerKit.xcframework"
-          ZIP_PATH="${ARTIFACT_DIR}/LoggerKit.xcframework.zip"
-
-          if [[ ! -d "${XCFRAMEWORK_PATH}" ]]; then
+          XCFRAMEWORK_PATH="${{ steps.build.outputs.xcframework_path }}"
+          if [[ -z "${XCFRAMEWORK_PATH}" || ! -d "${XCFRAMEWORK_PATH}" ]]; then
             echo "XCFramework not found: ${XCFRAMEWORK_PATH}" >&2
             exit 1
           fi
 
+          ARTIFACT_DIR="${{ steps.build.outputs.artifact_dir }}"
+          if [[ -z "${ARTIFACT_DIR}" || ! -d "${ARTIFACT_DIR}" ]]; then
+            ARTIFACT_DIR="$(cd "$(dirname "${XCFRAMEWORK_PATH}")" && pwd)"
+          fi
+          XCFRAMEWORK_NAME="${{ steps.build.outputs.xcframework_name }}"
+          if [[ -z "${XCFRAMEWORK_NAME}" ]]; then
+            XCFRAMEWORK_NAME="$(basename "${XCFRAMEWORK_PATH}")"
+          fi
+          ZIP_PATH="${ARTIFACT_DIR}/${XCFRAMEWORK_NAME}.zip"
+
           rm -f "${ZIP_PATH}"
           ditto -c -k --sequesterRsrc --keepParent "${XCFRAMEWORK_PATH}" "${ZIP_PATH}"
           CHECKSUM="$(swift package compute-checksum "${ZIP_PATH}")"
-          CHECKSUM_FILE="${ARTIFACT_DIR}/LoggerKit.xcframework.checksum.txt"
+          CHECKSUM_FILE="${ARTIFACT_DIR}/${XCFRAMEWORK_NAME}.checksum.txt"
 
           {
-            echo "File: LoggerKit.xcframework.zip"
+            echo "File: ${XCFRAMEWORK_NAME}.zip"
             echo "SHA-256: ${CHECKSUM}"
           } > "${CHECKSUM_FILE}"
 
+          echo "xcframework_name=${XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
           echo "zip_path=${ZIP_PATH}" >> "$GITHUB_OUTPUT"
           echo "checksum_path=${CHECKSUM_FILE}" >> "$GITHUB_OUTPUT"
           echo "checksum=${CHECKSUM}" >> "$GITHUB_OUTPUT"
@@ -116,8 +138,8 @@ jobs:
           body: |
             ## XCFramework Assets
 
-            - `LoggerKit.xcframework.zip`
-            - `LoggerKit.xcframework.checksum.txt`
+            - `${{ steps.package.outputs.xcframework_name }}.zip`
+            - `${{ steps.package.outputs.xcframework_name }}.checksum.txt`
 
             SwiftPM checksum:
             `${{ steps.package.outputs.checksum }}`
@@ -128,8 +150,9 @@ jobs:
             echo "## XCFramework Release"
             echo ""
             echo "- Tag: \`${{ steps.meta.outputs.tag }}\`"
-            echo "- ZIP: \`${{ steps.package.outputs.zip_path }}\`"
+            echo "- Artifact: \`${{ steps.package.outputs.xcframework_name }}.zip\`"
             echo "- Checksum: \`${{ steps.package.outputs.checksum }}\`"
-            echo "- Build Log Artifact: \`xcframework-build-log\`"
+            echo "- Checksum File: \`${{ steps.package.outputs.xcframework_name }}.checksum.txt\`"
+            echo "- Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}"
             echo "- Workflow Logs: [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } >> "$GITHUB_STEP_SUMMARY"

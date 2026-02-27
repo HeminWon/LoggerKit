@@ -25,6 +25,7 @@ Options:
                             (default: ios,macos,tvos,watchos)
   --configuration <name>    Build configuration (default: Release)
   --output <dir>            Output directory (default: ./gen/<pod>/Build)
+  --outputs-file <file>     Write resolved output paths as key=value lines
   --keep-temp               Keep intermediate generated/archive directories
   --no-debug-symbols        Do not include dSYM when creating xcframework
   -h, --help                Show this help
@@ -35,6 +36,7 @@ PODSPEC_FILE=""
 PLATFORMS="ios,macos,tvos,watchos"
 CONFIGURATION="Release"
 OUTPUT_DIR_OVERRIDE=""
+OUTPUTS_FILE=""
 KEEP_TEMP_ARTIFACTS=0
 INCLUDE_DEBUG_SYMBOLS=1
 
@@ -79,6 +81,15 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       OUTPUT_DIR_OVERRIDE="$2"
+      shift 2
+      ;;
+    --outputs-file)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --outputs-file" >&2
+        usage
+        exit 1
+      fi
+      OUTPUTS_FILE="$2"
       shift 2
       ;;
     --keep-temp)
@@ -387,5 +398,26 @@ run_logged xcodebuild -create-xcframework \
   "${framework_args[@]}" \
   -output "${XCFRAMEWORK_OUTPUT}"
 
+PODSPEC_BASENAME="$(basename "${PODSPEC_FILE}")"
+METADATA_OUTPUT="${BUILD_OUTPUT_DIR}/${PODSPEC_BASENAME}.json"
+printf '%s\n' "${SPEC_JSON}" > "${METADATA_OUTPUT}"
+
+if [[ -n "${OUTPUTS_FILE}" ]]; then
+  XCFRAMEWORK_OUTPUT_ABS="$(cd "$(dirname "${XCFRAMEWORK_OUTPUT}")" && pwd)/$(basename "${XCFRAMEWORK_OUTPUT}")"
+  RUN_LOG_ABS="$(cd "$(dirname "${RUN_LOG}")" && pwd)/$(basename "${RUN_LOG}")"
+  METADATA_OUTPUT_ABS="$(cd "$(dirname "${METADATA_OUTPUT}")" && pwd)/$(basename "${METADATA_OUTPUT}")"
+  BUILD_OUTPUT_DIR_ABS="$(cd "${BUILD_OUTPUT_DIR}" && pwd)"
+
+  {
+    echo "xcframework_path=${XCFRAMEWORK_OUTPUT_ABS}"
+    echo "artifact_dir=${BUILD_OUTPUT_DIR_ABS}"
+    echo "xcframework_name=$(basename "${XCFRAMEWORK_OUTPUT}")"
+    echo "log_path=${RUN_LOG_ABS}"
+    echo "metadata_path=${METADATA_OUTPUT_ABS}"
+    echo "metadata_name=$(basename "${METADATA_OUTPUT}")"
+  } >> "${OUTPUTS_FILE}"
+fi
+
 echo "Build output: ${XCFRAMEWORK_OUTPUT}"
 echo "Build log: ${RUN_LOG}"
+echo "Metadata output: ${METADATA_OUTPUT}"
