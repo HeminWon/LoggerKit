@@ -38,13 +38,35 @@ jobs:
           bundle install --jobs 4 --retry 3
           bundle exec pod --version
 
+      - name: Ensure Bash 4+
+        id: setup_bash
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "System /bin/bash: $(/bin/bash --version | head -n 1)"
+          MODERN_BASH="$(brew --prefix)/bin/bash"
+          if [[ ! -x "${MODERN_BASH}" ]]; then
+            brew install bash
+          fi
+          if [[ ! -x "${MODERN_BASH}" ]]; then
+            echo "Modern bash not found: ${MODERN_BASH}" >&2
+            exit 1
+          fi
+          echo "Using modern bash: $(${MODERN_BASH} --version | head -n 1)"
+          echo "modern_bash=${MODERN_BASH}" >> "$GITHUB_OUTPUT"
+
       - name: Build XCFramework
         id: build
         shell: bash
         run: |
           set -euo pipefail
+          BASH_BIN="${{ steps.setup_bash.outputs.modern_bash }}"
+          if [[ -z "${BASH_BIN}" || ! -x "${BASH_BIN}" ]]; then
+            echo "Invalid bash path: ${BASH_BIN}" >&2
+            exit 1
+          fi
           OUTPUTS_FILE="$(mktemp)"
-          bash Scripts/build-xcframework-from-podspec.sh --outputs-file "${OUTPUTS_FILE}"
+          "${BASH_BIN}" Scripts/build-xcframework-from-podspec.sh --outputs-file "${OUTPUTS_FILE}"
 
           XCFRAMEWORK_PATH=""
           ARTIFACT_DIR=""
