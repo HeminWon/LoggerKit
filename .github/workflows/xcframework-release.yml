@@ -4,11 +4,10 @@ on:
   push:
     tags:
       - "*.*.*"
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.2.4)."
+        description: "Release tag without v prefix (e.g. 0.2.4)."
         required: true
         type: string
 
@@ -122,11 +121,16 @@ jobs:
           CHECKSUM_FILE="${ARTIFACT_DIR}/${XCFRAMEWORK_NAME}.checksum.txt"
           TAG_INPUT="${{ github.event.inputs.tag }}"
           if [[ -n "${TAG_INPUT}" ]]; then
-            TAG_NAME="${TAG_INPUT}"
+            RAW_TAG="${TAG_INPUT}"
           else
-            TAG_NAME="${GITHUB_REF_NAME}"
+            RAW_TAG="${GITHUB_REF_NAME}"
           fi
-          VERSION="${TAG_NAME#v}"
+          TAG_NAME="${RAW_TAG#refs/tags/}"
+          if [[ "${TAG_NAME}" =~ ^[vV] ]]; then
+            echo "Tag must not start with 'v' for this workflow: ${TAG_NAME}" >&2
+            exit 1
+          fi
+          VERSION="${TAG_NAME}"
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${XCFRAMEWORK_NAME}.zip"
           PODSPEC_TEMPLATE="Specs/Binary/HMLoggerKit.podspec"
           BINARY_PODSPEC_FILE="${ARTIFACT_DIR}/HMLoggerKit.binary.podspec"
@@ -141,8 +145,8 @@ jobs:
             echo "SHA-256: ${CHECKSUM}"
           } > "${CHECKSUM_FILE}"
 
-          ruby - "${PODSPEC_TEMPLATE}" "${BINARY_PODSPEC_FILE}" "${VERSION}" "${CHECKSUM}" <<'RUBY'
-          template_path, output_path, version, checksum = ARGV
+          ruby - "${PODSPEC_TEMPLATE}" "${BINARY_PODSPEC_FILE}" "${VERSION}" "${CHECKSUM}" "${DOWNLOAD_URL}" <<'RUBY'
+          template_path, output_path, version, checksum, download_url = ARGV
           content = File.read(template_path)
 
           unless content.match?(/s\.version\s*=\s*"[^"]+"/)
@@ -151,9 +155,13 @@ jobs:
           unless content.match?(/:sha256\s*=>\s*"[^"]+"/)
             abort("Failed to find :sha256 in #{template_path}")
           end
+          unless content.match?(/:http\s*=>\s*"[^"]+"/)
+            abort("Failed to find :http in #{template_path}")
+          end
 
           updated = content.gsub(/s\.version\s*=\s*"[^"]+"/, %(s.version          = "#{version}"))
           updated = updated.gsub(/:sha256\s*=>\s*"[^"]+"/, %(:sha256 => "#{checksum}"))
+          updated = updated.gsub(/:http\s*=>\s*"[^"]+"/, %(:http => "#{download_url}"))
 
           File.write(output_path, updated)
           RUBY
@@ -177,9 +185,14 @@ jobs:
           fi
 
           if [[ -n "${TAG_INPUT}" ]]; then
-            TAG_NAME="${TAG_INPUT}"
+            RAW_TAG="${TAG_INPUT}"
           else
-            TAG_NAME="${GITHUB_REF_NAME}"
+            RAW_TAG="${GITHUB_REF_NAME}"
+          fi
+          TAG_NAME="${RAW_TAG#refs/tags/}"
+          if [[ "${TAG_NAME}" =~ ^[vV] ]]; then
+            echo "Tag must not start with 'v' for this workflow: ${TAG_NAME}" >&2
+            exit 1
           fi
           echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
 
