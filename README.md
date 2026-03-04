@@ -80,6 +80,20 @@ dependencies: [
 pod 'HMLoggerKit', '~> 0.2.7'
 ```
 
+#### Binary Podspec (Static / Dynamic)
+
+If you want to integrate prebuilt binaries from GitHub Releases, use a remote podspec URL:
+
+```ruby
+# Static library
+pod 'HMLoggerKit', :podspec => 'https://github.com/HeminWon/LoggerKit/releases/download/0.2.7/HMLoggerKit.binary.static.podspec'
+
+# Dynamic library
+pod 'HMLoggerKit', :podspec => 'https://github.com/HeminWon/LoggerKit/releases/download/0.2.7/HMLoggerKit.binary.dynamic.podspec'
+```
+
+You can replace `0.2.7` with the release version you need.
+
 ## Quick Start
 
 > Important: call `LK.configure(...)` early during app launch.
