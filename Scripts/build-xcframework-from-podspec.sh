@@ -23,6 +23,7 @@ Options:
   --podspec <file>          Podspec path (default: auto-detect)
   --platforms <list>        Comma separated: ios,macos,tvos,watchos
                             (default: ios,macos,tvos,watchos)
+  --static                  Build static xcframework (default: dynamic)
   --configuration <name>    Build configuration (default: Release)
   --output <dir>            Output directory (default: ./gen/<pod>/Build)
   --outputs-file <file>     Write resolved output paths as key=value lines
@@ -39,6 +40,7 @@ OUTPUT_DIR_OVERRIDE=""
 OUTPUTS_FILE=""
 KEEP_TEMP_ARTIFACTS=0
 INCLUDE_DEBUG_SYMBOLS=1
+LINKAGE="dynamic"
 
 if [[ "${1:-}" == *.podspec && "${1:-}" != --* ]]; then
   PODSPEC_FILE="$1"
@@ -73,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       fi
       CONFIGURATION="$2"
       shift 2
+      ;;
+    --static)
+      LINKAGE="static"
+      shift
       ;;
     --output)
       if [[ $# -lt 2 || -z "${2:-}" ]]; then
@@ -225,6 +231,7 @@ log_build_env() {
     echo "Module name: ${MODULE_NAME}"
     echo "Platforms: ${PLATFORMS}"
     echo "Configuration: ${CONFIGURATION}"
+    echo "Linkage: ${LINKAGE}"
     echo "Output: ${BUILD_OUTPUT_DIR}"
     echo "Keep temp: ${KEEP_TEMP_ARTIFACTS}"
     echo "Include debug symbols: ${INCLUDE_DEBUG_SYMBOLS}"
@@ -243,6 +250,11 @@ archive_for_destination() {
   local destination="$2"
   local scheme="$3"
   local archive_path="${TEMP_ARCHIVE_ROOT}/${label}"
+  local -a linkage_build_settings=()
+
+  if [[ "${LINKAGE}" == "static" ]]; then
+    linkage_build_settings+=(MACH_O_TYPE=staticlib)
+  fi
 
   run_logged xcodebuild \
     -workspace "${TEMP_GEN_ROOT}/${POD_NAME}/${POD_NAME}.xcworkspace" \
@@ -257,7 +269,8 @@ archive_for_destination() {
     VALIDATE_WORKSPACE=NO \
     -archivePath "${archive_path}" \
     SKIP_INSTALL=NO \
-    BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+    BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+    "${linkage_build_settings[@]}"
 }
 
 AVAILABLE_SCHEMES=()

@@ -54,7 +54,7 @@ jobs:
           echo "Using modern bash: $(${MODERN_BASH} --version | head -n 1)"
           echo "modern_bash=${MODERN_BASH}" >> "$GITHUB_OUTPUT"
 
-      - name: Build XCFramework
+      - name: Build XCFrameworks
         id: build
         shell: bash
         run: |
@@ -64,61 +64,73 @@ jobs:
             echo "Invalid bash path: ${BASH_BIN}" >&2
             exit 1
           fi
-          OUTPUTS_FILE="$(mktemp)"
-          "${BASH_BIN}" Scripts/build-xcframework-from-podspec.sh --outputs-file "${OUTPUTS_FILE}"
+          parse_outputs_file() {
+            local file_path="$1"
+            local key="$2"
+            local value=""
+            while IFS='=' read -r output_key output_value; do
+              if [[ "${output_key}" == "${key}" ]]; then
+                value="${output_value}"
+                break
+              fi
+            done < "${file_path}"
+            printf '%s\n' "${value}"
+          }
 
-          XCFRAMEWORK_PATH=""
-          ARTIFACT_DIR=""
-          XCFRAMEWORK_NAME=""
+          DYNAMIC_OUTPUTS_FILE="$(mktemp)"
+          STATIC_OUTPUTS_FILE="$(mktemp)"
 
-          while IFS='=' read -r key value; do
-            case "${key}" in
-              xcframework_path) XCFRAMEWORK_PATH="${value}" ;;
-              artifact_dir) ARTIFACT_DIR="${value}" ;;
-              xcframework_name) XCFRAMEWORK_NAME="${value}" ;;
-            esac
-          done < "${OUTPUTS_FILE}"
+          "${BASH_BIN}" Scripts/build-xcframework-from-podspec.sh \
+            --output "${RUNNER_TEMP}/xcframework-dynamic" \
+            --outputs-file "${DYNAMIC_OUTPUTS_FILE}"
 
-          if [[ -z "${XCFRAMEWORK_PATH}" || ! -d "${XCFRAMEWORK_PATH}" ]]; then
-            echo "XCFramework not found: ${XCFRAMEWORK_PATH}" >&2
+          "${BASH_BIN}" Scripts/build-xcframework-from-podspec.sh \
+            --static \
+            --output "${RUNNER_TEMP}/xcframework-static" \
+            --outputs-file "${STATIC_OUTPUTS_FILE}"
+
+          DYNAMIC_XCFRAMEWORK_PATH="$(parse_outputs_file "${DYNAMIC_OUTPUTS_FILE}" "xcframework_path")"
+          DYNAMIC_ARTIFACT_DIR="$(parse_outputs_file "${DYNAMIC_OUTPUTS_FILE}" "artifact_dir")"
+          DYNAMIC_XCFRAMEWORK_NAME="$(parse_outputs_file "${DYNAMIC_OUTPUTS_FILE}" "xcframework_name")"
+
+          STATIC_XCFRAMEWORK_PATH="$(parse_outputs_file "${STATIC_OUTPUTS_FILE}" "xcframework_path")"
+          STATIC_ARTIFACT_DIR="$(parse_outputs_file "${STATIC_OUTPUTS_FILE}" "artifact_dir")"
+          STATIC_XCFRAMEWORK_NAME="$(parse_outputs_file "${STATIC_OUTPUTS_FILE}" "xcframework_name")"
+
+          if [[ -z "${DYNAMIC_XCFRAMEWORK_PATH}" || ! -d "${DYNAMIC_XCFRAMEWORK_PATH}" ]]; then
+            echo "Dynamic XCFramework not found: ${DYNAMIC_XCFRAMEWORK_PATH}" >&2
             exit 1
           fi
-          if [[ -z "${ARTIFACT_DIR}" || ! -d "${ARTIFACT_DIR}" ]]; then
-            ARTIFACT_DIR="$(cd "$(dirname "${XCFRAMEWORK_PATH}")" && pwd)"
-          fi
-          if [[ -z "${XCFRAMEWORK_NAME}" ]]; then
-            XCFRAMEWORK_NAME="$(basename "${XCFRAMEWORK_PATH}")"
+          if [[ -z "${STATIC_XCFRAMEWORK_PATH}" || ! -d "${STATIC_XCFRAMEWORK_PATH}" ]]; then
+            echo "Static XCFramework not found: ${STATIC_XCFRAMEWORK_PATH}" >&2
+            exit 1
           fi
 
-          echo "xcframework_path=${XCFRAMEWORK_PATH}" >> "$GITHUB_OUTPUT"
-          echo "artifact_dir=${ARTIFACT_DIR}" >> "$GITHUB_OUTPUT"
-          echo "xcframework_name=${XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
+          if [[ -z "${DYNAMIC_ARTIFACT_DIR}" || ! -d "${DYNAMIC_ARTIFACT_DIR}" ]]; then
+            DYNAMIC_ARTIFACT_DIR="$(cd "$(dirname "${DYNAMIC_XCFRAMEWORK_PATH}")" && pwd)"
+          fi
+          if [[ -z "${STATIC_ARTIFACT_DIR}" || ! -d "${STATIC_ARTIFACT_DIR}" ]]; then
+            STATIC_ARTIFACT_DIR="$(cd "$(dirname "${STATIC_XCFRAMEWORK_PATH}")" && pwd)"
+          fi
+          if [[ -z "${DYNAMIC_XCFRAMEWORK_NAME}" ]]; then
+            DYNAMIC_XCFRAMEWORK_NAME="$(basename "${DYNAMIC_XCFRAMEWORK_PATH}")"
+          fi
+          if [[ -z "${STATIC_XCFRAMEWORK_NAME}" ]]; then
+            STATIC_XCFRAMEWORK_NAME="$(basename "${STATIC_XCFRAMEWORK_PATH}")"
+          fi
 
-      - name: Package XCFramework
+          echo "dynamic_xcframework_path=${DYNAMIC_XCFRAMEWORK_PATH}" >> "$GITHUB_OUTPUT"
+          echo "dynamic_artifact_dir=${DYNAMIC_ARTIFACT_DIR}" >> "$GITHUB_OUTPUT"
+          echo "dynamic_xcframework_name=${DYNAMIC_XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
+          echo "static_xcframework_path=${STATIC_XCFRAMEWORK_PATH}" >> "$GITHUB_OUTPUT"
+          echo "static_artifact_dir=${STATIC_ARTIFACT_DIR}" >> "$GITHUB_OUTPUT"
+          echo "static_xcframework_name=${STATIC_XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Package XCFrameworks
         id: package
         shell: bash
         run: |
           set -euo pipefail
-          XCFRAMEWORK_PATH="${{ steps.build.outputs.xcframework_path }}"
-          if [[ -z "${XCFRAMEWORK_PATH}" || ! -d "${XCFRAMEWORK_PATH}" ]]; then
-            echo "XCFramework not found: ${XCFRAMEWORK_PATH}" >&2
-            exit 1
-          fi
-
-          ARTIFACT_DIR="${{ steps.build.outputs.artifact_dir }}"
-          if [[ -z "${ARTIFACT_DIR}" || ! -d "${ARTIFACT_DIR}" ]]; then
-            ARTIFACT_DIR="$(cd "$(dirname "${XCFRAMEWORK_PATH}")" && pwd)"
-          fi
-          XCFRAMEWORK_NAME="${{ steps.build.outputs.xcframework_name }}"
-          if [[ -z "${XCFRAMEWORK_NAME}" ]]; then
-            XCFRAMEWORK_NAME="$(basename "${XCFRAMEWORK_PATH}")"
-          fi
-          ZIP_PATH="${ARTIFACT_DIR}/${XCFRAMEWORK_NAME}.zip"
-
-          rm -f "${ZIP_PATH}"
-          ditto -c -k --sequesterRsrc --keepParent "${XCFRAMEWORK_PATH}" "${ZIP_PATH}"
-          CHECKSUM="$(swift package compute-checksum "${ZIP_PATH}")"
-          CHECKSUM_FILE="${ARTIFACT_DIR}/${XCFRAMEWORK_NAME}.checksum.txt"
           TAG_INPUT="${{ github.event.inputs.tag }}"
           if [[ -n "${TAG_INPUT}" ]]; then
             RAW_TAG="${TAG_INPUT}"
@@ -131,22 +143,22 @@ jobs:
             exit 1
           fi
           VERSION="${TAG_NAME}"
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${XCFRAMEWORK_NAME}.zip"
           PODSPEC_TEMPLATE="Specs/Binary/HMLoggerKit.podspec"
-          BINARY_PODSPEC_FILE="${ARTIFACT_DIR}/HMLoggerKit.binary.podspec"
 
           if [[ ! -f "${PODSPEC_TEMPLATE}" ]]; then
             echo "Binary podspec template not found: ${PODSPEC_TEMPLATE}" >&2
             exit 1
           fi
 
-          {
-            echo "File: ${XCFRAMEWORK_NAME}.zip"
-            echo "SHA-256: ${CHECKSUM}"
-          } > "${CHECKSUM_FILE}"
-
-          ruby - "${PODSPEC_TEMPLATE}" "${BINARY_PODSPEC_FILE}" "${VERSION}" "${CHECKSUM}" "${DOWNLOAD_URL}" <<'RUBY'
-          template_path, output_path, version, checksum, download_url = ARGV
+          generate_binary_podspec() {
+            local template_path="$1"
+            local output_path="$2"
+            local version="$3"
+            local checksum="$4"
+            local download_url="$5"
+            local vendored_framework="$6"
+            ruby - "${template_path}" "${output_path}" "${version}" "${checksum}" "${download_url}" "${vendored_framework}" <<'RUBY'
+          template_path, output_path, version, checksum, download_url, vendored_framework = ARGV
           content = File.read(template_path)
 
           unless content.match?(/s\.version\s*=\s*"[^"]+"/)
@@ -158,19 +170,135 @@ jobs:
           unless content.match?(/:http\s*=>\s*"[^"]+"/)
             abort("Failed to find :http in #{template_path}")
           end
+          unless content.match?(/s\.vendored_frameworks\s*=\s*"[^"]+"/)
+            abort("Failed to find s.vendored_frameworks in #{template_path}")
+          end
 
           updated = content.gsub(/s\.version\s*=\s*"[^"]+"/, %(s.version          = "#{version}"))
           updated = updated.gsub(/:sha256\s*=>\s*"[^"]+"/, %(:sha256 => "#{checksum}"))
           updated = updated.gsub(/:http\s*=>\s*"[^"]+"/, %(:http => "#{download_url}"))
+          updated = updated.gsub(/s\.vendored_frameworks\s*=\s*"[^"]+"/, %(s.vendored_frameworks = "#{vendored_framework}"))
 
           File.write(output_path, updated)
           RUBY
+          }
 
-          echo "xcframework_name=${XCFRAMEWORK_NAME}" >> "$GITHUB_OUTPUT"
-          echo "zip_path=${ZIP_PATH}" >> "$GITHUB_OUTPUT"
-          echo "checksum_path=${CHECKSUM_FILE}" >> "$GITHUB_OUTPUT"
-          echo "binary_podspec_path=${BINARY_PODSPEC_FILE}" >> "$GITHUB_OUTPUT"
-          echo "checksum=${CHECKSUM}" >> "$GITHUB_OUTPUT"
+          verify_xcframework_linkage() {
+            local variant="$1"
+            local xcframework_path="$2"
+            local expected_pattern=""
+            local checked_count=0
+
+            case "${variant}" in
+              dynamic)
+                expected_pattern="dynamically linked shared library"
+                ;;
+              static)
+                expected_pattern="current ar archive"
+                ;;
+              *)
+                echo "Unknown linkage variant: ${variant}" >&2
+                exit 1
+                ;;
+            esac
+
+            while IFS= read -r framework_path; do
+              local framework_name
+              local binary_path
+              local file_desc
+
+              framework_name="$(basename "${framework_path}" .framework)"
+              binary_path="${framework_path}/${framework_name}"
+
+              if [[ ! -f "${binary_path}" ]]; then
+                echo "Framework binary not found: ${binary_path}" >&2
+                exit 1
+              fi
+
+              file_desc="$(file -b "${binary_path}")"
+              echo "Validated ${variant} binary: ${binary_path} (${file_desc})"
+
+              if [[ "${file_desc}" != *"${expected_pattern}"* ]]; then
+                echo "Unexpected linkage for ${binary_path}" >&2
+                echo "Expected to contain: ${expected_pattern}" >&2
+                echo "Actual: ${file_desc}" >&2
+                exit 1
+              fi
+
+              checked_count=$((checked_count + 1))
+            done < <(find "${xcframework_path}" -type d -name "*.framework")
+
+            if [[ "${checked_count}" -eq 0 ]]; then
+              echo "No frameworks found in xcframework: ${xcframework_path}" >&2
+              exit 1
+            fi
+          }
+
+          package_variant() {
+            local variant="$1"
+            local xcframework_path="$2"
+            local artifact_dir="$3"
+            local podspec_output_name="$4"
+            local output_prefix="$5"
+
+            if [[ -z "${xcframework_path}" || ! -d "${xcframework_path}" ]]; then
+              echo "XCFramework not found for ${variant}: ${xcframework_path}" >&2
+              exit 1
+            fi
+            if [[ -z "${artifact_dir}" || ! -d "${artifact_dir}" ]]; then
+              artifact_dir="$(cd "$(dirname "${xcframework_path}")" && pwd)"
+            fi
+
+            local xcframework_name
+            local xcframework_base_name
+            local release_asset_name
+            local zip_path
+            local checksum
+            local checksum_file
+            local download_url
+            local podspec_path
+
+            xcframework_name="$(basename "${xcframework_path}")"
+            xcframework_base_name="${xcframework_name%.xcframework}"
+            release_asset_name="${xcframework_base_name}.${variant}.xcframework"
+
+            verify_xcframework_linkage "${variant}" "${xcframework_path}"
+
+            zip_path="${artifact_dir}/${release_asset_name}.zip"
+            rm -f "${zip_path}"
+            ditto -c -k --sequesterRsrc --keepParent "${xcframework_path}" "${zip_path}"
+
+            checksum="$(swift package compute-checksum "${zip_path}")"
+            checksum_file="${artifact_dir}/${release_asset_name}.checksum.txt"
+            {
+              echo "File: ${release_asset_name}.zip"
+              echo "SHA-256: ${checksum}"
+            } > "${checksum_file}"
+
+            download_url="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${release_asset_name}.zip"
+            podspec_path="${artifact_dir}/${podspec_output_name}"
+            generate_binary_podspec "${PODSPEC_TEMPLATE}" "${podspec_path}" "${VERSION}" "${checksum}" "${download_url}" "${xcframework_name}"
+
+            echo "${output_prefix}_xcframework_name=${release_asset_name}" >> "$GITHUB_OUTPUT"
+            echo "${output_prefix}_zip_path=${zip_path}" >> "$GITHUB_OUTPUT"
+            echo "${output_prefix}_checksum_path=${checksum_file}" >> "$GITHUB_OUTPUT"
+            echo "${output_prefix}_binary_podspec_path=${podspec_path}" >> "$GITHUB_OUTPUT"
+            echo "${output_prefix}_checksum=${checksum}" >> "$GITHUB_OUTPUT"
+          }
+
+          package_variant \
+            "dynamic" \
+            "${{ steps.build.outputs.dynamic_xcframework_path }}" \
+            "${{ steps.build.outputs.dynamic_artifact_dir }}" \
+            "HMLoggerKit.binary.dynamic.podspec" \
+            "dynamic"
+
+          package_variant \
+            "static" \
+            "${{ steps.build.outputs.static_xcframework_path }}" \
+            "${{ steps.build.outputs.static_artifact_dir }}" \
+            "HMLoggerKit.binary.static.podspec" \
+            "static"
 
       - name: Resolve tag name
         id: meta
@@ -201,18 +329,37 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           files: |
-            ${{ steps.package.outputs.zip_path }}
-            ${{ steps.package.outputs.checksum_path }}
-            ${{ steps.package.outputs.binary_podspec_path }}
+            ${{ steps.package.outputs.dynamic_zip_path }}
+            ${{ steps.package.outputs.dynamic_checksum_path }}
+            ${{ steps.package.outputs.dynamic_binary_podspec_path }}
+            ${{ steps.package.outputs.static_zip_path }}
+            ${{ steps.package.outputs.static_checksum_path }}
+            ${{ steps.package.outputs.static_binary_podspec_path }}
           body: |
             ## XCFramework Assets
 
-            - `${{ steps.package.outputs.xcframework_name }}.zip`
-            - `${{ steps.package.outputs.xcframework_name }}.checksum.txt`
-            - `HMLoggerKit.binary.podspec`
+            - `${{ steps.package.outputs.dynamic_xcframework_name }}.zip`
+            - `${{ steps.package.outputs.dynamic_xcframework_name }}.checksum.txt`
+            - `HMLoggerKit.binary.dynamic.podspec`
+            - `${{ steps.package.outputs.static_xcframework_name }}.zip`
+            - `${{ steps.package.outputs.static_xcframework_name }}.checksum.txt`
+            - `HMLoggerKit.binary.static.podspec`
 
-            SwiftPM checksum:
-            `${{ steps.package.outputs.checksum }}`
+            ## Variants
+
+            - Dynamic (`HMLoggerKit.binary.dynamic.podspec`): links as dynamic framework at runtime.
+            - Static (`HMLoggerKit.binary.static.podspec`): links into app binary at build time.
+
+            ## Integration
+
+            - Use only one variant in a target.
+            - Pick the matching podspec for the variant you want.
+
+            Dynamic checksum:
+            `${{ steps.package.outputs.dynamic_checksum }}`
+
+            Static checksum:
+            `${{ steps.package.outputs.static_checksum }}`
 
       - name: Job Summary
         run: |
@@ -220,10 +367,16 @@ jobs:
             echo "## XCFramework Release"
             echo ""
             echo "- Tag: \`${{ steps.meta.outputs.tag }}\`"
-            echo "- Artifact: \`${{ steps.package.outputs.xcframework_name }}.zip\`"
-            echo "- Checksum: \`${{ steps.package.outputs.checksum }}\`"
-            echo "- Checksum File: \`${{ steps.package.outputs.xcframework_name }}.checksum.txt\`"
-            echo "- Binary Podspec: \`HMLoggerKit.binary.podspec\`"
+            echo "- Dynamic Artifact: \`${{ steps.package.outputs.dynamic_xcframework_name }}.zip\`"
+            echo "- Dynamic Checksum: \`${{ steps.package.outputs.dynamic_checksum }}\`"
+            echo "- Dynamic Checksum File: \`${{ steps.package.outputs.dynamic_xcframework_name }}.checksum.txt\`"
+            echo "- Dynamic Podspec: \`HMLoggerKit.binary.dynamic.podspec\`"
+            echo "- Dynamic Variant: runtime dynamic framework linkage"
+            echo "- Static Artifact: \`${{ steps.package.outputs.static_xcframework_name }}.zip\`"
+            echo "- Static Checksum: \`${{ steps.package.outputs.static_checksum }}\`"
+            echo "- Static Checksum File: \`${{ steps.package.outputs.static_xcframework_name }}.checksum.txt\`"
+            echo "- Static Podspec: \`HMLoggerKit.binary.static.podspec\`"
+            echo "- Static Variant: build-time static framework linkage"
             echo "- Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}"
             echo "- Workflow Logs: [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } >> "$GITHUB_STEP_SUMMARY"
